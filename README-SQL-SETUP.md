@@ -120,6 +120,39 @@ SELECT * FROM pg_policies
 WHERE tablename = 'workout_session_details';
 ```
 
+## Configuração da Função para Exclusão de Conta
+
+Execute este script no Editor SQL do Supabase para permitir que usuários possam excluir suas próprias contas:
+
+```sql
+-- Função para permitir que usuários excluam suas próprias contas
+CREATE OR REPLACE FUNCTION delete_user()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  uid uuid;
+BEGIN
+  -- Obter o ID do usuário atual
+  uid := auth.uid();
+  
+  IF uid IS NULL THEN
+    RAISE EXCEPTION 'Você precisa estar autenticado para excluir sua conta';
+  END IF;
+  
+  -- Excluir o usuário da tabela auth.users (isso vai acionar a exclusão em cascata)
+  DELETE FROM auth.users WHERE id = uid;
+END;
+$$;
+```
+
+Para verificar se a função foi criada corretamente, execute:
+
+```sql
+SELECT * FROM pg_proc WHERE proname = 'delete_user';
+```
+
 ## Próximos Passos
 
 Após a execução desses scripts, reinicie o aplicativo e o sistema de relatório estará pronto para uso. Ao realizar um treino, todos os detalhes serão registrados automaticamente e poderão ser visualizados no relatório. 
