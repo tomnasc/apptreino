@@ -350,6 +350,22 @@ export default function WorkoutMode() {
     
     // Registrar os detalhes da série
     try {
+      // Verificar se temos tempos válidos antes de prosseguir
+      if (!currentSetStartTime || !endTime) {
+        console.warn('Tempos de início ou fim da série são inválidos', { 
+          currentSetStartTime, 
+          endTime 
+        });
+        // Criar valores de fallback para não interromper o fluxo
+        const now = new Date();
+        if (!currentSetStartTime) {
+          setCurrentSetStartTime(now);
+        }
+        if (!endTime) {
+          endTime = now;
+        }
+      }
+      
       // Calcular tempos
       const executionTime = Math.round((endTime - currentSetStartTime) / 1000);
       const restTime = previousSetEndTime 
@@ -369,8 +385,8 @@ export default function WorkoutMode() {
             weight_used: currentExercise.weight,
             execution_time: executionTime,
             rest_time: restTime,
-            start_time: currentSetStartTime.toISOString(),
-            end_time: endTime.toISOString()
+            start_time: currentSetStartTime ? currentSetStartTime.toISOString() : new Date().toISOString(),
+            end_time: endTime ? endTime.toISOString() : new Date().toISOString()
           }
         ]);
         
