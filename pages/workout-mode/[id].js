@@ -320,12 +320,6 @@ export default function WorkoutMode() {
     const currentExercise = exercises[currentExerciseIndex];
     const exerciseKey = `${currentExerciseIndex}`;
     
-    // Verificar se deve mostrar o alerta de diminuir carga
-    if (currentExercise.reps && repsCompleted < 6) {
-      setShowWeightDecreaseAlert(true);
-      // Não retornamos mais aqui, permitindo concluir a série mesmo com menos de 6 repetições
-    }
-    
     // Verificar se deve mostrar o alerta de aumentar carga
     // Somente na última série e se atingiu ou ultrapassou o número de repetições
     if (
@@ -439,9 +433,12 @@ export default function WorkoutMode() {
     // Verificar se deve mostrar o alerta para diminuir carga
     if (repsCompleted < 6) {
       setShowWeightDecreaseAlert(true);
+      // Resetar a série em vez de concluir quando não atingir o mínimo de repetições
+      setRepsCompleted(0);
+      return;
     }
     
-    // Sempre permitir concluir, independentemente do número de repetições
+    // Sempre permitir concluir se o número mínimo de repetições for atingido
     handleSetCompleted();
   };
 
@@ -662,7 +659,7 @@ export default function WorkoutMode() {
                           {exercise.reps && (
                             <div className="flex items-center">
                               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 mr-1">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 1-.659 1.591L9.5 14.5M9.75 3.104V1.5M9.75 9.75v4.5m0-4.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H9.75Z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 1-.659 1.591L9.5 14.5M9.75 3.104V1.5M9.75 9.75v4.5m0-4.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H9.75Z" />
                               </svg>
                               <span className="font-medium text-gray-500">Repetições:</span>{' '}
                               <span className="ml-1 font-bold text-gray-700">{exercise.reps}</span>
