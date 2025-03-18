@@ -35,12 +35,77 @@ export default function WorkoutMode() {
   const [showWeightDecreaseAlert, setShowWeightDecreaseAlert] = useState(false);
   const [setRepsHistory, setSetRepsHistory] = useState({}); // Armazenar histórico de repetições por série
   
-  // Referências para intervalos
-  const exerciseTimerIntervalRef = useRef(null);
-  const restTimerIntervalRef = useRef(null);
-  const totalTimeIntervalRef = useRef(null);
+  // Estado para cronômetros baseados em Web Worker
   const [totalWorkoutTime, setTotalWorkoutTime] = useState(0);
+  const timerWorkerRef = useRef(null);
   const wakeLockRef = useRef(null);
+
+  // Inicializar o Web Worker
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Criar o Worker apenas no lado do cliente
+      timerWorkerRef.current = new Worker('/timer-worker.js');
+      
+      // Configurar o listener para mensagens do Worker
+      timerWorkerRef.current.onmessage = (event) => {
+        const { id, remaining, type } = event.data;
+        
+        switch (id) {
+          case 'exercise':
+            if (type === 'tick') {
+              setTimeRemaining(remaining);
+            } else if (type === 'complete') {
+              setTimerActive(false);
+              setTimeRemaining(0);
+              handleSetCompleted();
+            }
+            break;
+            
+          case 'rest':
+            if (type === 'tick') {
+              setRestTimeRemaining(remaining);
+            } else if (type === 'complete') {
+              setRestTimerActive(false);
+              setRestTimeRemaining(0);
+            }
+            break;
+            
+          case 'total':
+            if (type === 'tick') {
+              setTotalWorkoutTime(remaining);
+            }
+            break;
+        }
+      };
+      
+      return () => {
+        if (timerWorkerRef.current) {
+          timerWorkerRef.current.terminate();
+        }
+      };
+    }
+  }, []);
+
+  // Função para iniciar um timer no Web Worker
+  const startWorkerTimer = (id, duration) => {
+    if (timerWorkerRef.current) {
+      timerWorkerRef.current.postMessage({
+        action: 'start',
+        id,
+        duration
+      });
+    }
+  };
+  
+  // Função para parar um timer no Web Worker
+  const stopWorkerTimer = (id) => {
+    if (timerWorkerRef.current) {
+      timerWorkerRef.current.postMessage({
+        action: 'stop',
+        id
+      });
+    }
+  };
 
   // Função para adquirir o WakeLock
   const requestWakeLock = async () => {
@@ -84,8 +149,17 @@ export default function WorkoutMode() {
   useEffect(() => {
     if (isWorkoutActive) {
       requestWakeLock();
+      
+      // Iniciar cronômetro de tempo total se o treino estiver ativo
+      if (workoutStartTime) {
+        const initialDuration = Math.floor((new Date() - workoutStartTime) / 1000);
+        setTotalWorkoutTime(initialDuration);
+        // Iniciar o timer total em contagem crescente com um valor muito grande
+        startWorkerTimer('total', 86400); // 24 horas
+      }
     } else {
       releaseWakeLock();
+      stopWorkerTimer('total');
     }
     
     // Adicionar um listener para o evento visibilitychange
@@ -96,13 +170,73 @@ export default function WorkoutMode() {
       }
     };
     
+    // Lidar com eventos de visibilidade para gerenciar os timers
+    const handleAppFocus = () => {
+      if (timerWorkerRef.current && isWorkoutActive) {
+        // Ao voltar ao aplicativo, atualizar os estados dos timers
+        timerWorkerRef.current.postMessage({
+          action: 'get',
+          id: 'exercise'
+        });
+        
+        timerWorkerRef.current.postMessage({
+          action: 'get',
+          id: 'rest'
+        });
+        
+        timerWorkerRef.current.postMessage({
+          action: 'get',
+          id: 'total'
+        });
+      }
+    };
+    
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleAppFocus);
     
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleAppFocus);
       releaseWakeLock();
+      
+      // Parar todos os timers
+      if (timerWorkerRef.current) {
+        stopWorkerTimer('exercise');
+        stopWorkerTimer('rest');
+        stopWorkerTimer('total');
+      }
     };
-  }, [isWorkoutActive]);
+  }, [isWorkoutActive, workoutStartTime]);
+
+  // Efeito para cronômetro de exercício baseado em tempo
+  useEffect(() => {
+    if (timerActive && timeRemaining > 0) {
+      // Iniciar o timer no Web Worker
+      startWorkerTimer('exercise', timeRemaining);
+    } else if (!timerActive) {
+      // Parar o timer no Web Worker
+      stopWorkerTimer('exercise');
+    }
+    
+    return () => {
+      stopWorkerTimer('exercise');
+    };
+  }, [timerActive, timeRemaining]);
+
+  // Efeito para cronômetro de descanso entre séries
+  useEffect(() => {
+    if (restTimerActive && restTimeRemaining > 0) {
+      // Iniciar o timer no Web Worker
+      startWorkerTimer('rest', restTimeRemaining);
+    } else if (!restTimerActive) {
+      // Parar o timer no Web Worker
+      stopWorkerTimer('rest');
+    }
+    
+    return () => {
+      stopWorkerTimer('rest');
+    };
+  }, [restTimerActive, restTimeRemaining]);
 
   useEffect(() => {
     if (id && user) {
@@ -112,10 +246,15 @@ export default function WorkoutMode() {
     
     // Limpar todos os timers ao desmontar
     return () => {
-      if (exerciseTimerIntervalRef.current) clearInterval(exerciseTimerIntervalRef.current);
-      if (restTimerIntervalRef.current) clearInterval(restTimerIntervalRef.current);
-      if (totalTimeIntervalRef.current) clearInterval(totalTimeIntervalRef.current);
       releaseWakeLock();
+      
+      // Parar todos os timers do Worker
+      if (timerWorkerRef.current) {
+        stopWorkerTimer('exercise');
+        stopWorkerTimer('rest');
+        stopWorkerTimer('total');
+        timerWorkerRef.current.terminate();
+      }
     };
   }, [id, user]);
 
@@ -125,93 +264,6 @@ export default function WorkoutMode() {
       resumeWorkout(sessionUrlParam);
     }
   }, [sessionUrlParam, exercises, isWorkoutActive]);
-
-  // Efeito para cronômetro de tempo total de treino
-  useEffect(() => {
-    // Limpar intervalo existente
-    if (totalTimeIntervalRef.current) {
-      clearInterval(totalTimeIntervalRef.current);
-      totalTimeIntervalRef.current = null;
-    }
-    
-    // Iniciar novo cronômetro se o treino estiver ativo
-    if (isWorkoutActive && workoutStartTime) {
-      setTotalWorkoutTime(Math.floor((new Date() - workoutStartTime) / 1000));
-      
-      totalTimeIntervalRef.current = setInterval(() => {
-        setTotalWorkoutTime(Math.floor((new Date() - workoutStartTime) / 1000));
-      }, 1000);
-    }
-    
-    // Cleanup no desmonte
-    return () => {
-      if (totalTimeIntervalRef.current) {
-        clearInterval(totalTimeIntervalRef.current);
-      }
-    };
-  }, [isWorkoutActive, workoutStartTime]);
-
-  // Efeito para cronômetro de exercício baseado em tempo
-  useEffect(() => {
-    // Limpar intervalo existente
-    if (exerciseTimerIntervalRef.current) {
-      clearInterval(exerciseTimerIntervalRef.current);
-      exerciseTimerIntervalRef.current = null;
-    }
-    
-    // Iniciar novo cronômetro
-    if (timerActive && timeRemaining > 0) {
-      exerciseTimerIntervalRef.current = setInterval(() => {
-        setTimeRemaining(prevTime => {
-          const newTime = prevTime - 1;
-          if (newTime <= 0) {
-            clearInterval(exerciseTimerIntervalRef.current);
-            handleSetCompleted();
-            return 0;
-          }
-          return newTime;
-        });
-      }, 1000);
-    }
-    
-    // Cleanup no desmonte
-    return () => {
-      if (exerciseTimerIntervalRef.current) {
-        clearInterval(exerciseTimerIntervalRef.current);
-      }
-    };
-  }, [timerActive, timeRemaining]);
-
-  // Efeito para cronômetro de descanso entre séries
-  useEffect(() => {
-    // Limpar intervalo existente
-    if (restTimerIntervalRef.current) {
-      clearInterval(restTimerIntervalRef.current);
-      restTimerIntervalRef.current = null;
-    }
-    
-    // Iniciar novo cronômetro
-    if (restTimerActive && restTimeRemaining > 0) {
-      restTimerIntervalRef.current = setInterval(() => {
-        setRestTimeRemaining(prevTime => {
-          const newTime = prevTime - 1;
-          if (newTime <= 0) {
-            clearInterval(restTimerIntervalRef.current);
-            setRestTimerActive(false);
-            return 0;
-          }
-          return newTime;
-        });
-      }, 1000);
-    }
-    
-    // Cleanup no desmonte
-    return () => {
-      if (restTimerIntervalRef.current) {
-        clearInterval(restTimerIntervalRef.current);
-      }
-    };
-  }, [restTimerActive, restTimeRemaining]);
 
   const fetchWorkoutList = async () => {
     try {
@@ -269,6 +321,10 @@ export default function WorkoutMode() {
       setWorkoutStartTime(startTime);
       setCurrentSetStartTime(startTime); // Definir o momento de início da primeira série
       
+      // Iniciar o cronômetro de tempo total
+      setTotalWorkoutTime(0);
+      // O timer total será iniciado no useEffect que monitora isWorkoutActive e workoutStartTime
+      
       // Se o primeiro exercício for baseado em tempo, configurar o timer
       if (exercises[0].time) {
         setTimeRemaining(exercises[0].time);
@@ -313,6 +369,11 @@ export default function WorkoutMode() {
       
       // Liberar o WakeLock ao finalizar o treino
       releaseWakeLock();
+      
+      // Parar todos os timers
+      stopWorkerTimer('exercise');
+      stopWorkerTimer('rest');
+      stopWorkerTimer('total');
       
       // Atualizar a sessão de treino
       const { error } = await supabase
