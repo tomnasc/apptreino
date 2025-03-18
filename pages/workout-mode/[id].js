@@ -318,9 +318,6 @@ export default function WorkoutMode() {
         ? Math.round((validStartTime - previousSetEndTime) / 1000) 
         : 0;
         
-      // Gerar um ID único para este registro para evitar conflitos 409
-      const uniqueId = `${sessionId}_${currentExerciseIndex}_${currentSetIndex}_${Date.now()}`;
-        
       // Inserir detalhes da série no banco de dados
       const { error } = await supabase
         .from('workout_session_details')
@@ -335,8 +332,7 @@ export default function WorkoutMode() {
             execution_time: executionTime > 0 ? executionTime : 1, // Garantir valor positivo
             rest_time: restTime >= 0 ? restTime : 0, // Garantir valor não negativo
             start_time: validStartTime.toISOString(),
-            end_time: validEndTime.toISOString(),
-            record_id: uniqueId // Incluir ID único
+            end_time: validEndTime.toISOString()
           }
         ]);
         
