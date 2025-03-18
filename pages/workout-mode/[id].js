@@ -29,8 +29,13 @@ export default function WorkoutMode() {
   const [sessionId, setSessionId] = useState(null);
   const [currentSetStartTime, setCurrentSetStartTime] = useState(null);
   const [previousSetEndTime, setPreviousSetEndTime] = useState(null);
+  const [restTimerActive, setRestTimerActive] = useState(false);
+  const [restTimeRemaining, setRestTimeRemaining] = useState(0);
+  const [showWeightIncreaseAlert, setShowWeightIncreaseAlert] = useState(false);
+  const [showWeightDecreaseAlert, setShowWeightDecreaseAlert] = useState(false);
   
   const timerRef = useRef(null);
+  const restTimerRef = useRef(null);
 
   useEffect(() => {
     if (id && user) {
@@ -79,6 +84,31 @@ export default function WorkoutMode() {
       }
     };
   }, [timerActive, timeRemaining]);
+
+  // Timer para descanso entre séries
+  useEffect(() => {
+    if (restTimerActive && restTimeRemaining > 0) {
+      restTimerRef.current = setInterval(() => {
+        setRestTimeRemaining((prev) => {
+          if (prev <= 1) {
+            clearInterval(restTimerRef.current);
+            setRestTimerActive(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else if (restTimeRemaining <= 0) {
+      clearInterval(restTimerRef.current);
+      setRestTimerActive(false);
+    }
+
+    return () => {
+      if (restTimerRef.current) {
+        clearInterval(restTimerRef.current);
+      }
+    };
+  }, [restTimerActive, restTimeRemaining]);
 
   const fetchWorkoutList = async () => {
     try {
@@ -151,11 +181,11 @@ export default function WorkoutMode() {
       setCurrentSetStartTime(new Date());
       setPreviousSetEndTime(null);
       
-      // Se o exercício atual for baseado em tempo, iniciar o timer
+      // Se o exercício atual for baseado em tempo, apenas configurar o temporizador
       const currentExercise = exercises[0];
       if (currentExercise.time) {
         setTimeRemaining(currentExercise.time);
-        setTimerActive(true);
+        setTimerActive(false); // Não inicia automaticamente, espera o usuário clicar
       } else {
         setRepsCompleted(0);
       }
@@ -206,6 +236,22 @@ export default function WorkoutMode() {
     const endTime = new Date();
     const currentExercise = exercises[currentExerciseIndex];
     const exerciseKey = `${currentExerciseIndex}`;
+    
+    // Verificar se deve mostrar o alerta de diminuir carga
+    if (currentExercise.reps && repsCompleted < 6) {
+      setShowWeightDecreaseAlert(true);
+      return; // Não permite completar a série com menos de 6 repetições
+    }
+    
+    // Verificar se deve mostrar o alerta de aumentar carga
+    // Somente na última série e se atingiu ou ultrapassou o número de repetições
+    if (
+      currentExercise.reps && 
+      repsCompleted >= currentExercise.reps && 
+      currentSetIndex === currentExercise.sets - 1
+    ) {
+      setShowWeightIncreaseAlert(true);
+    }
     
     // Registrar os detalhes da série
     try {
@@ -263,11 +309,11 @@ export default function WorkoutMode() {
         const newSetStartTime = new Date();
         setCurrentSetStartTime(newSetStartTime);
         
-        // Se o próximo exercício for baseado em tempo, iniciar o timer
+        // Se o próximo exercício for baseado em tempo, configurar o timer
         const nextExercise = exercises[currentExerciseIndex + 1];
         if (nextExercise.time) {
           setTimeRemaining(nextExercise.time);
-          setTimerActive(true);
+          setTimerActive(false); // Não inicia automaticamente, espera o usuário clicar
         } else {
           setRepsCompleted(0);
         }
@@ -279,14 +325,20 @@ export default function WorkoutMode() {
       // Passar para a próxima série do mesmo exercício
       setCurrentSetIndex(currentSetIndex + 1);
       
+      // Iniciar temporizador de descanso
+      if (currentExercise.rest_time) {
+        setRestTimeRemaining(currentExercise.rest_time);
+        setRestTimerActive(true);
+      }
+      
       // Definir o momento de início da próxima série
       const newSetStartTime = new Date();
       setCurrentSetStartTime(newSetStartTime);
       
-      // Se o exercício for baseado em tempo, reiniciar o timer
+      // Se o exercício for baseado em tempo, configurar o timer
       if (currentExercise.time) {
         setTimeRemaining(currentExercise.time);
-        setTimerActive(true);
+        setTimerActive(false); // Não inicia automaticamente, espera o usuário clicar
       } else {
         setRepsCompleted(0);
       }
@@ -301,9 +353,11 @@ export default function WorkoutMode() {
   const handleRepsCompleted = () => {
     const currentExercise = exercises[currentExerciseIndex];
     
-    // Verificar se atingiu pelo menos 5 repetições
-    if (repsCompleted >= 5) {
+    // Verificar se atingiu pelo menos 6 repetições
+    if (repsCompleted >= 6) {
       handleSetCompleted();
+    } else {
+      setShowWeightDecreaseAlert(true);
     }
   };
 
@@ -699,18 +753,14 @@ export default function WorkoutMode() {
                       <button 
                         onClick={handleRepsCompleted}
                         className={`px-6 py-3 rounded-full font-bold shadow transition-all w-full md:w-auto
-                          ${repsCompleted >= 5 && repsCompleted < currentExercise.reps 
-                            ? 'bg-yellow-500 hover:bg-yellow-600 text-white' 
-                            : repsCompleted >= currentExercise.reps 
+                          ${repsCompleted >= 6 
+                            ? repsCompleted >= currentExercise.reps 
                               ? 'bg-green-500 hover:bg-green-600 text-white'
-                              : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
-                        disabled={repsCompleted < 5}
+                              : 'bg-blue-500 hover:bg-blue-600 text-white' 
+                            : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+                        disabled={repsCompleted < 6}
                       >
-                        {repsCompleted < 5 
-                          ? `Mínimo 5 repetições para concluir` 
-                          : repsCompleted < currentExercise.reps 
-                            ? `Concluir com ${repsCompleted}/${currentExercise.reps} repetições`
-                            : 'Marcar Série como Concluída'}
+                        Concluir
                       </button>
                     </div>
                     
@@ -726,13 +776,106 @@ export default function WorkoutMode() {
                   </div>
                 )}
                 
-                {currentExercise.time && timerActive && (
+                {currentExercise.time && (
                   <div className="mb-6 flex flex-col items-center">
                     <div className="w-48 h-48 rounded-full bg-blue-50 border-8 border-blue-100 flex flex-col items-center justify-center mb-4">
                       <span className="text-4xl font-bold text-blue-700">{timeRemaining}</span>
                       <span className="text-gray-500">segundos</span>
                     </div>
-                    <div className="text-sm text-gray-500">O temporizador irá avançar automaticamente quando terminar</div>
+                    
+                    {!timerActive ? (
+                      <button 
+                        onClick={() => setTimerActive(true)}
+                        className="px-6 py-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-bold shadow transition-all"
+                      >
+                        Iniciar Cronômetro
+                      </button>
+                    ) : (
+                      <div className="text-sm text-gray-500">O temporizador irá avançar automaticamente quando terminar</div>
+                    )}
+                  </div>
+                )}
+
+                {/* Timer de descanso entre séries */}
+                {restTimerActive && (
+                  <div className="mt-6 p-4 bg-indigo-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-indigo-500 mr-2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                        <span className="font-medium text-indigo-700">Descanso:</span>
+                      </div>
+                      <div className="text-xl font-bold text-indigo-700">{formatTime(restTimeRemaining)}</div>
+                    </div>
+                    <div className="w-full bg-indigo-100 rounded-full h-2 mt-2">
+                      <div 
+                        className="bg-indigo-500 h-2 rounded-full"
+                        style={{
+                          width: `${(restTimeRemaining / currentExercise.rest_time) * 100}%`
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Alerta para aumentar carga */}
+                {showWeightIncreaseAlert && (
+                  <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-green-600">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-green-800">
+                          Parabéns! Você completou todas as repetições.
+                        </h3>
+                        <div className="mt-1 text-sm text-green-700">
+                          Considere aumentar a carga no próximo treino para continuar progredindo.
+                        </div>
+                        <div className="mt-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowWeightIncreaseAlert(false)}
+                            className="inline-flex items-center px-3 py-1.5 border border-green-300 shadow-sm text-xs font-medium rounded-full text-green-700 bg-white hover:bg-green-50"
+                          >
+                            Entendi
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Alerta para diminuir carga */}
+                {showWeightDecreaseAlert && (
+                  <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-yellow-600">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-yellow-800">
+                          Você precisa completar no mínimo 6 repetições.
+                        </h3>
+                        <div className="mt-1 text-sm text-yellow-700">
+                          Considere diminuir a carga para conseguir executar pelo menos 6 repetições com boa forma.
+                        </div>
+                        <div className="mt-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowWeightDecreaseAlert(false)}
+                            className="inline-flex items-center px-3 py-1.5 border border-yellow-300 shadow-sm text-xs font-medium rounded-full text-yellow-700 bg-white hover:bg-yellow-50"
+                          >
+                            Entendi
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
                 

@@ -30,6 +30,7 @@ export default function EditWorkoutList() {
   const [time, setTime] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [isTimeBasedExercise, setIsTimeBasedExercise] = useState(false);
+  const [restTime, setRestTime] = useState('60');
 
   useEffect(() => {
     if (id && user) {
@@ -134,6 +135,11 @@ export default function EditWorkoutList() {
       }
     }
 
+    if (!restTime || parseInt(restTime) < 0) {
+      setError('Por favor, informe um tempo de descanso válido.');
+      return;
+    }
+
     try {
       setSaving(true);
       setError(null);
@@ -146,6 +152,7 @@ export default function EditWorkoutList() {
         reps: isTimeBasedExercise ? null : parseInt(reps),
         time: isTimeBasedExercise ? parseInt(time) : null,
         video_url: videoUrl || null,
+        rest_time: parseInt(restTime),
         order_position: exercises.length,
       };
 
@@ -184,14 +191,15 @@ export default function EditWorkoutList() {
   };
 
   const handleEditExercise = (exercise) => {
-    setEditingExerciseId(exercise.id);
     setExerciseName(exercise.name);
     setWeight(exercise.weight || '');
-    setSets(exercise.sets);
+    setSets(exercise.sets || '');
     setReps(exercise.reps || '');
     setTime(exercise.time || '');
     setVideoUrl(exercise.video_url || '');
-    setIsTimeBasedExercise(exercise.time !== null);
+    setIsTimeBasedExercise(exercise.time ? true : false);
+    setRestTime(exercise.rest_time || '60');
+    setEditingExerciseId(exercise.id);
     setShowExerciseForm(true);
   };
 
@@ -284,6 +292,7 @@ export default function EditWorkoutList() {
     setTime('');
     setVideoUrl('');
     setIsTimeBasedExercise(false);
+    setRestTime('60');
     setEditingExerciseId(null);
     setShowExerciseForm(false);
   };
@@ -505,6 +514,21 @@ export default function EditWorkoutList() {
                       </>
                     )}
                   </div>
+                  <div>
+                    <label htmlFor="restTime" className="block text-sm font-medium text-gray-700 mb-1">
+                      Tempo de descanso (segundos) *
+                    </label>
+                    <input
+                      type="number"
+                      id="restTime"
+                      className="input"
+                      value={restTime}
+                      onChange={(e) => setRestTime(e.target.value)}
+                      placeholder="Ex: 60"
+                      min="0"
+                      required
+                    />
+                  </div>
                   <div className="md:col-span-2">
                     <label htmlFor="videoUrl" className="block text-sm font-medium text-gray-700 mb-1">
                       Link do vídeo (YouTube)
@@ -575,6 +599,10 @@ export default function EditWorkoutList() {
                             <span>{exercise.time} segundos</span>
                           </div>
                         )}
+                        <div>
+                          <span className="font-medium text-gray-500">Descanso:</span>{' '}
+                          <span>{exercise.rest_time || 60} segundos</span>
+                        </div>
                       </div>
                       {exercise.video_url && (
                         <div className="mt-3">

@@ -156,3 +156,38 @@ SELECT * FROM pg_proc WHERE proname = 'delete_user';
 ## Próximos Passos
 
 Após a execução desses scripts, reinicie o aplicativo e o sistema de relatório estará pronto para uso. Ao realizar um treino, todos os detalhes serão registrados automaticamente e poderão ser visualizados no relatório. 
+
+## Adicionando Tempo de Descanso aos Exercícios
+
+Execute este script no Editor SQL do Supabase para adicionar o campo de tempo de descanso à tabela de exercícios:
+
+```sql
+-- Adicionar coluna de tempo de descanso (rest_time) à tabela workout_exercises, se não existir
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 
+    FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'workout_exercises' 
+    AND column_name = 'rest_time'
+  ) THEN
+    ALTER TABLE workout_exercises ADD COLUMN rest_time INTEGER DEFAULT 60;
+    -- Comentário explicativo na coluna
+    COMMENT ON COLUMN workout_exercises.rest_time IS 'Tempo de descanso entre séries em segundos';
+  END IF;
+END $$;
+
+-- Atualizar exercícios existentes para ter um tempo de descanso padrão de 60 segundos
+UPDATE workout_exercises SET rest_time = 60 WHERE rest_time IS NULL;
+```
+
+Após executar o script, verifique se a coluna foi adicionada com:
+
+```sql
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_schema = 'public' 
+AND table_name = 'workout_exercises' 
+AND column_name = 'rest_time';
+``` 
