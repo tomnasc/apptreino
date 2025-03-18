@@ -33,12 +33,13 @@ export default function WorkoutMode() {
   const [restTimeRemaining, setRestTimeRemaining] = useState(0);
   const [showWeightIncreaseAlert, setShowWeightIncreaseAlert] = useState(false);
   const [showWeightDecreaseAlert, setShowWeightDecreaseAlert] = useState(false);
-  const [workerInitialized, setWorkerInitialized] = useState(false);
   const [setRepsHistory, setSetRepsHistory] = useState({}); // Armazenar histórico de repetições por série
   
-  const timerRef = useRef(null);
-  const restTimerRef = useRef(null);
-  const timerWorkerRef = useRef(null);
+  // Referências para intervalos
+  const exerciseTimerIntervalRef = useRef(null);
+  const restTimerIntervalRef = useRef(null);
+  const totalTimeIntervalRef = useRef(null);
+  const [totalWorkoutTime, setTotalWorkoutTime] = useState(0);
 
   useEffect(() => {
     if (id && user) {
@@ -46,117 +47,13 @@ export default function WorkoutMode() {
       fetchExercises();
     }
     
-    // Inicializar o worker para os temporizadores
-    if (typeof window !== 'undefined' && !workerInitialized) {
-      // Criar o conteúdo do worker como uma URL de blob
-      const workerCode = `
-        let exerciseTimer = null;
-        let restTimer = null;
-        let exerciseTime = 0;
-        let restTime = 0;
-
-        self.onmessage = function(e) {
-          const { action, time, type } = e.data;
-          console.log('[WORKER] Received message:', e.data);
-          
-          if (action === 'start') {
-            // Limpar timers anteriores para evitar interferência
-            if (type === 'exercise') {
-              clearInterval(exerciseTimer);
-              exerciseTime = time;
-              
-              exerciseTimer = setInterval(() => {
-                exerciseTime -= 1;
-                self.postMessage({ type: 'exercise', time: exerciseTime });
-                
-                if (exerciseTime <= 0) {
-                  clearInterval(exerciseTimer);
-                }
-              }, 1000);
-              
-              console.log('[WORKER] Started exercise timer:', exerciseTime);
-            } 
-            else if (type === 'rest') {
-              clearInterval(restTimer);
-              restTime = time;
-              
-              restTimer = setInterval(() => {
-                restTime -= 1;
-                self.postMessage({ type: 'rest', time: restTime });
-                
-                if (restTime <= 0) {
-                  clearInterval(restTimer);
-                }
-              }, 1000);
-              
-              console.log('[WORKER] Started rest timer:', restTime);
-            }
-          } 
-          else if (action === 'stop') {
-            if (type === 'exercise' || !type) {
-              clearInterval(exerciseTimer);
-              console.log('[WORKER] Stopped exercise timer');
-            }
-            
-            if (type === 'rest' || !type) {
-              clearInterval(restTimer);
-              console.log('[WORKER] Stopped rest timer');
-            }
-          }
-          else if (action === 'update') {
-            if (type === 'exercise') {
-              exerciseTime = time;
-            } else if (type === 'rest') {
-              restTime = time;
-            }
-          }
-        };
-      `;
-      
-      const blob = new Blob([workerCode], { type: 'application/javascript' });
-      const workerUrl = URL.createObjectURL(blob);
-      
-      try {
-        timerWorkerRef.current = new Worker(workerUrl);
-        
-        timerWorkerRef.current.onmessage = (e) => {
-          const { type, time } = e.data;
-          console.log('[APP] Received from worker:', e.data);
-          
-          if (type === 'exercise') {
-            setTimeRemaining(time);
-            if (time <= 0) {
-              handleSetCompleted();
-            }
-          } else if (type === 'rest') {
-            setRestTimeRemaining(time);
-            if (time <= 0) {
-              setRestTimerActive(false);
-            }
-          }
-        };
-        
-        timerWorkerRef.current.onerror = (e) => {
-          console.error('Worker error:', e);
-          setWorkerInitialized(false);
-        };
-        
-        setWorkerInitialized(true);
-        console.log('Timer worker initialized successfully');
-      } catch (error) {
-        console.error('Failed to initialize worker:', error);
-        setWorkerInitialized(false);
-      }
-      
-      // Cleanup
-      return () => {
-        if (timerWorkerRef.current) {
-          timerWorkerRef.current.terminate();
-        }
-        URL.revokeObjectURL(workerUrl);
-      };
-    }
-  }, [id, user, workerInitialized]);
+    // Limpar todos os timers ao desmontar
+    return () => {
+      if (exerciseTimerIntervalRef.current) clearInterval(exerciseTimerIntervalRef.current);
+      if (restTimerIntervalRef.current) clearInterval(restTimerIntervalRef.current);
+      if (totalTimeIntervalRef.current) clearInterval(totalTimeIntervalRef.current);
+    };
+  }, [id, user]);
 
   useEffect(() => {
     // Verificar se há um ID de sessão na URL para retomar treino
@@ -165,101 +62,92 @@ export default function WorkoutMode() {
     }
   }, [sessionUrlParam, exercises, isWorkoutActive]);
 
+  // Efeito para cronômetro de tempo total de treino
   useEffect(() => {
+    // Limpar intervalo existente
+    if (totalTimeIntervalRef.current) {
+      clearInterval(totalTimeIntervalRef.current);
+      totalTimeIntervalRef.current = null;
+    }
+    
+    // Iniciar novo cronômetro se o treino estiver ativo
+    if (isWorkoutActive && workoutStartTime) {
+      setTotalWorkoutTime(Math.floor((new Date() - workoutStartTime) / 1000));
+      
+      totalTimeIntervalRef.current = setInterval(() => {
+        setTotalWorkoutTime(Math.floor((new Date() - workoutStartTime) / 1000));
+      }, 1000);
+    }
+    
+    // Cleanup no desmonte
+    return () => {
+      if (totalTimeIntervalRef.current) {
+        clearInterval(totalTimeIntervalRef.current);
+      }
+    };
+  }, [isWorkoutActive, workoutStartTime]);
+
+  // Efeito para cronômetro de exercício baseado em tempo
+  useEffect(() => {
+    // Limpar intervalo existente
+    if (exerciseTimerIntervalRef.current) {
+      clearInterval(exerciseTimerIntervalRef.current);
+      exerciseTimerIntervalRef.current = null;
+    }
+    
+    // Iniciar novo cronômetro
     if (timerActive && timeRemaining > 0) {
-      if (workerInitialized && timerWorkerRef.current) {
-        // Parar qualquer timer anterior para evitar conflitos
-        timerWorkerRef.current.postMessage({ action: 'stop' });
-        
-        // Iniciar novo timer para exercício
-        console.log('Iniciando timer de exercício com worker:', timeRemaining);
-        timerWorkerRef.current.postMessage({
-          action: 'start',
-          time: timeRemaining,
-          type: 'exercise'
+      exerciseTimerIntervalRef.current = setInterval(() => {
+        setTimeRemaining(prevTime => {
+          const newTime = prevTime - 1;
+          if (newTime <= 0) {
+            clearInterval(exerciseTimerIntervalRef.current);
+            handleSetCompleted();
+            return 0;
+          }
+          return newTime;
         });
-      } else {
-        // Método de fallback usando setInterval
-        console.log('Iniciando timer de exercício com setInterval:', timeRemaining);
-        clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-          setTimeRemaining((prev) => {
-            if (prev <= 1) {
-              clearInterval(timerRef.current);
-              setTimerActive(false);
-              handleSetCompleted();
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      }
-    } else if (!timerActive || timeRemaining <= 0) {
-      // Parar o timer quando não estiver ativo ou tempo acabou
-      if (workerInitialized && timerWorkerRef.current) {
-        timerWorkerRef.current.postMessage({ action: 'stop' });
-      } else {
-        clearInterval(timerRef.current);
-      }
-      
-      if (timeRemaining <= 0) {
-        setTimerActive(false);
-      }
+      }, 1000);
     }
-
+    
+    // Cleanup no desmonte
     return () => {
-      // Limpeza ao desmontar
-      clearInterval(timerRef.current);
+      if (exerciseTimerIntervalRef.current) {
+        clearInterval(exerciseTimerIntervalRef.current);
+      }
     };
-  }, [timerActive, timeRemaining, workerInitialized]);
+  }, [timerActive, timeRemaining]);
 
-  // Timer para descanso entre séries
+  // Efeito para cronômetro de descanso entre séries
   useEffect(() => {
-    if (restTimerActive && restTimeRemaining > 0) {
-      if (workerInitialized && timerWorkerRef.current) {
-        // Parar qualquer timer anterior para evitar conflitos
-        timerWorkerRef.current.postMessage({ action: 'stop' });
-        
-        // Iniciar novo timer para descanso
-        console.log('Iniciando timer de descanso com worker:', restTimeRemaining);
-        timerWorkerRef.current.postMessage({
-          action: 'start',
-          time: restTimeRemaining,
-          type: 'rest'
-        });
-      } else {
-        // Método de fallback usando setInterval
-        console.log('Iniciando timer de descanso com setInterval:', restTimeRemaining);
-        clearInterval(restTimerRef.current);
-        restTimerRef.current = setInterval(() => {
-          setRestTimeRemaining((prev) => {
-            if (prev <= 1) {
-              clearInterval(restTimerRef.current);
-              setRestTimerActive(false);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      }
-    } else if (!restTimerActive || restTimeRemaining <= 0) {
-      // Parar o timer quando não estiver ativo ou tempo acabou
-      if (workerInitialized && timerWorkerRef.current) {
-        timerWorkerRef.current.postMessage({ action: 'stop' });
-      } else {
-        clearInterval(restTimerRef.current);
-      }
-      
-      if (restTimeRemaining <= 0) {
-        setRestTimerActive(false);
-      }
+    // Limpar intervalo existente
+    if (restTimerIntervalRef.current) {
+      clearInterval(restTimerIntervalRef.current);
+      restTimerIntervalRef.current = null;
     }
-
+    
+    // Iniciar novo cronômetro
+    if (restTimerActive && restTimeRemaining > 0) {
+      restTimerIntervalRef.current = setInterval(() => {
+        setRestTimeRemaining(prevTime => {
+          const newTime = prevTime - 1;
+          if (newTime <= 0) {
+            clearInterval(restTimerIntervalRef.current);
+            setRestTimerActive(false);
+            return 0;
+          }
+          return newTime;
+        });
+      }, 1000);
+    }
+    
+    // Cleanup no desmonte
     return () => {
-      // Limpeza ao desmontar
-      clearInterval(restTimerRef.current);
+      if (restTimerIntervalRef.current) {
+        clearInterval(restTimerIntervalRef.current);
+      }
     };
-  }, [restTimerActive, restTimeRemaining, workerInitialized]);
+  }, [restTimerActive, restTimeRemaining]);
 
   const fetchWorkoutList = async () => {
     try {
@@ -503,19 +391,10 @@ export default function WorkoutMode() {
       // Passar para a próxima série do mesmo exercício
       setCurrentSetIndex(currentSetIndex + 1);
       
-      // Iniciar temporizador de descanso
+      // Iniciar temporizador de descanso se estiver configurado
       if (currentExercise.rest_time) {
         setRestTimeRemaining(currentExercise.rest_time);
         setRestTimerActive(true);
-        
-        // Iniciar o worker de temporizador para o descanso
-        if (workerInitialized && timerWorkerRef.current) {
-          timerWorkerRef.current.postMessage({
-            action: 'start',
-            time: currentExercise.rest_time,
-            type: 'rest'
-          });
-        }
       }
       
       // Definir o momento de início da próxima série
@@ -854,9 +733,7 @@ export default function WorkoutMode() {
                     </svg>
                     <span className="font-medium text-gray-600">Tempo de treino:</span>{' '}
                     <span className="ml-2 font-bold text-blue-700">
-                      {workoutStartTime
-                        ? formatTime(Math.floor((new Date() - workoutStartTime) / 1000))
-                        : '0:00'}
+                      {formatTime(totalWorkoutTime)}
                     </span>
                   </div>
                 </div>
@@ -900,7 +777,7 @@ export default function WorkoutMode() {
                   </div>
                   {currentExercise.reps && (
                     <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 mb-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 mr-1">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 1-.659 1.591L9.5 14.5M9.75 3.104V1.5M9.75 9.75v4.5m0-4.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H9.75Z" />
                       </svg>
                       <span className="font-medium text-gray-500 text-xs">Repetições</span>
@@ -975,7 +852,7 @@ export default function WorkoutMode() {
                     {!timerActive ? (
                       <button 
                         onClick={() => {
-                          console.log('Botão Iniciar Cronômetro clicado');
+                          console.log('Iniciando cronômetro de exercício');
                           setTimerActive(true);
                         }}
                         className="px-6 py-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-bold shadow transition-all"
@@ -985,7 +862,7 @@ export default function WorkoutMode() {
                     ) : (
                       <button 
                         onClick={() => {
-                          console.log('Botão Parar Cronômetro clicado');
+                          console.log('Parando cronômetro de exercício');
                           setTimerActive(false);
                         }}
                         className="px-6 py-3 rounded-full bg-red-500 hover:bg-red-600 text-white font-bold shadow transition-all"
