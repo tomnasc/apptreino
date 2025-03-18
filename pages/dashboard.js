@@ -3,7 +3,7 @@ import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import Layout from '../components/Layout';
 import Link from 'next/link';
 
-export default function Dashboard() {
+export default function DashboardPage() {
   const supabase = useSupabaseClient();
   const user = useUser();
   const [workoutLists, setWorkoutLists] = useState([]);
