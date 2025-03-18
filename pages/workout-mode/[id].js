@@ -318,9 +318,9 @@ export default function WorkoutMode() {
   };
 
   const handleSetCompleted = async () => {
-    const endTime = new Date();
     const currentExercise = exercises[currentExerciseIndex];
     const exerciseKey = `${currentExerciseIndex}`;
+    let endTime = new Date();
     
     // Atualizar o histórico de repetições para o exercício atual
     const updatedSetRepsHistory = { ...setRepsHistory };
