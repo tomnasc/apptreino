@@ -173,55 +173,14 @@ export default function Dashboard() {
           {loading ? (
             <p>Carregando...</p>
           ) : recentWorkouts.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Data
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Lista de Treino
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Duração
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Status
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-right text-sm font-medium"
-                    >
-                      Ação
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+            <>
+              <div className="block sm:hidden">
+                {/* Versão em Cards para telas pequenas (mobile) */}
+                <div className="space-y-4">
                   {recentWorkouts.map((session) => (
-                    <tr key={session.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(session.created_at)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {session.workout_list?.name || 'Lista removida'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {session.duration ? `${Math.round(session.duration / 60)} min` : 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                    <div key={session.id} className="bg-gray-50 rounded-lg p-4 shadow-sm">
+                      <div className="flex justify-between">
+                        <div className="text-sm font-medium">{formatDate(session.created_at)}</div>
                         <span
                           className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             session.completed
@@ -231,29 +190,122 @@ export default function Dashboard() {
                         >
                           {session.completed ? 'Concluído' : 'Em progresso'}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      </div>
+                      
+                      <div className="mt-2">
+                        <div className="font-medium text-gray-900">
+                          {session.workout_list?.name || 'Lista removida'}
+                        </div>
+                        <div className="text-sm text-gray-500 mt-1">
+                          Duração: {session.duration ? `${Math.round(session.duration / 60)} min` : 'N/A'}
+                        </div>
+                      </div>
+                      
+                      <div className="mt-3 flex justify-end">
                         {!session.completed ? (
                           <Link
                             href={`/workout-mode/${session.workout_list_id}?session=${session.id}`}
-                            className="text-blue-600 hover:text-blue-900"
+                            className="text-blue-600 hover:text-blue-900 text-sm font-medium"
                           >
                             Retomar Treino
                           </Link>
                         ) : (
                           <Link
                             href={`/workout-report/${session.id}`}
-                            className="text-green-600 hover:text-green-900"
+                            className="text-green-600 hover:text-green-900 text-sm font-medium"
                           >
                             Ver Relatório
                           </Link>
                         )}
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              </div>
+              
+              <div className="hidden sm:block overflow-x-auto">
+                {/* Versão em Tabela para telas maiores */}
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Data
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Lista de Treino
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Duração
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Status
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-right text-sm font-medium"
+                      >
+                        Ação
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {recentWorkouts.map((session) => (
+                      <tr key={session.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(session.created_at)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {session.workout_list?.name || 'Lista removida'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {session.duration ? `${Math.round(session.duration / 60)} min` : 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              session.completed
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}
+                          >
+                            {session.completed ? 'Concluído' : 'Em progresso'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          {!session.completed ? (
+                            <Link
+                              href={`/workout-mode/${session.workout_list_id}?session=${session.id}`}
+                              className="text-blue-600 hover:text-blue-900"
+                            >
+                              Retomar Treino
+                            </Link>
+                          ) : (
+                            <Link
+                              href={`/workout-report/${session.id}`}
+                              className="text-green-600 hover:text-green-900"
+                            >
+                              Ver Relatório
+                            </Link>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : (
             <p className="text-gray-500">
               Você ainda não realizou nenhum treino.{' '}
