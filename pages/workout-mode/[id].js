@@ -50,32 +50,65 @@ export default function WorkoutMode() {
     if (typeof window !== 'undefined' && !workerInitialized) {
       // Criar o conteúdo do worker como uma URL de blob
       const workerCode = `
-        let timerInterval = null;
-        let remainingTime = 0;
-        let timerType = '';
+        let exerciseTimer = null;
+        let restTimer = null;
+        let exerciseTime = 0;
+        let restTime = 0;
 
         self.onmessage = function(e) {
           const { action, time, type } = e.data;
+          console.log('[WORKER] Received message:', e.data);
           
           if (action === 'start') {
-            remainingTime = time;
-            timerType = type;
-            
-            clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-              remainingTime -= 1;
-              self.postMessage({ type: timerType, time: remainingTime });
+            // Limpar timers anteriores para evitar interferência
+            if (type === 'exercise') {
+              clearInterval(exerciseTimer);
+              exerciseTime = time;
               
-              if (remainingTime <= 0) {
-                clearInterval(timerInterval);
-              }
-            }, 1000);
+              exerciseTimer = setInterval(() => {
+                exerciseTime -= 1;
+                self.postMessage({ type: 'exercise', time: exerciseTime });
+                
+                if (exerciseTime <= 0) {
+                  clearInterval(exerciseTimer);
+                }
+              }, 1000);
+              
+              console.log('[WORKER] Started exercise timer:', exerciseTime);
+            } 
+            else if (type === 'rest') {
+              clearInterval(restTimer);
+              restTime = time;
+              
+              restTimer = setInterval(() => {
+                restTime -= 1;
+                self.postMessage({ type: 'rest', time: restTime });
+                
+                if (restTime <= 0) {
+                  clearInterval(restTimer);
+                }
+              }, 1000);
+              
+              console.log('[WORKER] Started rest timer:', restTime);
+            }
           } 
           else if (action === 'stop') {
-            clearInterval(timerInterval);
+            if (type === 'exercise' || !type) {
+              clearInterval(exerciseTimer);
+              console.log('[WORKER] Stopped exercise timer');
+            }
+            
+            if (type === 'rest' || !type) {
+              clearInterval(restTimer);
+              console.log('[WORKER] Stopped rest timer');
+            }
           }
           else if (action === 'update') {
-            remainingTime = time;
+            if (type === 'exercise') {
+              exerciseTime = time;
+            } else if (type === 'rest') {
+              restTime = time;
+            }
           }
         };
       `;
@@ -83,25 +116,37 @@ export default function WorkoutMode() {
       const blob = new Blob([workerCode], { type: 'application/javascript' });
       const workerUrl = URL.createObjectURL(blob);
       
-      timerWorkerRef.current = new Worker(workerUrl);
-      
-      timerWorkerRef.current.onmessage = (e) => {
-        const { type, time } = e.data;
+      try {
+        timerWorkerRef.current = new Worker(workerUrl);
         
-        if (type === 'exercise') {
-          setTimeRemaining(time);
-          if (time <= 0) {
-            handleSetCompleted();
+        timerWorkerRef.current.onmessage = (e) => {
+          const { type, time } = e.data;
+          console.log('[APP] Received from worker:', e.data);
+          
+          if (type === 'exercise') {
+            setTimeRemaining(time);
+            if (time <= 0) {
+              handleSetCompleted();
+            }
+          } else if (type === 'rest') {
+            setRestTimeRemaining(time);
+            if (time <= 0) {
+              setRestTimerActive(false);
+            }
           }
-        } else if (type === 'rest') {
-          setRestTimeRemaining(time);
-          if (time <= 0) {
-            setRestTimerActive(false);
-          }
-        }
-      };
-      
-      setWorkerInitialized(true);
+        };
+        
+        timerWorkerRef.current.onerror = (e) => {
+          console.error('Worker error:', e);
+          setWorkerInitialized(false);
+        };
+        
+        setWorkerInitialized(true);
+        console.log('Timer worker initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize worker:', error);
+        setWorkerInitialized(false);
+      }
       
       // Cleanup
       return () => {
@@ -123,12 +168,20 @@ export default function WorkoutMode() {
   useEffect(() => {
     if (timerActive && timeRemaining > 0) {
       if (workerInitialized && timerWorkerRef.current) {
+        // Parar qualquer timer anterior para evitar conflitos
+        timerWorkerRef.current.postMessage({ action: 'stop' });
+        
+        // Iniciar novo timer para exercício
+        console.log('Iniciando timer de exercício com worker:', timeRemaining);
         timerWorkerRef.current.postMessage({
           action: 'start',
           time: timeRemaining,
           type: 'exercise'
         });
       } else {
+        // Método de fallback usando setInterval
+        console.log('Iniciando timer de exercício com setInterval:', timeRemaining);
+        clearInterval(timerRef.current);
         timerRef.current = setInterval(() => {
           setTimeRemaining((prev) => {
             if (prev <= 1) {
@@ -141,19 +194,22 @@ export default function WorkoutMode() {
           });
         }, 1000);
       }
-    } else if (timeRemaining <= 0) {
+    } else if (!timerActive || timeRemaining <= 0) {
+      // Parar o timer quando não estiver ativo ou tempo acabou
       if (workerInitialized && timerWorkerRef.current) {
         timerWorkerRef.current.postMessage({ action: 'stop' });
       } else {
         clearInterval(timerRef.current);
       }
-      setTimerActive(false);
+      
+      if (timeRemaining <= 0) {
+        setTimerActive(false);
+      }
     }
 
     return () => {
-      if (!workerInitialized) {
-        clearInterval(timerRef.current);
-      }
+      // Limpeza ao desmontar
+      clearInterval(timerRef.current);
     };
   }, [timerActive, timeRemaining, workerInitialized]);
 
@@ -161,12 +217,20 @@ export default function WorkoutMode() {
   useEffect(() => {
     if (restTimerActive && restTimeRemaining > 0) {
       if (workerInitialized && timerWorkerRef.current) {
+        // Parar qualquer timer anterior para evitar conflitos
+        timerWorkerRef.current.postMessage({ action: 'stop' });
+        
+        // Iniciar novo timer para descanso
+        console.log('Iniciando timer de descanso com worker:', restTimeRemaining);
         timerWorkerRef.current.postMessage({
           action: 'start',
           time: restTimeRemaining,
           type: 'rest'
         });
       } else {
+        // Método de fallback usando setInterval
+        console.log('Iniciando timer de descanso com setInterval:', restTimeRemaining);
+        clearInterval(restTimerRef.current);
         restTimerRef.current = setInterval(() => {
           setRestTimeRemaining((prev) => {
             if (prev <= 1) {
@@ -178,19 +242,22 @@ export default function WorkoutMode() {
           });
         }, 1000);
       }
-    } else if (restTimeRemaining <= 0) {
+    } else if (!restTimerActive || restTimeRemaining <= 0) {
+      // Parar o timer quando não estiver ativo ou tempo acabou
       if (workerInitialized && timerWorkerRef.current) {
         timerWorkerRef.current.postMessage({ action: 'stop' });
       } else {
         clearInterval(restTimerRef.current);
       }
-      setRestTimerActive(false);
+      
+      if (restTimeRemaining <= 0) {
+        setRestTimerActive(false);
+      }
     }
 
     return () => {
-      if (!workerInitialized) {
-        clearInterval(restTimerRef.current);
-      }
+      // Limpeza ao desmontar
+      clearInterval(restTimerRef.current);
     };
   }, [restTimerActive, restTimeRemaining, workerInitialized]);
 
@@ -908,21 +975,23 @@ export default function WorkoutMode() {
                     {!timerActive ? (
                       <button 
                         onClick={() => {
+                          console.log('Botão Iniciar Cronômetro clicado');
                           setTimerActive(true);
-                          if (workerInitialized && timerWorkerRef.current) {
-                            timerWorkerRef.current.postMessage({
-                              action: 'start',
-                              time: timeRemaining,
-                              type: 'exercise'
-                            });
-                          }
                         }}
                         className="px-6 py-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-bold shadow transition-all"
                       >
                         Iniciar Cronômetro
                       </button>
                     ) : (
-                      <div className="text-sm text-gray-500">O temporizador irá avançar automaticamente quando terminar</div>
+                      <button 
+                        onClick={() => {
+                          console.log('Botão Parar Cronômetro clicado');
+                          setTimerActive(false);
+                        }}
+                        className="px-6 py-3 rounded-full bg-red-500 hover:bg-red-600 text-white font-bold shadow transition-all"
+                      >
+                        Parar Cronômetro
+                      </button>
                     )}
                   </div>
                 )}
