@@ -154,26 +154,36 @@ export default function WorkoutMode() {
         
         // Salvar o estado atual no localStorage
         saveTimersState();
-        
-        // Enviar heartbeat para o service worker se existir
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({
-            type: 'HEARTBEAT',
-            data: {
-              workoutStartTime: workoutStartTime ? workoutStartTime.getTime() : null,
-              timeRemaining,
-              restTimeRemaining,
-              timerActive,
-              restTimerActive
-            }
-          });
-        }
       }, 100);
+      
+      // Usar requestAnimationFrame para maior precisão
+      const animationFrameId = requestAnimationFrame(function updateTimers() {
+        // Garantir que os timers continuem rodando mesmo em segundo plano
+        if (mainIntervalRef.current === null && isWorkoutActive) {
+          // Se o intervalo foi limpo por algum motivo, recriá-lo
+          mainIntervalRef.current = setInterval(() => {
+            const now = Date.now();
+            
+            // Atualizar tempo total de treino
+            if (workoutStartTime) {
+              const elapsed = Math.floor((now - workoutStartTime.getTime()) / 1000);
+              setTotalWorkoutTime(elapsed);
+            }
+            
+            // Atualizar estado dos temporizadores baseado no localStorage
+            loadTimersState();
+          }, 100);
+        }
+        
+        // Continuar o loop
+        requestAnimationFrame(updateTimers);
+      });
       
       return () => {
         if (mainIntervalRef.current) {
           clearInterval(mainIntervalRef.current);
         }
+        cancelAnimationFrame(animationFrameId);
       };
     } else {
       // Limpar o intervalo quando o treino não estiver ativo
@@ -189,49 +199,48 @@ export default function WorkoutMode() {
     }
   }, [isWorkoutActive, timerActive, restTimerActive, timeRemaining, restTimeRemaining, workoutStartTime]);
 
-  // Registrar service worker para execução em segundo plano
+  // Sincronizar sempre que o app voltar ao foco
   useEffect(() => {
-    const registerServiceWorker = async () => {
+    // Função para verificar e sincronizar estado quando o app voltar ao foco
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isWorkoutActive) {
+        // Quando a página fica visível novamente, verificar o estado
+        console.log('App voltou ao foco, sincronizando timers');
+        loadTimersState();
+      } else if (document.visibilityState === 'hidden' && isWorkoutActive) {
+        // Quando a página fica oculta, salvar o estado atual
+        console.log('App em segundo plano, salvando estado dos timers');
+        saveTimersState();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', loadTimersState);
+    window.addEventListener('beforeunload', saveTimersState);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', loadTimersState);
+      window.removeEventListener('beforeunload', saveTimersState);
+    };
+  }, [isWorkoutActive, workoutStartTime, timerActive, restTimerActive]);
+
+  // Remover registro do service worker que está causando problemas
+  useEffect(() => {
+    const unregisterServiceWorkers = async () => {
       if ('serviceWorker' in navigator) {
-        try {
-          console.log('Registrando service worker...');
-          const registration = await navigator.serviceWorker.register('/workout-timer-sw.js');
-          console.log('Service worker registrado:', registration);
-        } catch (error) {
-          console.error('Falha ao registrar service worker:', error);
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          registration.unregister();
+          console.log('Service worker desregistrado');
         }
       }
     };
     
-    registerServiceWorker();
-    
-    // Ouvir mensagens do service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', event => {
-        if (event.data.type === 'TIMER_UPDATE') {
-          const { timeRemaining: exerciseTime, restTimeRemaining: restTime } = event.data.data;
-          
-          if (timerActive && exerciseTime >= 0) {
-            setTimeRemaining(exerciseTime);
-          }
-          
-          if (restTimerActive && restTime >= 0) {
-            setRestTimeRemaining(restTime);
-          }
-        } else if (event.data.type === 'TIMER_COMPLETE') {
-          if (event.data.timer === 'exercise' && timerActive) {
-            setTimerActive(false);
-            setTimeRemaining(0);
-            handleSetCompleted();
-          } else if (event.data.timer === 'rest' && restTimerActive) {
-            setRestTimerActive(false);
-            setRestTimeRemaining(0);
-          }
-        }
-      });
-    }
+    // Desregistrar service workers existentes
+    unregisterServiceWorkers();
   }, []);
-  
+
   // Carregar estado dos timers quando a sessão é carregada
   useEffect(() => {
     if (sessionId) {
