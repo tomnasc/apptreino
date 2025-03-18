@@ -40,6 +40,69 @@ export default function WorkoutMode() {
   const restTimerIntervalRef = useRef(null);
   const totalTimeIntervalRef = useRef(null);
   const [totalWorkoutTime, setTotalWorkoutTime] = useState(0);
+  const wakeLockRef = useRef(null);
+
+  // Função para adquirir o WakeLock
+  const requestWakeLock = async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        // Solicitar o WakeLock para manter a tela ativa
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        console.log('WakeLock ativado para manter a tela ligada');
+        
+        // Adicionar um listener para reativar o WakeLock se o usuário retornar ao aplicativo
+        wakeLockRef.current.addEventListener('release', () => {
+          console.log('WakeLock foi liberado');
+          // Tentar reativar o WakeLock se o treino ainda estiver ativo
+          if (isWorkoutActive) {
+            requestWakeLock();
+          }
+        });
+      } else {
+        console.log('WakeLock API não é suportada neste navegador');
+      }
+    } catch (err) {
+      console.error('Erro ao ativar o WakeLock:', err);
+    }
+  };
+
+  // Função para liberar o WakeLock
+  const releaseWakeLock = () => {
+    if (wakeLockRef.current) {
+      wakeLockRef.current.release()
+        .then(() => {
+          wakeLockRef.current = null;
+          console.log('WakeLock liberado com sucesso');
+        })
+        .catch((err) => {
+          console.error('Erro ao liberar o WakeLock:', err);
+        });
+    }
+  };
+
+  // Ativar/desativar o WakeLock quando o treino iniciar/terminar
+  useEffect(() => {
+    if (isWorkoutActive) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+    
+    // Adicionar um listener para o evento visibilitychange
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isWorkoutActive) {
+        // Reativar o WakeLock quando o documento se torna visível novamente
+        requestWakeLock();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      releaseWakeLock();
+    };
+  }, [isWorkoutActive]);
 
   useEffect(() => {
     if (id && user) {
@@ -52,6 +115,7 @@ export default function WorkoutMode() {
       if (exerciseTimerIntervalRef.current) clearInterval(exerciseTimerIntervalRef.current);
       if (restTimerIntervalRef.current) clearInterval(restTimerIntervalRef.current);
       if (totalTimeIntervalRef.current) clearInterval(totalTimeIntervalRef.current);
+      releaseWakeLock();
     };
   }, [id, user]);
 
@@ -197,6 +261,9 @@ export default function WorkoutMode() {
       setCompletedSets({});
       setSetRepsHistory({});
       
+      // Ativar o WakeLock para manter a tela ligada
+      requestWakeLock();
+      
       // Iniciar o tempo de treino
       const startTime = new Date();
       setWorkoutStartTime(startTime);
@@ -243,6 +310,9 @@ export default function WorkoutMode() {
     try {
       const endTime = new Date();
       const durationInSeconds = Math.floor((endTime - workoutStartTime) / 1000);
+      
+      // Liberar o WakeLock ao finalizar o treino
+      releaseWakeLock();
       
       // Atualizar a sessão de treino
       const { error } = await supabase
