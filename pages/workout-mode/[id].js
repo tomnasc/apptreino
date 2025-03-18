@@ -35,60 +35,209 @@ export default function WorkoutMode() {
   const [showWeightDecreaseAlert, setShowWeightDecreaseAlert] = useState(false);
   const [setRepsHistory, setSetRepsHistory] = useState({}); // Armazenar histórico de repetições por série
   
-  // Estado para cronômetros baseados em Web Worker
+  // Estado para cronômetros
   const [totalWorkoutTime, setTotalWorkoutTime] = useState(0);
-  const timerWorkerRef = useRef(null);
   const wakeLockRef = useRef(null);
   
-  // Referências para armazenar os tempos absolutos de início/fim
-  const exerciseTimerEndRef = useRef(null);
-  const restTimerEndRef = useRef(null);
-  const workoutStartRef = useRef(null);
-  const lastUpdateRef = useRef(null);
+  // Referências para os intervalos
+  const mainIntervalRef = useRef(null);
 
-  // Inicializar o timer de sincronização
+  // Função para salvar estado dos timers no localStorage
+  const saveTimersState = () => {
+    if (typeof window !== 'undefined') {
+      const timerState = {
+        workoutStartTime: workoutStartTime ? workoutStartTime.getTime() : null,
+        exerciseEndTime: timerActive ? Date.now() + (timeRemaining * 1000) : null,
+        restEndTime: restTimerActive ? Date.now() + (restTimeRemaining * 1000) : null,
+        lastUpdate: Date.now(),
+        isWorkoutActive,
+        timerActive,
+        restTimerActive,
+        sessionId
+      };
+      localStorage.setItem('appTreino_timerState', JSON.stringify(timerState));
+    }
+  };
+
+  // Função para carregar estado dos timers do localStorage
+  const loadTimersState = () => {
+    if (typeof window !== 'undefined') {
+      const timerStateJson = localStorage.getItem('appTreino_timerState');
+      if (timerStateJson) {
+        try {
+          const timerState = JSON.parse(timerStateJson);
+          
+          // Verificar se o timer está ativo e se pertence à sessão atual
+          if (timerState.isWorkoutActive && timerState.sessionId) {
+            // Restaurar tempos de treino
+            if (timerState.workoutStartTime) {
+              const now = Date.now();
+              const startTime = new Date(timerState.workoutStartTime);
+              setWorkoutStartTime(startTime);
+              setTotalWorkoutTime(Math.floor((now - timerState.workoutStartTime) / 1000));
+            }
+            
+            // Restaurar timer de exercício
+            if (timerState.exerciseEndTime) {
+              const now = Date.now();
+              const remaining = Math.max(0, Math.ceil((timerState.exerciseEndTime - now) / 1000));
+              if (remaining > 0) {
+                setTimeRemaining(remaining);
+                setTimerActive(true);
+              }
+            }
+            
+            // Restaurar timer de descanso
+            if (timerState.restEndTime) {
+              const now = Date.now();
+              const remaining = Math.max(0, Math.ceil((timerState.restEndTime - now) / 1000));
+              if (remaining > 0) {
+                setRestTimeRemaining(remaining);
+                setRestTimerActive(true);
+              }
+            }
+            
+            if (timerState.sessionId !== sessionId && sessionId) {
+              // Se o ID da sessão mudou, limpar o estado
+              localStorage.removeItem('appTreino_timerState');
+            }
+          }
+        } catch (e) {
+          console.error('Erro ao carregar estado dos timers:', e);
+          localStorage.removeItem('appTreino_timerState');
+        }
+      }
+    }
+  };
+
+  // Efeito para inicializar o intervalo principal
   useEffect(() => {
-    // Verificar o estado de todos os timers a cada 500ms
-    const timerSyncInterval = setInterval(() => {
-      const now = Date.now();
-      
-      // Atualizar o tempo total de treino
-      if (workoutStartRef.current && isWorkoutActive) {
-        const elapsed = Math.floor((now - workoutStartRef.current) / 1000);
-        setTotalWorkoutTime(elapsed);
+    if (isWorkoutActive) {
+      // Limpar qualquer intervalo existente
+      if (mainIntervalRef.current) {
+        clearInterval(mainIntervalRef.current);
       }
       
-      // Verificar se o timer de exercício terminou
-      if (exerciseTimerEndRef.current && now >= exerciseTimerEndRef.current) {
-        exerciseTimerEndRef.current = null;
-        setTimerActive(false);
-        setTimeRemaining(0);
-        handleSetCompleted();
-      } 
-      // Atualizar o tempo restante do exercício
-      else if (exerciseTimerEndRef.current && timerActive) {
-        const remaining = Math.ceil((exerciseTimerEndRef.current - now) / 1000);
-        setTimeRemaining(Math.max(0, remaining));
+      // Criar novo intervalo para atualizar todos os timers a cada 100ms
+      mainIntervalRef.current = setInterval(() => {
+        const now = Date.now();
+        
+        // Atualizar tempo total de treino
+        if (workoutStartTime) {
+          const elapsed = Math.floor((now - workoutStartTime.getTime()) / 1000);
+          setTotalWorkoutTime(elapsed);
+        }
+        
+        // Atualizar tempo de exercício
+        if (timerActive && timeRemaining > 0) {
+          setTimeRemaining(prev => {
+            const newTime = prev - 0.1;
+            if (newTime <= 0) {
+              handleSetCompleted();
+              return 0;
+            }
+            return Math.max(0, parseFloat(newTime.toFixed(1)));
+          });
+        }
+        
+        // Atualizar tempo de descanso
+        if (restTimerActive && restTimeRemaining > 0) {
+          setRestTimeRemaining(prev => {
+            const newTime = prev - 0.1;
+            if (newTime <= 0) {
+              setRestTimerActive(false);
+              return 0;
+            }
+            return Math.max(0, parseFloat(newTime.toFixed(1)));
+          });
+        }
+        
+        // Salvar o estado atual no localStorage
+        saveTimersState();
+        
+        // Enviar heartbeat para o service worker se existir
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'HEARTBEAT',
+            data: {
+              workoutStartTime: workoutStartTime ? workoutStartTime.getTime() : null,
+              timeRemaining,
+              restTimeRemaining,
+              timerActive,
+              restTimerActive
+            }
+          });
+        }
+      }, 100);
+      
+      return () => {
+        if (mainIntervalRef.current) {
+          clearInterval(mainIntervalRef.current);
+        }
+      };
+    } else {
+      // Limpar o intervalo quando o treino não estiver ativo
+      if (mainIntervalRef.current) {
+        clearInterval(mainIntervalRef.current);
+        mainIntervalRef.current = null;
       }
       
-      // Verificar se o timer de descanso terminou
-      if (restTimerEndRef.current && now >= restTimerEndRef.current) {
-        restTimerEndRef.current = null;
-        setRestTimerActive(false);
-        setRestTimeRemaining(0);
-      } 
-      // Atualizar o tempo restante de descanso
-      else if (restTimerEndRef.current && restTimerActive) {
-        const remaining = Math.ceil((restTimerEndRef.current - now) / 1000);
-        setRestTimeRemaining(Math.max(0, remaining));
+      // Limpar o estado do timer no localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('appTreino_timerState');
       }
-      
-      // Atualizar a referência de última atualização
-      lastUpdateRef.current = now;
-    }, 500);
+    }
+  }, [isWorkoutActive, timerActive, restTimerActive, timeRemaining, restTimeRemaining, workoutStartTime]);
+
+  // Registrar service worker para execução em segundo plano
+  useEffect(() => {
+    const registerServiceWorker = async () => {
+      if ('serviceWorker' in navigator) {
+        try {
+          console.log('Registrando service worker...');
+          const registration = await navigator.serviceWorker.register('/workout-timer-sw.js');
+          console.log('Service worker registrado:', registration);
+        } catch (error) {
+          console.error('Falha ao registrar service worker:', error);
+        }
+      }
+    };
     
-    return () => clearInterval(timerSyncInterval);
-  }, [isWorkoutActive, timerActive, restTimerActive]);
+    registerServiceWorker();
+    
+    // Ouvir mensagens do service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data.type === 'TIMER_UPDATE') {
+          const { timeRemaining: exerciseTime, restTimeRemaining: restTime } = event.data.data;
+          
+          if (timerActive && exerciseTime >= 0) {
+            setTimeRemaining(exerciseTime);
+          }
+          
+          if (restTimerActive && restTime >= 0) {
+            setRestTimeRemaining(restTime);
+          }
+        } else if (event.data.type === 'TIMER_COMPLETE') {
+          if (event.data.timer === 'exercise' && timerActive) {
+            setTimerActive(false);
+            setTimeRemaining(0);
+            handleSetCompleted();
+          } else if (event.data.timer === 'rest' && restTimerActive) {
+            setRestTimerActive(false);
+            setRestTimeRemaining(0);
+          }
+        }
+      });
+    }
+  }, []);
+  
+  // Carregar estado dos timers quando a sessão é carregada
+  useEffect(() => {
+    if (sessionId) {
+      loadTimersState();
+    }
+  }, [sessionId]);
 
   // Função para adquirir o WakeLock
   const requestWakeLock = async () => {
@@ -132,18 +281,8 @@ export default function WorkoutMode() {
   useEffect(() => {
     if (isWorkoutActive) {
       requestWakeLock();
-      
-      // Armazenar o tempo de início absoluto
-      if (workoutStartTime) {
-        workoutStartRef.current = workoutStartTime.getTime();
-      }
     } else {
       releaseWakeLock();
-      
-      // Resetar todas as referências de tempo
-      workoutStartRef.current = null;
-      exerciseTimerEndRef.current = null;
-      restTimerEndRef.current = null;
     }
     
     // Adicionar um listener para o evento visibilitychange
@@ -151,57 +290,38 @@ export default function WorkoutMode() {
       if (document.visibilityState === 'visible' && isWorkoutActive) {
         // Reativar o WakeLock quando o documento se torna visível novamente
         requestWakeLock();
+        
+        // Recarregar o estado dos timers
+        loadTimersState();
+      } else if (document.visibilityState === 'hidden' && isWorkoutActive) {
+        // Salvar o estado dos timers quando a página ficar oculta
+        saveTimersState();
       }
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
+    // Adicionar listener para event beforeunload para salvar estado antes de fechar
+    const handleBeforeUnload = () => {
+      if (isWorkoutActive) {
+        saveTimersState();
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       releaseWakeLock();
     };
-  }, [isWorkoutActive, workoutStartTime]);
-
-  // Efeito para cronômetro de exercício baseado em tempo
-  useEffect(() => {
-    if (timerActive && timeRemaining > 0) {
-      // Calcular o tempo absoluto de término
-      const now = Date.now();
-      exerciseTimerEndRef.current = now + (timeRemaining * 1000);
-      console.log('Timer de exercício ativado, termina em:', new Date(exerciseTimerEndRef.current).toLocaleTimeString());
-    } else if (!timerActive) {
-      // Limpar o tempo de término
-      exerciseTimerEndRef.current = null;
-    }
-  }, [timerActive, timeRemaining]);
-
-  // Efeito para cronômetro de descanso entre séries
-  useEffect(() => {
-    if (restTimerActive && restTimeRemaining > 0) {
-      // Calcular o tempo absoluto de término
-      const now = Date.now();
-      restTimerEndRef.current = now + (restTimeRemaining * 1000);
-      console.log('Timer de descanso ativado, termina em:', new Date(restTimerEndRef.current).toLocaleTimeString());
-    } else if (!restTimerActive) {
-      // Limpar o tempo de término
-      restTimerEndRef.current = null;
-    }
-  }, [restTimerActive, restTimeRemaining]);
+  }, [isWorkoutActive, timerActive, restTimerActive, timeRemaining, restTimeRemaining, workoutStartTime]);
 
   useEffect(() => {
     if (id && user) {
       fetchWorkoutList();
       fetchExercises();
     }
-    
-    return () => {
-      releaseWakeLock();
-      
-      // Limpar todas as referências de tempo
-      workoutStartRef.current = null;
-      exerciseTimerEndRef.current = null;
-      restTimerEndRef.current = null;
-    };
   }, [id, user]);
 
   useEffect(() => {
@@ -752,7 +872,7 @@ export default function WorkoutMode() {
                           {exercise.reps && (
                             <div className="flex items-center">
                               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 mr-1">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 1-.659 1.591L9.5 14.5M9.75 3.104V1.5M9.75 9.75v4.5m0-4.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H9.75Z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 1-.659 1.591L9.5 14.5M9.75 3.104V1.5M9.75 9.75v4.5m0-4.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H9.75Z" />
                               </svg>
                               <span className="font-medium text-gray-500">Repetições:</span>{' '}
                               <span className="ml-1 font-bold text-gray-700">{exercise.reps}</span>
@@ -881,7 +1001,7 @@ export default function WorkoutMode() {
                   {currentExercise.reps && (
                     <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg">
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 mb-1">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 1-.659 1.591L9.5 14.5M9.75 3.104V1.5M9.75 9.75v4.5m0-4.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H9.75Z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 1-.659 1.591L9.5 14.5M9.75 3.104V1.5M9.75 9.75v4.5m0-4.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H9.75Z" />
                       </svg>
                       <span className="font-medium text-gray-500 text-xs">Repetições</span>
                       <span className="font-bold text-gray-800 text-lg">{repsCompleted} / {currentExercise.reps}</span>
