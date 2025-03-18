@@ -275,21 +275,25 @@ export default function WorkoutMode() {
   // Função para adquirir o WakeLock
   const requestWakeLock = async () => {
     try {
-      if ('wakeLock' in navigator) {
-        // Solicitar o WakeLock para manter a tela ativa
+      if ('wakeLock' in navigator && document.visibilityState === 'visible') {
+        // Solicitar o WakeLock para manter a tela ativa apenas quando a página estiver visível
         wakeLockRef.current = await navigator.wakeLock.request('screen');
         console.log('WakeLock ativado para manter a tela ligada');
         
         // Adicionar um listener para reativar o WakeLock se o usuário retornar ao aplicativo
         wakeLockRef.current.addEventListener('release', () => {
           console.log('WakeLock foi liberado');
-          // Tentar reativar o WakeLock se o treino ainda estiver ativo
-          if (isWorkoutActive) {
-            requestWakeLock();
+          // Tentar reativar o WakeLock apenas se o treino estiver ativo e a página estiver visível
+          if (isWorkoutActive && document.visibilityState === 'visible') {
+            setTimeout(() => {
+              requestWakeLock();
+            }, 500); // Pequeno atraso para garantir que a página esteja completamente visível
           }
         });
-      } else {
+      } else if (!('wakeLock' in navigator)) {
         console.log('WakeLock API não é suportada neste navegador');
+      } else {
+        console.log('Não é possível ativar o WakeLock quando a página não está visível');
       }
     } catch (err) {
       console.error('Erro ao ativar o WakeLock:', err);
@@ -312,7 +316,7 @@ export default function WorkoutMode() {
 
   // Ativar/desativar o WakeLock quando o treino iniciar/terminar
   useEffect(() => {
-    if (isWorkoutActive) {
+    if (isWorkoutActive && document.visibilityState === 'visible') {
       requestWakeLock();
     } else {
       releaseWakeLock();
@@ -322,7 +326,9 @@ export default function WorkoutMode() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && isWorkoutActive) {
         // Reativar o WakeLock quando o documento se torna visível novamente
-        requestWakeLock();
+        setTimeout(() => {
+          requestWakeLock();
+        }, 500); // Pequeno atraso para garantir que a página esteja completamente visível
         
         // Recarregar o estado dos timers
         loadTimersState();
