@@ -438,8 +438,7 @@ export default function WorkoutMode() {
           .insert({
             user_id: user.id,
             workout_list_id: id,
-            started_at: startTime.toISOString(),
-            status: 'in_progress'
+            started_at: startTime.toISOString()
           })
           .select('id')
           .single();
