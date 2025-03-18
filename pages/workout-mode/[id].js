@@ -318,10 +318,10 @@ export default function WorkoutMode() {
         ? Math.round((validStartTime - previousSetEndTime) / 1000) 
         : 0;
         
-      // Inserir detalhes da série no banco de dados
+      // Usar upsert em vez de insert para evitar conflito de chave duplicada
       const { error } = await supabase
         .from('workout_session_details')
-        .insert([
+        .upsert([
           {
             session_id: sessionId,
             exercise_id: currentExercise.id,
@@ -334,7 +334,8 @@ export default function WorkoutMode() {
             start_time: validStartTime.toISOString(),
             end_time: validEndTime.toISOString()
           }
-        ]);
+        ])
+        .select();
         
       if (error) {
         console.error('Erro ao salvar detalhes da série:', error);
