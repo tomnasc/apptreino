@@ -440,6 +440,15 @@ export default function WorkoutMode() {
       if (currentExercise.rest_time) {
         setRestTimeRemaining(currentExercise.rest_time);
         setRestTimerActive(true);
+        
+        // Iniciar o worker de temporizador para o descanso
+        if (workerInitialized && timerWorkerRef.current) {
+          timerWorkerRef.current.postMessage({
+            action: 'start',
+            time: currentExercise.rest_time,
+            type: 'rest'
+          });
+        }
       }
       
       // Definir o momento de início da próxima série
