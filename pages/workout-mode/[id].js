@@ -39,73 +39,56 @@ export default function WorkoutMode() {
   const [totalWorkoutTime, setTotalWorkoutTime] = useState(0);
   const timerWorkerRef = useRef(null);
   const wakeLockRef = useRef(null);
-
-  // Inicializar o Web Worker
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Criar o Worker apenas no lado do cliente
-      timerWorkerRef.current = new Worker('/timer-worker.js');
-      
-      // Configurar o listener para mensagens do Worker
-      timerWorkerRef.current.onmessage = (event) => {
-        const { id, remaining, type } = event.data;
-        
-        switch (id) {
-          case 'exercise':
-            if (type === 'tick') {
-              setTimeRemaining(remaining);
-            } else if (type === 'complete') {
-              setTimerActive(false);
-              setTimeRemaining(0);
-              handleSetCompleted();
-            }
-            break;
-            
-          case 'rest':
-            if (type === 'tick') {
-              setRestTimeRemaining(remaining);
-            } else if (type === 'complete') {
-              setRestTimerActive(false);
-              setRestTimeRemaining(0);
-            }
-            break;
-            
-          case 'total':
-            if (type === 'tick') {
-              setTotalWorkoutTime(remaining);
-            }
-            break;
-        }
-      };
-      
-      return () => {
-        if (timerWorkerRef.current) {
-          timerWorkerRef.current.terminate();
-        }
-      };
-    }
-  }, []);
-
-  // Função para iniciar um timer no Web Worker
-  const startWorkerTimer = (id, duration) => {
-    if (timerWorkerRef.current) {
-      timerWorkerRef.current.postMessage({
-        action: 'start',
-        id,
-        duration
-      });
-    }
-  };
   
-  // Função para parar um timer no Web Worker
-  const stopWorkerTimer = (id) => {
-    if (timerWorkerRef.current) {
-      timerWorkerRef.current.postMessage({
-        action: 'stop',
-        id
-      });
-    }
-  };
+  // Referências para armazenar os tempos absolutos de início/fim
+  const exerciseTimerEndRef = useRef(null);
+  const restTimerEndRef = useRef(null);
+  const workoutStartRef = useRef(null);
+  const lastUpdateRef = useRef(null);
+
+  // Inicializar o timer de sincronização
+  useEffect(() => {
+    // Verificar o estado de todos os timers a cada 500ms
+    const timerSyncInterval = setInterval(() => {
+      const now = Date.now();
+      
+      // Atualizar o tempo total de treino
+      if (workoutStartRef.current && isWorkoutActive) {
+        const elapsed = Math.floor((now - workoutStartRef.current) / 1000);
+        setTotalWorkoutTime(elapsed);
+      }
+      
+      // Verificar se o timer de exercício terminou
+      if (exerciseTimerEndRef.current && now >= exerciseTimerEndRef.current) {
+        exerciseTimerEndRef.current = null;
+        setTimerActive(false);
+        setTimeRemaining(0);
+        handleSetCompleted();
+      } 
+      // Atualizar o tempo restante do exercício
+      else if (exerciseTimerEndRef.current && timerActive) {
+        const remaining = Math.ceil((exerciseTimerEndRef.current - now) / 1000);
+        setTimeRemaining(Math.max(0, remaining));
+      }
+      
+      // Verificar se o timer de descanso terminou
+      if (restTimerEndRef.current && now >= restTimerEndRef.current) {
+        restTimerEndRef.current = null;
+        setRestTimerActive(false);
+        setRestTimeRemaining(0);
+      } 
+      // Atualizar o tempo restante de descanso
+      else if (restTimerEndRef.current && restTimerActive) {
+        const remaining = Math.ceil((restTimerEndRef.current - now) / 1000);
+        setRestTimeRemaining(Math.max(0, remaining));
+      }
+      
+      // Atualizar a referência de última atualização
+      lastUpdateRef.current = now;
+    }, 500);
+    
+    return () => clearInterval(timerSyncInterval);
+  }, [isWorkoutActive, timerActive, restTimerActive]);
 
   // Função para adquirir o WakeLock
   const requestWakeLock = async () => {
@@ -150,16 +133,17 @@ export default function WorkoutMode() {
     if (isWorkoutActive) {
       requestWakeLock();
       
-      // Iniciar cronômetro de tempo total se o treino estiver ativo
+      // Armazenar o tempo de início absoluto
       if (workoutStartTime) {
-        const initialDuration = Math.floor((new Date() - workoutStartTime) / 1000);
-        setTotalWorkoutTime(initialDuration);
-        // Iniciar o timer total em contagem crescente com um valor muito grande
-        startWorkerTimer('total', 86400); // 24 horas
+        workoutStartRef.current = workoutStartTime.getTime();
       }
     } else {
       releaseWakeLock();
-      stopWorkerTimer('total');
+      
+      // Resetar todas as referências de tempo
+      workoutStartRef.current = null;
+      exerciseTimerEndRef.current = null;
+      restTimerEndRef.current = null;
     }
     
     // Adicionar um listener para o evento visibilitychange
@@ -170,72 +154,38 @@ export default function WorkoutMode() {
       }
     };
     
-    // Lidar com eventos de visibilidade para gerenciar os timers
-    const handleAppFocus = () => {
-      if (timerWorkerRef.current && isWorkoutActive) {
-        // Ao voltar ao aplicativo, atualizar os estados dos timers
-        timerWorkerRef.current.postMessage({
-          action: 'get',
-          id: 'exercise'
-        });
-        
-        timerWorkerRef.current.postMessage({
-          action: 'get',
-          id: 'rest'
-        });
-        
-        timerWorkerRef.current.postMessage({
-          action: 'get',
-          id: 'total'
-        });
-      }
-    };
-    
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleAppFocus);
     
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleAppFocus);
       releaseWakeLock();
-      
-      // Parar todos os timers
-      if (timerWorkerRef.current) {
-        stopWorkerTimer('exercise');
-        stopWorkerTimer('rest');
-        stopWorkerTimer('total');
-      }
     };
   }, [isWorkoutActive, workoutStartTime]);
 
   // Efeito para cronômetro de exercício baseado em tempo
   useEffect(() => {
     if (timerActive && timeRemaining > 0) {
-      // Iniciar o timer no Web Worker
-      startWorkerTimer('exercise', timeRemaining);
+      // Calcular o tempo absoluto de término
+      const now = Date.now();
+      exerciseTimerEndRef.current = now + (timeRemaining * 1000);
+      console.log('Timer de exercício ativado, termina em:', new Date(exerciseTimerEndRef.current).toLocaleTimeString());
     } else if (!timerActive) {
-      // Parar o timer no Web Worker
-      stopWorkerTimer('exercise');
+      // Limpar o tempo de término
+      exerciseTimerEndRef.current = null;
     }
-    
-    return () => {
-      stopWorkerTimer('exercise');
-    };
   }, [timerActive, timeRemaining]);
 
   // Efeito para cronômetro de descanso entre séries
   useEffect(() => {
     if (restTimerActive && restTimeRemaining > 0) {
-      // Iniciar o timer no Web Worker
-      startWorkerTimer('rest', restTimeRemaining);
+      // Calcular o tempo absoluto de término
+      const now = Date.now();
+      restTimerEndRef.current = now + (restTimeRemaining * 1000);
+      console.log('Timer de descanso ativado, termina em:', new Date(restTimerEndRef.current).toLocaleTimeString());
     } else if (!restTimerActive) {
-      // Parar o timer no Web Worker
-      stopWorkerTimer('rest');
+      // Limpar o tempo de término
+      restTimerEndRef.current = null;
     }
-    
-    return () => {
-      stopWorkerTimer('rest');
-    };
   }, [restTimerActive, restTimeRemaining]);
 
   useEffect(() => {
@@ -244,17 +194,13 @@ export default function WorkoutMode() {
       fetchExercises();
     }
     
-    // Limpar todos os timers ao desmontar
     return () => {
       releaseWakeLock();
       
-      // Parar todos os timers do Worker
-      if (timerWorkerRef.current) {
-        stopWorkerTimer('exercise');
-        stopWorkerTimer('rest');
-        stopWorkerTimer('total');
-        timerWorkerRef.current.terminate();
-      }
+      // Limpar todas as referências de tempo
+      workoutStartRef.current = null;
+      exerciseTimerEndRef.current = null;
+      restTimerEndRef.current = null;
     };
   }, [id, user]);
 
@@ -321,9 +267,11 @@ export default function WorkoutMode() {
       setWorkoutStartTime(startTime);
       setCurrentSetStartTime(startTime); // Definir o momento de início da primeira série
       
+      // Configurar a referência para o tempo absoluto de início
+      workoutStartRef.current = startTime.getTime();
+      
       // Iniciar o cronômetro de tempo total
       setTotalWorkoutTime(0);
-      // O timer total será iniciado no useEffect que monitora isWorkoutActive e workoutStartTime
       
       // Se o primeiro exercício for baseado em tempo, configurar o timer
       if (exercises[0].time) {
@@ -370,10 +318,10 @@ export default function WorkoutMode() {
       // Liberar o WakeLock ao finalizar o treino
       releaseWakeLock();
       
-      // Parar todos os timers
-      stopWorkerTimer('exercise');
-      stopWorkerTimer('rest');
-      stopWorkerTimer('total');
+      // Limpar todas as referências de tempo
+      workoutStartRef.current = null;
+      exerciseTimerEndRef.current = null;
+      restTimerEndRef.current = null;
       
       // Atualizar a sessão de treino
       const { error } = await supabase
@@ -932,7 +880,7 @@ export default function WorkoutMode() {
                   </div>
                   {currentExercise.reps && (
                     <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 mr-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 mb-1">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 1-.659 1.591L9.5 14.5M9.75 3.104V1.5M9.75 9.75v4.5m0-4.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H9.75Z" />
                       </svg>
                       <span className="font-medium text-gray-500 text-xs">Repetições</span>
