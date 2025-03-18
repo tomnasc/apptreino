@@ -213,16 +213,29 @@ export default function WorkoutMode() {
           });
         }
         
-        // Atualizar tempo de descanso
+        // Atualizar tempo de descanso usando tempo absoluto
         if (restTimerActive && restTimeRemaining > 0) {
-          setRestTimeRemaining(prev => {
-            const newTime = prev - 0.1;
-            if (newTime <= 0) {
+          if (restTimerEndRef.current) {
+            // Calcular o tempo restante com base no tempo absoluto de término
+            const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
+            setRestTimeRemaining(remaining);
+            
+            if (remaining <= 0) {
               setRestTimerActive(false);
-              return 0;
+              setRestTimeRemaining(0);
+              restTimerEndRef.current = null;
             }
-            return Math.max(0, parseFloat(newTime.toFixed(1)));
-          });
+          } else {
+            // Se não tivermos um tempo de término absoluto, decremente normalmente
+            setRestTimeRemaining(prev => {
+              const newTime = prev - 0.1;
+              if (newTime <= 0) {
+                setRestTimerActive(false);
+                return 0;
+              }
+              return Math.max(0, parseFloat(newTime.toFixed(1)));
+            });
+          }
         }
         
         // Salvar o estado atual no localStorage
@@ -248,6 +261,24 @@ export default function WorkoutMode() {
       }
     }
   }, [isWorkoutActive, timerActive, restTimerActive, timeRemaining, restTimeRemaining, workoutStartTime]);
+
+  // Atualizar o tempo de término do temporizador de descanso quando é ativado
+  useEffect(() => {
+    if (restTimerActive && restTimeRemaining > 0) {
+      const now = Date.now();
+      restTimerEndRef.current = now + (restTimeRemaining * 1000);
+      console.log('Temporizador de descanso definido para terminar em:', new Date(restTimerEndRef.current).toLocaleTimeString());
+    }
+  }, [restTimerActive]);
+
+  // Função para iniciar o timer de descanso
+  const startRestTimer = (duration) => {
+    setRestTimeRemaining(duration);
+    setRestTimerActive(true);
+    const now = Date.now();
+    restTimerEndRef.current = now + (duration * 1000);
+    console.log('Temporizador de descanso iniciado, terminará em:', new Date(restTimerEndRef.current).toLocaleTimeString());
+  };
 
   // Remover registro do service worker que está causando problemas
   useEffect(() => {
@@ -669,8 +700,7 @@ export default function WorkoutMode() {
       
       // Iniciar temporizador de descanso se estiver configurado
       if (currentExercise.rest_time) {
-        setRestTimeRemaining(currentExercise.rest_time);
-        setRestTimerActive(true);
+        startRestTimer(currentExercise.rest_time);
       }
       
       // Definir o momento de início da próxima série
