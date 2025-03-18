@@ -264,16 +264,31 @@ export default function WorkoutReport() {
                               <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Tempo de Descanso
                               </th>
+                              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Horário
+                              </th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {sessionDetails.filter(d => d.exercise_id === exercise.id).map((detail) => (
-                              <tr key={`${detail.exercise_id}-${detail.set_index}`}>
+                              <tr key={`${detail.exercise_id}-${detail.set_index}`} 
+                                  className={detail.reps_completed >= (exercise.reps || 0) ? "bg-green-50" : ""}>
                                 <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
                                   {detail.set_index + 1}
                                 </td>
-                                <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                                  {detail.reps_completed || 'N/A'}
+                                <td className="px-3 py-2 whitespace-nowrap text-sm font-medium">
+                                  {detail.reps_completed !== null ? (
+                                    <span className={
+                                      detail.reps_completed >= (exercise.reps || 0) 
+                                        ? "text-green-700" 
+                                        : detail.reps_completed >= (exercise.reps * 0.7 || 0)
+                                          ? "text-yellow-700"
+                                          : "text-red-700"
+                                    }>
+                                      {detail.reps_completed}
+                                      {exercise.reps ? ` / ${exercise.reps}` : ''}
+                                    </span>
+                                  ) : 'N/A'}
                                 </td>
                                 <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
                                   {detail.weight_used ? `${detail.weight_used} kg` : 'N/A'}
@@ -284,11 +299,63 @@ export default function WorkoutReport() {
                                 <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
                                   {detail.rest_time ? `${detail.rest_time}s` : 'N/A'}
                                 </td>
+                                <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
+                                  {detail.start_time ? new Date(detail.start_time).toLocaleTimeString('pt-BR', {
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  }) : 'N/A'}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
+                      
+                      {/* Estatísticas específicas deste exercício */}
+                      {sessionDetails && sessionDetails.filter(d => d.exercise_id === exercise.id).length > 0 && (
+                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          <div className="bg-blue-50 p-3 rounded border border-blue-100">
+                            <h5 className="text-xs font-medium text-blue-800 mb-1">Média de Repetições</h5>
+                            <p className="text-lg font-bold text-blue-600">
+                              {Math.round(sessionDetails
+                                .filter(d => d.exercise_id === exercise.id && d.reps_completed)
+                                .reduce((sum, d) => sum + d.reps_completed, 0) / 
+                                sessionDetails.filter(d => d.exercise_id === exercise.id && d.reps_completed).length
+                              )}
+                            </p>
+                          </div>
+                          
+                          <div className="bg-green-50 p-3 rounded border border-green-100">
+                            <h5 className="text-xs font-medium text-green-800 mb-1">Tempo Total</h5>
+                            <p className="text-lg font-bold text-green-600">
+                              {formatDuration(sessionDetails
+                                .filter(d => d.exercise_id === exercise.id && d.execution_time)
+                                .reduce((sum, d) => sum + d.execution_time, 0)
+                              )}
+                            </p>
+                          </div>
+                          
+                          <div className="bg-yellow-50 p-3 rounded border border-yellow-100">
+                            <h5 className="text-xs font-medium text-yellow-800 mb-1">Repetições Totais</h5>
+                            <p className="text-lg font-bold text-yellow-600">
+                              {sessionDetails
+                                .filter(d => d.exercise_id === exercise.id && d.reps_completed)
+                                .reduce((sum, d) => sum + d.reps_completed, 0)
+                              }
+                            </p>
+                          </div>
+                          
+                          <div className="bg-purple-50 p-3 rounded border border-purple-100">
+                            <h5 className="text-xs font-medium text-purple-800 mb-1">Descanso Total</h5>
+                            <p className="text-lg font-bold text-purple-600">
+                              {formatDuration(sessionDetails
+                                .filter(d => d.exercise_id === exercise.id && d.rest_time)
+                                .reduce((sum, d) => sum + d.rest_time, 0)
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="mt-3 text-sm text-gray-500 italic">
@@ -309,114 +376,183 @@ export default function WorkoutReport() {
             Resumo e Estatísticas
           </h2>
           
-          <p className="text-gray-500 mb-4">
-            Este relatório mostra um resumo da sessão de treino realizada. 
-            Para dados mais detalhados, será necessário implementar um sistema de acompanhamento
-            detalhado de cada série e repetição durante o treino.
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-              <h3 className="text-sm font-medium text-blue-800 mb-2">Total de Exercícios</h3>
-              <p className="text-2xl font-bold text-blue-600">{exercises.length}</p>
-            </div>
-            
-            <div className="bg-green-50 p-4 rounded-lg border border-green-100">
-              <h3 className="text-sm font-medium text-green-800 mb-2">Tempo Total</h3>
-              <p className="text-2xl font-bold text-green-600">
-                {formatDuration(session.duration)}
-              </p>
-            </div>
-            
-            <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
-              <h3 className="text-sm font-medium text-purple-800 mb-2">Séries Totais</h3>
-              <p className="text-2xl font-bold text-purple-600">
-                {exercises.reduce((total, ex) => total + (ex.sets || 0), 0)}
-              </p>
-            </div>
-          </div>
-          
-          {sessionDetails && sessionDetails.length > 0 && (
-            <div className="mt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Estatísticas Detalhadas</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-                  <h4 className="text-sm font-medium text-indigo-800 mb-2">Média de Repetições</h4>
-                  <p className="text-2xl font-bold text-indigo-600">
-                    {sessionDetails.filter(d => d.reps_completed).length > 0 
-                      ? Math.round(sessionDetails.reduce((sum, d) => sum + (d.reps_completed || 0), 0) / 
-                          sessionDetails.filter(d => d.reps_completed).length)
-                      : 'N/A'}
+          {sessionDetails && sessionDetails.length > 0 ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                  <h3 className="text-sm font-medium text-blue-800 mb-2">Total de Exercícios</h3>
+                  <p className="text-2xl font-bold text-blue-600">{exercises.length}</p>
+                  <p className="text-xs text-blue-500 mt-1">
+                    {new Set(sessionDetails.map(d => d.exercise_id)).size} exercícios executados
                   </p>
                 </div>
                 
-                <div className="bg-pink-50 p-4 rounded-lg border border-pink-100">
-                  <h4 className="text-sm font-medium text-pink-800 mb-2">Tempo Médio de Execução</h4>
-                  <p className="text-2xl font-bold text-pink-600">
-                    {sessionDetails.filter(d => d.execution_time).length > 0 
-                      ? `${Math.round(sessionDetails.reduce((sum, d) => sum + (d.execution_time || 0), 0) / 
-                          sessionDetails.filter(d => d.execution_time).length)}s`
-                      : 'N/A'}
+                <div className="bg-green-50 p-4 rounded-lg border border-green-100">
+                  <h3 className="text-sm font-medium text-green-800 mb-2">Tempo Total</h3>
+                  <p className="text-2xl font-bold text-green-600">
+                    {formatDuration(session.duration)}
+                  </p>
+                  <p className="text-xs text-green-500 mt-1">
+                    Execução: {formatDuration(sessionDetails.reduce((sum, d) => sum + (d.execution_time || 0), 0))}
                   </p>
                 </div>
                 
-                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
-                  <h4 className="text-sm font-medium text-yellow-800 mb-2">Tempo Médio de Descanso</h4>
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {sessionDetails.filter(d => d.rest_time).length > 0 
-                      ? `${Math.round(sessionDetails.reduce((sum, d) => sum + (d.rest_time || 0), 0) / 
-                          sessionDetails.filter(d => d.rest_time).length)}s`
-                      : 'N/A'}
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                  <h3 className="text-sm font-medium text-purple-800 mb-2">Séries Totais</h3>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {exercises.reduce((total, ex) => total + (ex.sets || 0), 0)}
                   </p>
-                </div>
-                
-                <div className="bg-orange-50 p-4 rounded-lg border border-orange-100">
-                  <h4 className="text-sm font-medium text-orange-800 mb-2">Carga Média</h4>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {sessionDetails.filter(d => d.weight_used).length > 0 
-                      ? `${(sessionDetails.reduce((sum, d) => sum + (parseFloat(d.weight_used) || 0), 0) / 
-                          sessionDetails.filter(d => d.weight_used).length).toFixed(1)} kg`
-                      : 'N/A'}
+                  <p className="text-xs text-purple-500 mt-1">
+                    {sessionDetails.length} séries executadas
                   </p>
                 </div>
               </div>
               
-              <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <h4 className="text-sm font-medium text-gray-800 mb-3">Progresso ao Longo do Treino</h4>
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Estatísticas Detalhadas</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                    <h4 className="text-sm font-medium text-indigo-800 mb-2">Média de Repetições</h4>
+                    <p className="text-2xl font-bold text-indigo-600">
+                      {sessionDetails.filter(d => d.reps_completed).length > 0 
+                        ? Math.round(sessionDetails.reduce((sum, d) => sum + (d.reps_completed || 0), 0) / 
+                            sessionDetails.filter(d => d.reps_completed).length)
+                        : 'N/A'}
+                    </p>
+                    <p className="text-xs text-indigo-500 mt-1">
+                      Total: {sessionDetails.reduce((sum, d) => sum + (d.reps_completed || 0), 0)} repetições
+                    </p>
+                  </div>
+                  
+                  <div className="bg-pink-50 p-4 rounded-lg border border-pink-100">
+                    <h4 className="text-sm font-medium text-pink-800 mb-2">Tempo Médio de Execução</h4>
+                    <p className="text-2xl font-bold text-pink-600">
+                      {sessionDetails.filter(d => d.execution_time).length > 0 
+                        ? `${Math.round(sessionDetails.reduce((sum, d) => sum + (d.execution_time || 0), 0) / 
+                            sessionDetails.filter(d => d.execution_time).length)}s`
+                        : 'N/A'}
+                    </p>
+                    <p className="text-xs text-pink-500 mt-1">
+                      Total: {formatDuration(sessionDetails.reduce((sum, d) => sum + (d.execution_time || 0), 0))}
+                    </p>
+                  </div>
+                  
+                  <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                    <h4 className="text-sm font-medium text-yellow-800 mb-2">Tempo Médio de Descanso</h4>
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {sessionDetails.filter(d => d.rest_time).length > 0 
+                        ? `${Math.round(sessionDetails.reduce((sum, d) => sum + (d.rest_time || 0), 0) / 
+                            sessionDetails.filter(d => d.rest_time).length)}s`
+                        : 'N/A'}
+                    </p>
+                    <p className="text-xs text-yellow-500 mt-1">
+                      Total: {formatDuration(sessionDetails.reduce((sum, d) => sum + (d.rest_time || 0), 0))}
+                    </p>
+                  </div>
+                  
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-100">
+                    <h4 className="text-sm font-medium text-orange-800 mb-2">Carga Média</h4>
+                    <p className="text-2xl font-bold text-orange-600">
+                      {sessionDetails.filter(d => d.weight_used).length > 0 
+                        ? `${(sessionDetails.reduce((sum, d) => sum + (parseFloat(d.weight_used) || 0), 0) / 
+                            sessionDetails.filter(d => d.weight_used).length).toFixed(1)} kg`
+                        : 'N/A'}
+                    </p>
+                    <p className="text-xs text-orange-500 mt-1">
+                      Volume total: {Math.round(sessionDetails.reduce((sum, d) => 
+                        sum + ((d.weight_used || 0) * (d.reps_completed || 0)), 0))} kg
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                    <h4 className="text-sm font-medium text-red-800 mb-2">Densidade do Treino</h4>
+                    <p className="text-2xl font-bold text-red-600">
+                      {sessionDetails.length > 0 
+                        ? `${(sessionDetails.reduce((sum, d) => sum + (d.execution_time || 0), 0) / 
+                            Math.max(1, session.duration) * 100).toFixed(1)}%`
+                        : 'N/A'}
+                    </p>
+                    <p className="text-xs text-red-500 mt-1">
+                      Tempo de trabalho vs tempo total
+                    </p>
+                  </div>
+                  
+                  <div className="bg-teal-50 p-4 rounded-lg border border-teal-100">
+                    <h4 className="text-sm font-medium text-teal-800 mb-2">Eficiência de Repetições</h4>
+                    <p className="text-2xl font-bold text-teal-600">
+                      {sessionDetails.filter(d => d.reps_completed && exercises.find(e => e.id === d.exercise_id)?.reps).length > 0
+                        ? `${(sessionDetails
+                            .filter(d => exercises.find(e => e.id === d.exercise_id)?.reps)
+                            .reduce((sum, d) => sum + (d.reps_completed || 0), 0) / 
+                            sessionDetails
+                              .filter(d => exercises.find(e => e.id === d.exercise_id)?.reps)
+                              .reduce((sum, d) => sum + (exercises.find(e => e.id === d.exercise_id)?.reps || 0), 0) * 100).toFixed(1)}%`
+                        : 'N/A'}
+                    </p>
+                    <p className="text-xs text-teal-500 mt-1">
+                      Repetições realizadas vs planejadas
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h4 className="text-sm font-medium text-gray-800 mb-3">Progresso das Repetições por Série</h4>
                 <div className="h-64">
                   <div className="h-full flex items-end justify-between space-x-1">
                     {sessionDetails
                       .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
                       .map((detail, index) => {
-                        const height = detail.reps_completed 
-                          ? `${Math.min(100, (detail.reps_completed / (exercises.find(e => e.id === detail.exercise_id)?.reps || 1)) * 100)}%`
-                          : '20%';
+                        const targetReps = exercises.find(e => e.id === detail.exercise_id)?.reps || 1;
+                        const efficiency = detail.reps_completed 
+                          ? Math.min(100, (detail.reps_completed / targetReps) * 100)
+                          : 20;
+                        
+                        let barColor = 'bg-gray-400';
+                        if (detail.reps_completed) {
+                          if (detail.reps_completed >= targetReps) barColor = 'bg-green-500';
+                          else if (detail.reps_completed >= targetReps * 0.7) barColor = 'bg-yellow-500';
+                          else barColor = 'bg-red-500';
+                        }
                         
                         return (
                           <div 
-                            key={index} 
-                            className="bg-blue-500 rounded-t w-full"
-                            style={{ 
-                              height, 
-                              transition: 'height 0.3s ease'
-                            }}
-                            title={`Exercício: ${(exercises.find(e => e.id === detail.exercise_id)?.name || 'Desconhecido')}
+                            key={index}
+                            className="relative w-full h-full flex flex-col justify-end"
+                          >
+                            <div 
+                              className={`rounded-t w-full ${barColor}`}
+                              style={{ 
+                                height: `${efficiency}%`, 
+                                transition: 'height 0.3s ease'
+                              }}
+                              title={`Exercício: ${(exercises.find(e => e.id === detail.exercise_id)?.name || 'Desconhecido')}
 Série: ${detail.set_index + 1}
-Repetições: ${detail.reps_completed || 'N/A'}
+Repetições: ${detail.reps_completed || 'N/A'}/${targetReps}
 Carga: ${detail.weight_used ? `${detail.weight_used} kg` : 'N/A'}
 Tempo: ${detail.execution_time ? `${detail.execution_time}s` : 'N/A'}`}
-                          />
+                            />
+                            <div className="text-xs text-gray-500 truncate text-center mt-1" style={{transform: 'rotate(-45deg)', transformOrigin: 'left top', width: '20px'}}>
+                              {index + 1}
+                            </div>
+                          </div>
                         );
                       })
                     }
                   </div>
                 </div>
                 <div className="text-xs text-gray-500 mt-1 text-center">
-                  Cada barra representa uma série (altura baseada no % de repetições completadas)
+                  Cada barra representa uma série (altura baseada no % de repetições completadas vs. planejadas)
                 </div>
               </div>
             </div>
+          ) : (
+            <p className="text-gray-500 mb-4">
+              Não há dados detalhados disponíveis para esta sessão de treino.
+            </p>
           )}
         </div>
       </div>
