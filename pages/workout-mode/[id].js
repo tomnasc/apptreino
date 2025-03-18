@@ -189,49 +189,51 @@ export default function WorkoutMode() {
   };
 
   const startWorkout = async () => {
-    if (exercises.length === 0) {
-      setError('Esta lista de treinos não possui exercícios.');
-      return;
-    }
-
     try {
-      // Criar uma nova sessão de treino
-      const startTime = new Date();
-      const { data, error } = await supabase
-        .from('workout_sessions')
-        .insert([
-          {
-            user_id: user.id,
-            workout_list_id: id,
-            started_at: startTime.toISOString(),
-            completed: false
-          }
-        ])
-        .select();
-
-      if (error) throw error;
-      
-      setSessionId(data[0].id);
-      setWorkoutStartTime(startTime);
+      // Inicializar o estado do treino
       setIsWorkoutActive(true);
       setCurrentExerciseIndex(0);
       setCurrentSetIndex(0);
       setCompletedSets({});
-      setSetRepsHistory({}); // Resetar o histórico de repetições
-      setCurrentSetStartTime(new Date());
-      setPreviousSetEndTime(null);
+      setSetRepsHistory({});
       
-      // Se o exercício atual for baseado em tempo, apenas configurar o temporizador
-      const currentExercise = exercises[0];
-      if (currentExercise.time) {
-        setTimeRemaining(currentExercise.time);
-        setTimerActive(false); // Não inicia automaticamente, espera o usuário clicar
-      } else {
-        setRepsCompleted(0);
+      // Iniciar o tempo de treino
+      const startTime = new Date();
+      setWorkoutStartTime(startTime);
+      setCurrentSetStartTime(startTime); // Definir o momento de início da primeira série
+      
+      // Se o primeiro exercício for baseado em tempo, configurar o timer
+      if (exercises[0].time) {
+        setTimeRemaining(exercises[0].time);
       }
+      
+      // Criar uma nova sessão de treino
+      const { data, error } = await supabase
+        .from('workout_sessions')
+        .insert({
+          user_id: user.id,
+          workout_list_id: id,
+          start_time: startTime.toISOString(),
+          status: 'in_progress'
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        setError(`Erro ao iniciar treino: ${error.message}`);
+        console.error('Erro ao iniciar treino:', error);
+        return;
+      }
+      
+      setSessionId(data.id);
+      
+      // Atualizar a URL com o ID da sessão para possibilitar a retomada
+      router.replace(`/workout-mode/${id}?session=${data.id}`, undefined, { 
+        shallow: true 
+      });
     } catch (error) {
       console.error('Erro ao iniciar treino:', error);
-      setError('Ocorreu um erro ao iniciar o treino. Por favor, tente novamente.');
+      setError('Ocorreu um erro ao iniciar o treino. Tente novamente.');
     }
   };
 
@@ -305,27 +307,19 @@ export default function WorkoutMode() {
     
     // Registrar os detalhes da série
     try {
-      // Verificar se temos tempos válidos antes de prosseguir
-      if (!currentSetStartTime || !endTime) {
-        console.warn('Tempos de início ou fim da série são inválidos', { 
-          currentSetStartTime, 
-          endTime 
-        });
-        // Criar valores de fallback para não interromper o fluxo
-        const now = new Date();
-        if (!currentSetStartTime) {
-          setCurrentSetStartTime(now);
-        }
-        if (!endTime) {
-          endTime = now;
-        }
-      }
+      // Garantir que temos valores válidos para tempos de início e fim
+      const now = new Date();
+      const validStartTime = currentSetStartTime || now;
+      const validEndTime = endTime || now;
       
       // Calcular tempos
-      const executionTime = Math.round((endTime - currentSetStartTime) / 1000);
+      const executionTime = Math.round((validEndTime - validStartTime) / 1000);
       const restTime = previousSetEndTime 
-        ? Math.round((currentSetStartTime - previousSetEndTime) / 1000) 
+        ? Math.round((validStartTime - previousSetEndTime) / 1000) 
         : 0;
+        
+      // Gerar um ID único para este registro para evitar conflitos 409
+      const uniqueId = `${sessionId}_${currentExerciseIndex}_${currentSetIndex}_${Date.now()}`;
         
       // Inserir detalhes da série no banco de dados
       const { error } = await supabase
@@ -338,10 +332,11 @@ export default function WorkoutMode() {
             set_index: currentSetIndex,
             reps_completed: repsCompleted,
             weight_used: currentExercise.weight,
-            execution_time: executionTime,
-            rest_time: restTime,
-            start_time: currentSetStartTime ? currentSetStartTime.toISOString() : new Date().toISOString(),
-            end_time: endTime ? endTime.toISOString() : new Date().toISOString()
+            execution_time: executionTime > 0 ? executionTime : 1, // Garantir valor positivo
+            rest_time: restTime >= 0 ? restTime : 0, // Garantir valor não negativo
+            start_time: validStartTime.toISOString(),
+            end_time: validEndTime.toISOString(),
+            record_id: uniqueId // Incluir ID único
           }
         ]);
         
