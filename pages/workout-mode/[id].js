@@ -400,15 +400,15 @@ export default function WorkoutMode() {
   return (
     <Layout title={`Treino: ${workoutList?.name || ''}`}>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">
+        <div className="flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-400 rounded-lg shadow-lg p-4 text-white">
+          <h1 className="text-2xl font-bold">
             {isWorkoutActive ? 'Treino em Andamento' : 'Iniciar Treino'}
           </h1>
           <div className="flex space-x-2">
             {isWorkoutActive ? (
               <button
                 onClick={finishWorkout}
-                className="btn-danger"
+                className="bg-white text-red-500 hover:bg-red-50 font-bold py-2 px-4 rounded-full shadow transition-all transform hover:scale-105"
               >
                 Finalizar Treino
               </button>
@@ -416,13 +416,13 @@ export default function WorkoutMode() {
               <>
                 <Link
                   href="/workout-lists"
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className="bg-white/30 backdrop-blur-sm text-white hover:bg-white/40 font-medium py-2 px-4 rounded-full shadow transition-all"
                 >
                   Voltar
                 </Link>
                 <button
                   onClick={startWorkout}
-                  className="btn-secondary"
+                  className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-full shadow transition-all transform hover:scale-105"
                   disabled={exercises.length === 0}
                 >
                   Iniciar Treino
@@ -433,7 +433,7 @@ export default function WorkoutMode() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4">
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm">
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg
@@ -457,17 +457,22 @@ export default function WorkoutMode() {
         )}
 
         {!isWorkoutActive ? (
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              {workoutList?.name}
-            </h2>
-            {workoutList?.description && (
-              <p className="text-gray-600 mb-6">{workoutList.description}</p>
-            )}
+          <div className="bg-white shadow-lg rounded-xl overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 border-b border-gray-100">
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                {workoutList?.name}
+              </h2>
+              {workoutList?.description && (
+                <p className="text-gray-600">{workoutList.description}</p>
+              )}
+            </div>
 
             {exercises.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500 mb-4">
+              <div className="text-center py-12 px-6">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                </svg>
+                <p className="text-gray-500 mb-6">
                   Esta lista de treinos não possui exercícios.
                 </p>
                 <Link
@@ -478,72 +483,90 @@ export default function WorkoutMode() {
                 </Link>
               </div>
             ) : (
-              <div className="space-y-4">
-                <p className="text-gray-700 mb-4">
-                  Esta lista contém {exercises.length} exercícios. Clique em "Iniciar Treino" para começar.
+              <div className="p-6">
+                <p className="text-gray-700 mb-6 text-center font-medium">
+                  Esta lista contém <span className="text-blue-600 font-bold">{exercises.length}</span> exercícios. Clique em "Iniciar Treino" para começar.
                 </p>
                 
-                <div className="overflow-hidden bg-gray-50 border border-gray-200 rounded-lg">
-                  <ul className="divide-y divide-gray-200">
-                    {exercises.map((exercise, index) => (
-                      <li key={exercise.id} className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="text-lg font-medium text-gray-900">
-                              {index + 1}. {exercise.name}
-                            </h3>
-                            <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                              {exercise.weight && (
-                                <div>
-                                  <span className="font-medium text-gray-500">Carga:</span>{' '}
-                                  <span>{exercise.weight} kg</span>
-                                </div>
-                              )}
-                              <div>
-                                <span className="font-medium text-gray-500">Séries:</span>{' '}
-                                <span>{exercise.sets}</span>
-                              </div>
-                              {exercise.reps && (
-                                <div>
-                                  <span className="font-medium text-gray-500">Repetições:</span>{' '}
-                                  <span>{exercise.reps}</span>
-                                </div>
-                              )}
-                              {exercise.time && (
-                                <div>
-                                  <span className="font-medium text-gray-500">Tempo:</span>{' '}
-                                  <span>{exercise.time} segundos</span>
-                                </div>
-                              )}
-                            </div>
+                <div className="space-y-4">
+                  {exercises.map((exercise, index) => (
+                    <div 
+                      key={exercise.id} 
+                      className="bg-gradient-to-r from-gray-50 to-white border border-gray-100 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-all"
+                    >
+                      <div className="flex flex-col md:flex-row md:items-center p-4">
+                        <div className="flex items-center mb-3 md:mb-0">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold mr-3">
+                            {index + 1}
                           </div>
-                          {exercise.video_url && (
-                            <a
-                              href={exercise.video_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5 mr-1"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                              >
-                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                                <path
-                                  fillRule="evenodd"
-                                  d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-                                  clipRule="evenodd"
-                                />
+                          <h3 className="text-lg font-bold text-gray-800">
+                            {exercise.name}
+                          </h3>
+                        </div>
+                        
+                        <div className="ml-0 md:ml-11 grid grid-cols-2 gap-x-6 gap-y-1 text-sm flex-grow">
+                          {exercise.weight && (
+                            <div className="flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 mr-1">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
                               </svg>
-                              Ver demonstração
-                            </a>
+                              <span className="font-medium text-gray-500">Carga:</span>{' '}
+                              <span className="ml-1 font-bold text-gray-700">{exercise.weight} kg</span>
+                            </div>
+                          )}
+                          <div className="flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 mr-1">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                            </svg>
+                            <span className="font-medium text-gray-500">Séries:</span>{' '}
+                            <span className="ml-1 font-bold text-gray-700">{exercise.sets}</span>
+                          </div>
+                          {exercise.reps && (
+                            <div className="flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 mr-1">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 1-.659 1.591L9.5 14.5M9.75 3.104V1.5M9.75 9.75v4.5m0-4.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H9.75Z" />
+                              </svg>
+                              <span className="font-medium text-gray-500">Repetições:</span>{' '}
+                              <span className="ml-1 font-bold text-gray-700">{exercise.reps}</span>
+                            </div>
+                          )}
+                          {exercise.time && (
+                            <div className="flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 mr-1">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                              </svg>
+                              <span className="font-medium text-gray-500">Tempo:</span>{' '}
+                              <span className="ml-1 font-bold text-gray-700">{exercise.time} segundos</span>
+                            </div>
                           )}
                         </div>
-                      </li>
-                    ))}
-                  </ul>
+                        
+                        {exercise.video_url && (
+                          <a
+                            href={exercise.video_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-3 md:mt-0 inline-flex items-center justify-center px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-full text-sm font-medium transition-colors ml-auto"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4 mr-1"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                              <path
+                                fillRule="evenodd"
+                                d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                            Ver demonstração
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -551,236 +574,239 @@ export default function WorkoutMode() {
         ) : (
           <div className="space-y-6">
             {/* Progresso do treino */}
-            <div className="bg-white shadow rounded-lg p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">
+            <div className="bg-white shadow-lg rounded-xl overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-600 to-blue-400 p-4 flex justify-between items-center text-white">
+                <h2 className="text-xl font-bold">
                   Progresso
                 </h2>
-                <span className="text-sm text-gray-500">
+                <div className="bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 text-sm">
                   Exercício {currentExerciseIndex + 1} de {exercises.length}
-                </span>
-              </div>
-              
-              <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
-                <div
-                  className="bg-blue-600 h-2.5 rounded-full"
-                  style={{
-                    width: `${((currentExerciseIndex + (currentSetIndex / currentExercise.sets)) / exercises.length) * 100}%`
-                  }}
-                ></div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium text-gray-500">Série atual:</span>{' '}
-                  <span>{currentSetIndex + 1} de {currentExercise.sets}</span>
                 </div>
-                <div>
-                  <span className="font-medium text-gray-500">Tempo de treino:</span>{' '}
-                  <span>
-                    {workoutStartTime
-                      ? formatTime(Math.floor((new Date() - workoutStartTime) / 1000))
-                      : '0:00'}
-                  </span>
+              </div>
+              
+              <div className="p-5">
+                <div className="w-full bg-gray-200 rounded-full h-3 mb-6 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-blue-500 to-indigo-500 h-3 rounded-full transition-all duration-300 ease-in-out"
+                    style={{
+                      width: `${((currentExerciseIndex + (currentSetIndex / currentExercise.sets)) / exercises.length) * 100}%`
+                    }}
+                  ></div>
+                </div>
+                
+                <div className="flex flex-wrap justify-between gap-4 text-sm">
+                  <div className="flex items-center bg-blue-50 rounded-lg px-4 py-3 flex-grow">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-blue-500 mr-2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 5.25h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5" />
+                    </svg>
+                    <span className="font-medium text-gray-600">Série atual:</span>{' '}
+                    <span className="ml-2 font-bold text-blue-700">{currentSetIndex + 1} de {currentExercise.sets}</span>
+                  </div>
+                  <div className="flex items-center bg-blue-50 rounded-lg px-4 py-3 flex-grow">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-blue-500 mr-2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                    <span className="font-medium text-gray-600">Tempo de treino:</span>{' '}
+                    <span className="ml-2 font-bold text-blue-700">
+                      {workoutStartTime
+                        ? formatTime(Math.floor((new Date() - workoutStartTime) / 1000))
+                        : '0:00'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
             
             {/* Exercício atual */}
-            <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                Exercício Atual
-              </h2>
+            <div className="bg-white shadow-lg rounded-xl overflow-hidden">
+              <div className="bg-gradient-to-r from-green-600 to-green-400 p-4 text-white">
+                <h2 className="text-xl font-bold">
+                  Exercício Atual
+                </h2>
+              </div>
               
-              <div className="mb-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  {currentExercise.name}
-                </h3>
+              <div className="p-6">
+                <div className="flex items-center mb-6">
+                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold mr-3">
+                    {currentExerciseIndex + 1}
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-800">
+                    {currentExercise.name}
+                  </h3>
+                </div>
                 
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mb-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
                   {currentExercise.weight && (
-                    <div>
-                      <span className="font-medium text-gray-500">Carga:</span>{' '}
-                      <span>{currentExercise.weight} kg</span>
+                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 mb-1">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                      </svg>
+                      <span className="font-medium text-gray-500 text-xs">Carga</span>
+                      <span className="font-bold text-gray-800 text-lg">{currentExercise.weight} kg</span>
                     </div>
                   )}
-                  <div>
-                    <span className="font-medium text-gray-500">Séries:</span>{' '}
-                    <span>{currentSetIndex + 1} de {currentExercise.sets}</span>
+                  <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 mb-1">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                    </svg>
+                    <span className="font-medium text-gray-500 text-xs">Séries</span>
+                    <span className="font-bold text-gray-800 text-lg">{currentSetIndex + 1} / {currentExercise.sets}</span>
                   </div>
                   {currentExercise.reps && (
-                    <div>
-                      <span className="font-medium text-gray-500">Repetições:</span>{' '}
-                      <span>{currentExercise.reps}</span>
+                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 mb-1">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 1-.659 1.591L9.5 14.5M9.75 3.104V1.5M9.75 9.75v4.5m0-4.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H9.75Z" />
+                      </svg>
+                      <span className="font-medium text-gray-500 text-xs">Repetições</span>
+                      <span className="font-bold text-gray-800 text-lg">{repsCompleted} / {currentExercise.reps}</span>
                     </div>
                   )}
-                  {currentExercise.time && (
-                    <div>
-                      <span className="font-medium text-gray-500">Tempo:</span>{' '}
-                      <span>{currentExercise.time} segundos</span>
+                  {currentExercise.time && timerActive && (
+                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 mb-1">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                      <span className="font-medium text-gray-500 text-xs">Tempo Restante</span>
+                      <span className="font-bold text-gray-800 text-lg">{formatTime(timeRemaining)}</span>
                     </div>
                   )}
                 </div>
                 
+                {currentExercise.reps && !timerActive && (
+                  <div className="mb-6">
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-4 mb-4">
+                      <div className="flex items-center justify-center p-2 bg-blue-50 rounded-lg text-center w-full md:w-auto">
+                        <div className="font-medium text-gray-600 mr-2">Repetições realizadas:</div>
+                        <div className="flex items-center">
+                          <button 
+                            onClick={() => setRepsCompleted(Math.max(0, repsCompleted - 1))}
+                            className="bg-white w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center mr-2 text-gray-500 hover:bg-gray-100"
+                            disabled={repsCompleted <= 0}
+                          >
+                            -
+                          </button>
+                          <span className="font-bold text-blue-700 text-xl px-3">{repsCompleted}</span>
+                          <button 
+                            onClick={() => setRepsCompleted(Math.min(currentExercise.reps, repsCompleted + 1))}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center ml-2 text-white ${repsCompleted >= currentExercise.reps ? 'bg-green-500 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'}`}
+                            disabled={repsCompleted >= currentExercise.reps}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <button 
+                        onClick={handleRepsCompleted}
+                        className={`px-6 py-3 rounded-full font-bold shadow transition-all w-full md:w-auto
+                          ${repsCompleted >= 5 && repsCompleted < currentExercise.reps 
+                            ? 'bg-yellow-500 hover:bg-yellow-600 text-white' 
+                            : repsCompleted >= currentExercise.reps 
+                              ? 'bg-green-500 hover:bg-green-600 text-white'
+                              : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+                        disabled={repsCompleted < 5}
+                      >
+                        {repsCompleted < 5 
+                          ? `Mínimo 5 repetições para concluir` 
+                          : repsCompleted < currentExercise.reps 
+                            ? `Concluir com ${repsCompleted}/${currentExercise.reps} repetições`
+                            : 'Marcar Série como Concluída'}
+                      </button>
+                    </div>
+                    
+                    <button 
+                      onClick={() => setRepsCompleted(0)}
+                      className="w-full py-2 text-gray-500 hover:text-gray-700 text-sm flex items-center justify-center"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                      </svg>
+                      Resetar contador
+                    </button>
+                  </div>
+                )}
+                
+                {currentExercise.time && timerActive && (
+                  <div className="mb-6 flex flex-col items-center">
+                    <div className="w-48 h-48 rounded-full bg-blue-50 border-8 border-blue-100 flex flex-col items-center justify-center mb-4">
+                      <span className="text-4xl font-bold text-blue-700">{timeRemaining}</span>
+                      <span className="text-gray-500">segundos</span>
+                    </div>
+                    <div className="text-sm text-gray-500">O temporizador irá avançar automaticamente quando terminar</div>
+                  </div>
+                )}
+                
                 {videoId && (
-                  <div className="mb-4">
+                  <div className="mt-6 border-t border-gray-100 pt-6">
                     <button
                       onClick={toggleVideo}
-                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center mb-2"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-5 w-5 mr-1"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
                       >
-                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                        <path
-                          fillRule="evenodd"
-                          d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-                          clipRule="evenodd"
-                        />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      {showVideo ? 'Ocultar vídeo' : 'Ver demonstração'}
+                      {showVideo ? 'Ocultar vídeo' : 'Ver demonstração do exercício'}
                     </button>
                     
                     {showVideo && (
-                      <div className="mt-2">
+                      <div className="mt-2 rounded-lg overflow-hidden shadow-lg">
                         <YouTube
                           videoId={videoId}
                           opts={{
-                            height: '240',
                             width: '100%',
                             playerVars: {
                               autoplay: 0,
                             },
                           }}
+                          className="w-full"
                         />
                       </div>
                     )}
                   </div>
                 )}
-                
-                {/* Séries */}
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {Array.from({ length: currentExercise.sets }).map((_, index) => (
-                    <div
-                      key={index}
-                      className={`w-10 h-10 flex items-center justify-center rounded-full border ${
-                        isSetCompleted(currentExerciseIndex, index)
-                          ? 'bg-green-100 border-green-500 text-green-800'
-                          : index === currentSetIndex
-                          ? 'bg-blue-100 border-blue-500 text-blue-800'
-                          : 'bg-gray-100 border-gray-300 text-gray-500'
-                      }`}
-                    >
-                      {index + 1}
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Controles */}
-                {currentExercise.time ? (
-                  <div className="text-center">
-                    <div className="text-4xl font-bold mb-4">
-                      {formatTime(timeRemaining)}
-                    </div>
-                    {!timerActive && timeRemaining > 0 && (
-                      <button
-                        onClick={() => setTimerActive(true)}
-                        className="btn-primary w-full mb-2"
-                      >
-                        Iniciar Timer
-                      </button>
-                    )}
-                    {timerActive && (
-                      <button
-                        onClick={() => setTimerActive(false)}
-                        className="btn-danger w-full mb-2"
-                      >
-                        Pausar
-                      </button>
-                    )}
-                    <button
-                      onClick={handleSetCompleted}
-                      className="btn-secondary w-full"
-                    >
-                      Marcar como Concluído
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="mb-4">
-                      <label htmlFor="reps" className="block text-sm font-medium text-gray-700 mb-1">
-                        Repetições realizadas
-                      </label>
-                      <div className="flex items-center space-x-3">
-                        <div className="text-xl font-bold">{repsCompleted}</div>
-                        <button
-                          onClick={() => setRepsCompleted(prev => 
-                            prev < currentExercise.reps ? prev + 1 : prev
-                          )}
-                          className="btn-primary px-3 py-2"
-                          disabled={repsCompleted >= currentExercise.reps}
-                        >
-                          +1 Rep
-                        </button>
-                        <button
-                          onClick={() => setRepsCompleted(0)}
-                          className="btn-secondary px-3 py-2 text-xs"
-                        >
-                          Resetar
-                        </button>
-                        <div className="text-sm text-gray-500">
-                          Meta: {currentExercise.reps} repetições
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleRepsCompleted}
-                      className="btn-primary w-full"
-                      disabled={repsCompleted < 5}
-                    >
-                      {repsCompleted < currentExercise.reps
-                        ? repsCompleted >= 5 
-                          ? `Concluir com ${repsCompleted}/${currentExercise.reps} repetições` 
-                          : `Mínimo 5 repetições para concluir`
-                        : 'Marcar Série como Concluída'}
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
             
-            {/* Próximos exercícios */}
+            {/* Próximos Exercícios */}
             {currentExerciseIndex < exercises.length - 1 && (
-              <div className="bg-white shadow rounded-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  Próximos Exercícios
-                </h2>
+              <div className="bg-white shadow-lg rounded-xl overflow-hidden">
+                <div className="bg-gradient-to-r from-gray-700 to-gray-600 p-4 text-white">
+                  <h2 className="text-xl font-bold">
+                    Próximos Exercícios
+                  </h2>
+                </div>
                 
-                <ul className="divide-y divide-gray-200">
-                  {exercises.slice(currentExerciseIndex + 1, currentExerciseIndex + 4).map((exercise, index) => (
-                    <li key={exercise.id} className="py-3">
-                      <div className="flex items-center">
-                        <span className="bg-gray-200 text-gray-700 rounded-full w-6 h-6 flex items-center justify-center text-sm mr-3">
+                <div className="p-4">
+                  <div className="space-y-3">
+                    {exercises.slice(currentExerciseIndex + 1, currentExerciseIndex + 3).map((exercise, index) => (
+                      <div key={exercise.id} className="flex items-center p-3 bg-gray-50 rounded-lg">
+                        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold mr-3">
                           {currentExerciseIndex + index + 2}
-                        </span>
+                        </div>
                         <div>
-                          <h3 className="text-sm font-medium text-gray-900">
-                            {exercise.name}
-                          </h3>
-                          <p className="text-xs text-gray-500">
-                            {exercise.sets} séries
-                            {exercise.reps ? ` × ${exercise.reps} repetições` : ''}
-                            {exercise.time ? ` × ${exercise.time} segundos` : ''}
-                            {exercise.weight ? ` • ${exercise.weight} kg` : ''}
+                          <h3 className="font-medium text-gray-800">{exercise.name}</h3>
+                          <p className="text-sm text-gray-500">
+                            {exercise.sets} séries{exercise.reps ? `, ${exercise.reps} repetições` : ''}
+                            {exercise.time ? `, ${exercise.time} segundos` : ''}
                           </p>
                         </div>
                       </div>
-                    </li>
-                  ))}
-                </ul>
+                    ))}
+                    
+                    {exercises.length > currentExerciseIndex + 3 && (
+                      <div className="text-center text-sm text-gray-500 pt-2">
+                        +{exercises.length - (currentExerciseIndex + 3)} exercícios restantes
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>
