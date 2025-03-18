@@ -318,24 +318,56 @@ export default function WorkoutMode() {
         ? Math.round((validStartTime - previousSetEndTime) / 1000) 
         : 0;
         
-      // Usar upsert em vez de insert para evitar conflito de chave duplicada
-      const { error } = await supabase
+      // Verificar se já existe um registro para esta combinação de chaves
+      const { data: existingData, error: checkError } = await supabase
         .from('workout_session_details')
-        .upsert([
-          {
+        .select('*')
+        .eq('session_id', sessionId)
+        .eq('exercise_id', currentExercise.id)
+        .eq('set_index', currentSetIndex);
+        
+      if (checkError) {
+        console.error('Erro ao verificar detalhes da série existentes:', checkError);
+      }
+      
+      let error;
+      
+      if (existingData && existingData.length > 0) {
+        // O registro já existe, vamos atualizá-lo
+        const { error: updateError } = await supabase
+          .from('workout_session_details')
+          .update({
+            reps_completed: repsCompleted,
+            weight_used: currentExercise.weight,
+            execution_time: executionTime > 0 ? executionTime : 1,
+            rest_time: restTime >= 0 ? restTime : 0,
+            start_time: validStartTime.toISOString(),
+            end_time: validEndTime.toISOString()
+          })
+          .eq('session_id', sessionId)
+          .eq('exercise_id', currentExercise.id)
+          .eq('set_index', currentSetIndex);
+          
+        error = updateError;
+      } else {
+        // O registro não existe, vamos inserir um novo
+        const { error: insertError } = await supabase
+          .from('workout_session_details')
+          .insert([{
             session_id: sessionId,
             exercise_id: currentExercise.id,
             exercise_index: currentExerciseIndex,
             set_index: currentSetIndex,
             reps_completed: repsCompleted,
             weight_used: currentExercise.weight,
-            execution_time: executionTime > 0 ? executionTime : 1, // Garantir valor positivo
-            rest_time: restTime >= 0 ? restTime : 0, // Garantir valor não negativo
+            execution_time: executionTime > 0 ? executionTime : 1,
+            rest_time: restTime >= 0 ? restTime : 0,
             start_time: validStartTime.toISOString(),
             end_time: validEndTime.toISOString()
-          }
-        ])
-        .select();
+          }]);
+          
+        error = insertError;
+      }
         
       if (error) {
         console.error('Erro ao salvar detalhes da série:', error);
