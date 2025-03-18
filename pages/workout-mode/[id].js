@@ -447,11 +447,6 @@ export default function WorkoutMode() {
       // Liberar o WakeLock ao finalizar o treino
       releaseWakeLock();
       
-      // Limpar todas as referências de tempo
-      workoutStartRef.current = null;
-      exerciseTimerEndRef.current = null;
-      restTimerEndRef.current = null;
-      
       // Atualizar a sessão de treino
       const { error } = await supabase
         .from('workout_sessions')
@@ -471,8 +466,12 @@ export default function WorkoutMode() {
       setCompletedSets({});
       setTimerActive(false);
       setTimeRemaining(0);
+      setRestTimerActive(false);
+      setRestTimeRemaining(0);
       setWorkoutStartTime(null);
       setSessionId(null);
+      setRepsCompleted(0);
+      setSetRepsHistory({});
       
       // Redirecionar para o dashboard
       router.push('/dashboard');
