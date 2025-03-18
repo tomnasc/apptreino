@@ -676,8 +676,10 @@ export default function WorkoutMode() {
   };
 
   const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    // Garantir que seconds seja um número inteiro
+    const secondsInt = Math.floor(seconds);
+    const mins = Math.floor(secondsInt / 60);
+    const secs = secondsInt % 60;
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
@@ -880,7 +882,7 @@ export default function WorkoutMode() {
                           {exercise.reps && (
                             <div className="flex items-center">
                               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 mr-1">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 1-.659 1.591L9.5 14.5M9.75 3.104V1.5M9.75 9.75v4.5m0-4.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H9.75Z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 1-.659 1.591L9.5 14.5M9.75 3.104V1.5M9.75 9.75v4.5m0-4.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125-1.125H9.75Z" />
                               </svg>
                               <span className="font-medium text-gray-500">Repetições:</span>{' '}
                               <span className="ml-1 font-bold text-gray-700">{exercise.reps}</span>
