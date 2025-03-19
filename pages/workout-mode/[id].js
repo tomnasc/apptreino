@@ -867,6 +867,11 @@ export default function WorkoutMode() {
         if ('vibrate' in navigator) {
           navigator.vibrate([200, 100, 200, 100, 200]);
         }
+        
+        // Mostrar alerta visual para iOS mesmo sem permissão
+        if (isIOS) {
+          showIOSAlert();
+        }
       } catch (audioError) {
         console.error('Erro ao inicializar áudio:', audioError);
       }
@@ -878,9 +883,12 @@ export default function WorkoutMode() {
       const notificationTitle = 'Descanso finalizado!';
       const notificationBody = `Hora de começar a próxima série de ${currentExercise.name}`;
       
-      // Para iOS, usar uma abordagem específica
+      // Para iOS, usar uma abordagem específica com alerta visual
       if (isIOS) {
         console.log('Enviando notificação para iOS, standalone mode:', window.navigator.standalone);
+        
+        // Mostrar alerta visual para iOS (overlay ou modal que chama atenção)
+        showIOSAlert();
         
         // Vibrar o dispositivo duas vezes para aumentar a atenção
         if ('vibrate' in navigator) {
@@ -936,10 +944,6 @@ export default function WorkoutMode() {
               console.log('WakeLock não suportado:', wlError);
             }
           }
-          
-          // Mostrar um alerta visual na interface
-          // Este código pode ser implementado para mostrar um banner ou modal
-          
         } catch (audioError) {
           console.log('Erro ao inicializar áudio no iOS:', audioError);
         }
@@ -987,6 +991,114 @@ export default function WorkoutMode() {
     } catch (error) {
       console.error('Erro ao enviar notificação:', error);
     }
+  };
+
+  // Função para mostrar alerta visual específico para iOS
+  const showIOSAlert = () => {
+    console.log('Mostrando alerta visual para iOS');
+    
+    // Criar um elemento de overlay para o alerta
+    const alertOverlay = document.createElement('div');
+    alertOverlay.style.position = 'fixed';
+    alertOverlay.style.top = '0';
+    alertOverlay.style.left = '0';
+    alertOverlay.style.width = '100%';
+    alertOverlay.style.height = '100%';
+    alertOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    alertOverlay.style.zIndex = '9999';
+    alertOverlay.style.display = 'flex';
+    alertOverlay.style.flexDirection = 'column';
+    alertOverlay.style.justifyContent = 'center';
+    alertOverlay.style.alignItems = 'center';
+    alertOverlay.style.padding = '20px';
+    alertOverlay.style.animation = 'fadeIn 0.3s ease-in-out';
+    
+    // Definir CSS para animação
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    // Conteúdo do alerta
+    const alertBox = document.createElement('div');
+    alertBox.style.backgroundColor = '#fff';
+    alertBox.style.borderRadius = '12px';
+    alertBox.style.padding = '20px';
+    alertBox.style.maxWidth = '85%';
+    alertBox.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.5)';
+    alertBox.style.animation = 'pulse 1.5s infinite';
+    
+    // Título do alerta
+    const alertTitle = document.createElement('h2');
+    alertTitle.style.fontSize = '22px';
+    alertTitle.style.fontWeight = 'bold';
+    alertTitle.style.marginBottom = '15px';
+    alertTitle.style.textAlign = 'center';
+    alertTitle.style.color = '#4338ca'; // indigo-700
+    alertTitle.textContent = 'Descanso Finalizado!';
+    
+    // Mensagem do alerta
+    const alertMessage = document.createElement('p');
+    alertMessage.style.fontSize = '18px';
+    alertMessage.style.marginBottom = '20px';
+    alertMessage.style.textAlign = 'center';
+    alertMessage.style.color = '#1f2937'; // gray-800
+    
+    const currentExercise = exercises[currentExerciseIndex];
+    alertMessage.textContent = `Hora de começar a próxima série de ${currentExercise.name}`;
+    
+    // Botão de fechar
+    const closeButton = document.createElement('button');
+    closeButton.style.backgroundColor = '#4f46e5'; // indigo-600
+    closeButton.style.color = 'white';
+    closeButton.style.border = 'none';
+    closeButton.style.borderRadius = '9999px';
+    closeButton.style.padding = '12px 24px';
+    closeButton.style.fontSize = '16px';
+    closeButton.style.fontWeight = 'bold';
+    closeButton.style.cursor = 'pointer';
+    closeButton.style.width = '100%';
+    closeButton.style.marginTop = '10px';
+    closeButton.textContent = 'Iniciar Próxima Série';
+    
+    // Adicionar evento para fechar o alerta
+    closeButton.addEventListener('click', () => {
+      document.body.removeChild(alertOverlay);
+      
+      // Tentar reproduzir o som ao clicar (iOS requer interação do usuário)
+      try {
+        const audio = new Audio('/sounds/notification.mp3');
+        audio.volume = 1.0;
+        audio.play().catch(e => console.log('Erro ao reproduzir som após clique:', e));
+      } catch (error) {
+        console.log('Erro ao tocar som após interação:', error);
+      }
+    });
+    
+    // Montar o alerta
+    alertBox.appendChild(alertTitle);
+    alertBox.appendChild(alertMessage);
+    alertBox.appendChild(closeButton);
+    alertOverlay.appendChild(alertBox);
+    
+    // Adicionar o alerta ao corpo da página
+    document.body.appendChild(alertOverlay);
+    
+    // Remover automaticamente após 30 segundos (caso o usuário não interaja)
+    setTimeout(() => {
+      if (document.body.contains(alertOverlay)) {
+        document.body.removeChild(alertOverlay);
+      }
+    }, 30000);
   };
 
   if (loading) {
