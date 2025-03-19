@@ -857,91 +857,131 @@ export default function WorkoutMode() {
 
   // Função para enviar notificação
   const sendRestFinishedNotification = () => {
-    if (!notificationPermission) return;
+    if (!notificationPermission) {
+      console.log('Notificações não permitidas. Tentando reproduzir som como alternativa.');
+      try {
+        const audio = new Audio('/sounds/notification.mp3');
+        audio.volume = 1.0;
+        audio.play().catch(e => console.log('Erro ao tocar som:', e));
+        
+        if ('vibrate' in navigator) {
+          navigator.vibrate([200, 100, 200, 100, 200]);
+        }
+      } catch (audioError) {
+        console.error('Erro ao inicializar áudio:', audioError);
+      }
+      return;
+    }
     
     try {
       const currentExercise = exercises[currentExerciseIndex];
       const notificationTitle = 'Descanso finalizado!';
       const notificationBody = `Hora de começar a próxima série de ${currentExercise.name}`;
       
-      // Se for iOS e o app estiver instalado como PWA, usamos uma abordagem diferente
-      if (isIOS && window.navigator.standalone) {
-        // Vibrar o dispositivo se possível
-        if ('vibrate' in navigator) {
-          navigator.vibrate([200, 100, 200]);
-        }
+      // Para iOS, usar uma abordagem específica
+      if (isIOS) {
+        console.log('Enviando notificação para iOS, standalone mode:', window.navigator.standalone);
         
-        // Adicionar um alerta visual na interface
-        // Este código pode ser expandido para mostrar uma UI específica
-        console.log('Notificação em iOS PWA instalado:', notificationTitle, notificationBody);
+        // Vibrar o dispositivo duas vezes para aumentar a atenção
+        if ('vibrate' in navigator) {
+          navigator.vibrate([300, 100, 300, 100, 300]);
+        }
         
         // Tocar um som mais alto em iOS
         try {
+          // Criar e configurar áudio com volume alto
           const audio = new Audio('/sounds/notification.mp3');
-          audio.volume = 1.0; // Volume máximo para iOS
+          audio.volume = 1.0; // Volume máximo
           
-          // Tentar reproduzir o som imediatamente quando o app voltar ao foco
+          // Função para tentar reproduzir o som com repetição
           const playSound = () => {
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-              playPromise.catch(e => {
-                console.log('Erro ao tentar reproduzir som no iOS:', e.message);
+            console.log('Tentando reproduzir som no iOS');
+            
+            // Tentar reproduzir múltiplas vezes (iOS pode limitar a reprodução automática)
+            const playAttempt = () => {
+              audio.play().catch(e => {
+                console.log('Erro ao tentar reproduzir som no iOS:', e);
+                
+                // Se falhar, tentar novamente quando o usuário interagir com a página
+                document.addEventListener('touchstart', function playOnTouch() {
+                  audio.play().catch(err => console.log('Erro após interação:', err));
+                  document.removeEventListener('touchstart', playOnTouch);
+                }, { once: true });
               });
-            }
+            };
+            
+            // Tentar reproduzir agora
+            playAttempt();
+            
+            // E tentar novamente em 1 segundo para aumentar as chances
+            setTimeout(playAttempt, 1000);
           };
           
           // Reproduzir som agora
           playSound();
           
-          // E também quando a página ficar visível
-          document.addEventListener('visibilitychange', function onVisChange() {
-            if (document.visibilityState === 'visible') {
-              playSound();
-              document.removeEventListener('visibilitychange', onVisChange);
+          // Força a tela a ficar ligada (quando possível)
+          if ('wakeLock' in navigator) {
+            try {
+              navigator.wakeLock.request('screen').then(wakeLock => {
+                console.log('WakeLock ativado para manter a tela ligada');
+                
+                // Liberar após 10 segundos
+                setTimeout(() => {
+                  wakeLock.release();
+                  console.log('WakeLock liberado');
+                }, 10000);
+              }).catch(e => console.log('Erro ao tentar WakeLock:', e));
+            } catch (wlError) {
+              console.log('WakeLock não suportado:', wlError);
             }
-          });
+          }
+          
+          // Mostrar um alerta visual na interface
+          // Este código pode ser implementado para mostrar um banner ou modal
+          
         } catch (audioError) {
           console.log('Erro ao inicializar áudio no iOS:', audioError);
         }
       } else {
         // Abordagem padrão para outros navegadores
-        const notification = new Notification(notificationTitle, {
-          body: notificationBody,
-          icon: '/icon-192x192.png',
-          vibrate: [200, 100, 200],
-          tag: 'rest-finished',
-          requireInteraction: true // Requer interação do usuário para fechar
-        });
-        
-        // Quando o usuário clicar na notificação, trazer o app para o primeiro plano
-        notification.onclick = function() {
-          window.focus();
-          notification.close();
-        };
-        
-        // Tocar um som de alerta com tratamento de erros aprimorado
         try {
+          const notification = new Notification(notificationTitle, {
+            body: notificationBody,
+            icon: '/icon-192x192.png',
+            vibrate: [200, 100, 200],
+            tag: 'rest-finished',
+            renotify: true,
+            requireInteraction: true // Requer interação do usuário para fechar
+          });
+          
+          // Quando o usuário clicar na notificação, trazer o app para o primeiro plano
+          notification.onclick = function() {
+            console.log('Notificação clicada, focando na janela');
+            window.focus();
+            notification.close();
+          };
+          
+          // Tocar um som de alerta com tratamento de erros aprimorado
           const audio = new Audio('/sounds/notification.mp3');
-          audio.volume = 0.7; // Reduzir volume para 70%
+          audio.volume = 0.8;
+          audio.play().catch(e => console.log('Erro ao reproduzir som:', e));
           
-          // Pré-carregar o áudio antes de tocar
-          audio.addEventListener('canplaythrough', () => {
-            const playPromise = audio.play();
-            
-            if (playPromise !== undefined) {
-              playPromise.catch(e => {
-                console.log('Erro ao tentar reproduzir som:', e.message);
-              });
-            }
-          });
+          // Vibrar dispositivo
+          if ('vibrate' in navigator) {
+            navigator.vibrate([200, 100, 200]);
+          }
+        } catch (notificationError) {
+          console.error('Erro ao criar notificação:', notificationError);
           
-          // Lidar com erro de carregamento
-          audio.addEventListener('error', (e) => {
-            console.log('Erro ao carregar o som:', 
-              e.target.error ? e.target.error.message : 'Erro desconhecido');
-          });
-        } catch (audioError) {
-          console.log('Erro ao inicializar áudio:', audioError);
+          // Fallback para som se a notificação falhar
+          try {
+            const audio = new Audio('/sounds/notification.mp3');
+            audio.volume = 1.0;
+            audio.play().catch(e => console.log('Erro no fallback de som:', e));
+          } catch (audioError) {
+            console.error('Fallback de áudio também falhou:', audioError);
+          }
         }
       }
     } catch (error) {
