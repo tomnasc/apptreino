@@ -783,7 +783,7 @@ export default function WorkoutMode() {
       const currentExercise = exercises[currentExerciseIndex];
       const notification = new Notification('Descanso finalizado!', {
         body: `Hora de começar a próxima série de ${currentExercise.name}`,
-        icon: '/icons/icon-192x192.png', // Caminho para o ícone do app
+        icon: '/icon-192x192.png', // Caminho atualizado para o ícone
         vibrate: [200, 100, 200],
         tag: 'rest-finished',
         requireInteraction: true // Requer interação do usuário para fechar
