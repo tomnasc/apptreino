@@ -66,12 +66,26 @@ export default async function handler(req, res) {
         rest_time INTEGER,
         start_time TIMESTAMP WITH TIME ZONE,
         end_time TIMESTAMP WITH TIME ZONE,
+        exercise_name TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         UNIQUE(session_id, exercise_id, set_index)
       );
       
       ALTER TABLE workout_session_details ENABLE ROW LEVEL SECURITY;
+    `;
+
+    // Criar a view workout_session_averages
+    const createViewSql = `
+      CREATE OR REPLACE VIEW workout_session_averages AS
+      SELECT 
+        session_id,
+        exercise_id,
+        AVG(execution_time) as avg_execution_time,
+        AVG(rest_time) as avg_rest_time,
+        COUNT(*) as total_sets
+      FROM workout_session_details
+      GROUP BY session_id, exercise_id;
     `;
 
     // Configurar as políticas de segurança
@@ -132,6 +146,17 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Erro ao criar tabela', details: tableError });
     }
 
+    // Executar script para criar a view
+    console.log('Criando view workout_session_averages...');
+    const { error: viewError } = await supabase.rpc('exec_sql', {
+      sql_query: createViewSql
+    });
+
+    if (viewError) {
+      console.error('Erro ao criar view:', viewError);
+      return res.status(500).json({ error: 'Erro ao criar view', details: viewError });
+    }
+
     // Executar script para configurar as políticas
     console.log('Configurando políticas de segurança...');
     const { error: policiesError } = await supabase.rpc('exec_sql', {
@@ -144,8 +169,9 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({ 
-      message: 'Tabela e políticas configuradas com sucesso!',
+      message: 'Tabela, view e políticas configuradas com sucesso!',
       table: 'workout_session_details criada',
+      view: 'workout_session_averages criada',
       policies: 'Políticas de segurança configuradas'
     });
   } catch (error) {
