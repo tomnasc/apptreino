@@ -292,16 +292,9 @@ export default function WorkoutMode() {
               localStorage.removeItem('appTreino_restTimerDuration');
               localStorage.removeItem('appTreino_restTimerEnd');
               
-              // Usar uma combinação de métodos para chamar atenção do usuário
-              vibrarDispositivoIntensamente();
-              reproduzirSomAlto();
-              window.alert("DESCANSO FINALIZADO!\n\nÉ hora de começar a próxima série!");
-              console.log('iOS: Combinação de alertas mostrada ao voltar ao foco');
-              
-              // Mostrar um alerta visual na interface principal
-              setTimeout(() => {
-                showIOSAlert();
-              }, 500);
+              // Mostrar apenas o popup simples
+              showIOSAlert();
+              console.log('iOS: Alerta visual mostrado ao voltar ao foco');
             } else {
               // Atualizar o tempo restante com valor preciso do localStorage
               setRestTimeRemaining(remaining);
@@ -323,62 +316,7 @@ export default function WorkoutMode() {
           if (restTimerActive && restTimerEndRef.current) {
             localStorage.setItem('appTreino_restTimerEnd', restTimerEndRef.current.toString());
             console.log(`iOS: Timer terminará em: ${new Date(restTimerEndRef.current).toLocaleTimeString()}`);
-            
-            // Mostrar mensagem antes de ir para segundo plano
-            try {
-              const timeRemaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
-              if (timeRemaining <= 5) {
-                alert("O timer está prestes a terminar! Volte rapidamente ao app.");
-              }
-            } catch (e) {
-              console.log('Erro ao mostrar alerta de tempo restante:', e);
-            }
           }
-        }
-      };
-      
-      // Função para vibrar o dispositivo de forma intensa
-      const vibrarDispositivoIntensamente = () => {
-        if ('vibrate' in navigator) {
-          // Padrão de vibração longo e repetitivo
-          navigator.vibrate([1000, 300, 1000, 300, 1000, 300, 1000]);
-          console.log('Vibração intensa ativada');
-          
-          // Repetir a vibração após um curto intervalo
-          setTimeout(() => {
-            navigator.vibrate([1000, 300, 1000, 300, 1000]);
-          }, 5000);
-        }
-      };
-      
-      // Função para reproduzir som alto
-      const reproduzirSomAlto = () => {
-        try {
-          // Criar múltiplos elementos de áudio para aumentar o volume percebido
-          const audio1 = new Audio('/sounds/notification.mp3');
-          const audio2 = new Audio('/sounds/notification.mp3');
-          
-          // Configurar para volume máximo
-          audio1.volume = 1.0;
-          audio2.volume = 1.0;
-          
-          // Pequeno atraso entre os sons para aumentar percepção
-          audio1.play().catch(e => console.log('Erro ao reproduzir áudio 1:', e));
-          
-          setTimeout(() => {
-            audio2.play().catch(e => console.log('Erro ao reproduzir áudio 2:', e));
-          }, 300);
-          
-          // Repetir o som após alguns segundos
-          setTimeout(() => {
-            const audio3 = new Audio('/sounds/notification.mp3');
-            audio3.volume = 1.0;
-            audio3.play().catch(e => console.log('Erro ao reproduzir áudio 3:', e));
-          }, 1500);
-          
-          console.log('Reprodução de som alto ativada');
-        } catch (e) {
-          console.error('Erro ao reproduzir som alto:', e);
         }
       };
       
@@ -406,26 +344,12 @@ export default function WorkoutMode() {
             localStorage.removeItem('appTreino_restTimerDuration');
             localStorage.removeItem('appTreino_restTimerEnd');
             
-            // Alertas quando o app está em primeiro plano
-            vibrarDispositivoIntensamente();
-            reproduzirSomAlto();
+            // Apenas mostrar o popup simples
             showIOSAlert();
           } else {
             // Atualizar o tempo restante com precisão de 1 casa decimal
             const newRestTime = Number(remaining.toFixed(1));
             setRestTimeRemaining(newRestTime);
-            
-            // Avisar visualmente quando o timer está próximo do fim
-            if (remaining <= 5 && remaining > 4.8) {
-              // Flash visual ou outra indicação quando está nos últimos 5 segundos
-              const body = document.querySelector('body');
-              if (body) {
-                body.style.backgroundColor = '#fff8e8';
-                setTimeout(() => {
-                  body.style.backgroundColor = '';
-                }, 300);
-              }
-            }
           }
         }
       }, 100); // Intervalo menor para maior precisão quando visível
@@ -1187,105 +1111,49 @@ export default function WorkoutMode() {
     }
   };
 
-  // Função para mostrar alerta visual específico para iOS
+  // Função para mostrar alerta visual simplificado
   const showIOSAlert = () => {
-    console.log('Mostrando alerta visual para iOS - INÍCIO DA FUNÇÃO');
+    console.log('Mostrando popup de timer finalizado');
     
     try {
-      // Vibrar o dispositivo duas vezes para aumentar a atenção (tentar várias vezes)
-      if ('vibrate' in navigator) {
-        navigator.vibrate([500, 200, 500, 200, 500]);
-        console.log('iOS: Vibração enviada');
-        
-        // Tentar vibrar novamente após um pequeno atraso
-        setTimeout(() => {
-          navigator.vibrate([500, 200, 500]);
-          console.log('iOS: Segunda vibração enviada');
-        }, 2000);
-      }
-      
-      // Tocar um som mais alto em iOS
-      try {
-        // Criar e configurar áudio com volume alto
-        const audio = new Audio('/sounds/notification.mp3');
-        audio.volume = 1.0; // Volume máximo
-        console.log('iOS: Tentando reproduzir som');
-        
-        // Tentar reproduzir imediatamente e novamente após um atraso
-        audio.play().catch(e => console.log('iOS: Erro ao reproduzir som:', e));
-        
-        // Tentar novamente após um atraso
-        setTimeout(() => {
-          audio.play().catch(e => console.log('iOS: Erro ao reproduzir som (tentativa 2):', e));
-        }, 1000);
-      } catch (audioError) {
-        console.error('iOS: Erro ao inicializar áudio:', audioError);
-      }
-      
-      // Criar um elemento de overlay para o alerta
+      // Criar um elemento de overlay para o popup
       const alertOverlay = document.createElement('div');
       alertOverlay.style.position = 'fixed';
       alertOverlay.style.top = '0';
       alertOverlay.style.left = '0';
       alertOverlay.style.width = '100%';
       alertOverlay.style.height = '100%';
-      alertOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.85)';
+      alertOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
       alertOverlay.style.zIndex = '9999';
       alertOverlay.style.display = 'flex';
       alertOverlay.style.flexDirection = 'column';
       alertOverlay.style.justifyContent = 'center';
       alertOverlay.style.alignItems = 'center';
       alertOverlay.style.padding = '20px';
-      alertOverlay.style.animation = 'fadeIn 0.3s ease-in-out';
-      console.log('iOS: Elemento de overlay criado');
       
-      // Definir CSS para animação mais chamativa
-      const style = document.createElement('style');
-      style.textContent = `
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes pulse {
-          0% { transform: scale(1); background-color: #ff3b30; }
-          50% { transform: scale(1.05); background-color: #ff0000; }
-          100% { transform: scale(1); background-color: #ff3b30; }
-        }
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
-          20%, 40%, 60%, 80% { transform: translateX(10px); }
-        }
-      `;
-      document.head.appendChild(style);
-      console.log('iOS: Estilos de animação adicionados');
-      
-      // Conteúdo do alerta
+      // Conteúdo do popup
       const alertBox = document.createElement('div');
-      alertBox.style.backgroundColor = '#ff3b30'; // Cor mais vibrante (vermelho iOS)
+      alertBox.style.backgroundColor = '#fff';
       alertBox.style.borderRadius = '12px';
-      alertBox.style.padding = '25px';
+      alertBox.style.padding = '20px';
       alertBox.style.maxWidth = '85%';
-      alertBox.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.5)';
-      alertBox.style.animation = 'pulse 1s infinite, shake 0.5s';
+      alertBox.style.boxShadow = '0 5px 15px rgba(0, 0, 0, 0.3)';
       
-      // Título do alerta
+      // Título do popup
       const alertTitle = document.createElement('h2');
-      alertTitle.style.fontSize = '28px';
+      alertTitle.style.fontSize = '22px';
       alertTitle.style.fontWeight = 'bold';
       alertTitle.style.marginBottom = '15px';
       alertTitle.style.textAlign = 'center';
-      alertTitle.style.color = 'white';
-      alertTitle.style.textTransform = 'uppercase';
-      alertTitle.textContent = 'DESCANSO FINALIZADO!';
+      alertTitle.style.color = '#4338ca'; 
+      alertTitle.textContent = 'Descanso Finalizado';
       
-      // Mensagem do alerta
+      // Mensagem do popup
       const alertMessage = document.createElement('p');
-      alertMessage.style.fontSize = '20px';
-      alertMessage.style.marginBottom = '25px';
+      alertMessage.style.fontSize = '18px';
+      alertMessage.style.marginBottom = '20px';
       alertMessage.style.textAlign = 'center';
-      alertMessage.style.color = 'white';
-      alertMessage.style.fontWeight = 'bold';
+      alertMessage.style.color = '#333';
       
       let exerciseName = 'próximo exercício';
       try {
@@ -1294,101 +1162,78 @@ export default function WorkoutMode() {
           exerciseName = currentExercise.name;
         }
       } catch (e) {
-        console.log('iOS: Erro ao obter nome do exercício:', e);
+        console.log('Erro ao obter nome do exercício:', e);
       }
       
-      alertMessage.textContent = `HORA DE COMEÇAR A PRÓXIMA SÉRIE DE ${exerciseName.toUpperCase()}`;
+      alertMessage.textContent = `Hora de começar a próxima série de ${exerciseName}`;
       
       // Botão de fechar
       const closeButton = document.createElement('button');
-      closeButton.style.backgroundColor = 'white';
-      closeButton.style.color = '#ff3b30';
+      closeButton.style.backgroundColor = '#4f46e5';
+      closeButton.style.color = 'white';
       closeButton.style.border = 'none';
-      closeButton.style.borderRadius = '9999px';
-      closeButton.style.padding = '16px 24px';
-      closeButton.style.fontSize = '20px';
+      closeButton.style.borderRadius = '8px';
+      closeButton.style.padding = '12px 24px';
+      closeButton.style.fontSize = '16px';
       closeButton.style.fontWeight = 'bold';
       closeButton.style.cursor = 'pointer';
       closeButton.style.width = '100%';
-      closeButton.style.marginTop = '15px';
-      closeButton.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
-      closeButton.textContent = 'INICIAR PRÓXIMA SÉRIE';
-      console.log('iOS: Elementos do alerta criados');
+      closeButton.style.marginTop = '10px';
+      closeButton.textContent = 'Iniciar Próxima Série';
       
-      // Adicionar evento para fechar o alerta
+      // Adicionar evento para fechar o popup
       closeButton.addEventListener('click', () => {
         if (document.body.contains(alertOverlay)) {
           document.body.removeChild(alertOverlay);
-          console.log('iOS: Alerta fechado pelo botão');
-          
-          // Tentar reproduzir o som ao clicar (iOS requer interação do usuário)
-          try {
-            const audio = new Audio('/sounds/notification.mp3');
-            audio.volume = 1.0;
-            audio.play().catch(e => console.log('Erro ao reproduzir som após clique:', e));
-          } catch (error) {
-            console.log('Erro ao tocar som após interação:', error);
-          }
+          console.log('Popup fechado pelo botão');
         }
       });
       
       // Adicionar evento de toque em qualquer lugar para fechar
       alertOverlay.addEventListener('click', (event) => {
-        // Prevenir que o clique dentro do alerta feche-o
+        // Prevenir que o clique dentro do popup feche-o
         if (event.target === alertOverlay) {
           document.body.removeChild(alertOverlay);
-          console.log('iOS: Alerta fechado por toque fora');
+          console.log('Popup fechado por toque fora');
         }
       });
       
-      // Montar o alerta
+      // Montar o popup
       alertBox.appendChild(alertTitle);
       alertBox.appendChild(alertMessage);
       alertBox.appendChild(closeButton);
       alertOverlay.appendChild(alertBox);
-      console.log('iOS: Estrutura do alerta montada');
       
       // Remover alertas existentes antes de adicionar um novo
       const existingAlerts = document.querySelectorAll('[data-ios-alert="true"]');
       existingAlerts.forEach(alert => {
         if (document.body.contains(alert)) {
           document.body.removeChild(alert);
-          console.log('iOS: Alerta existente removido');
+          console.log('Alerta existente removido');
         }
       });
       
       // Adicionar atributo de identificação
       alertOverlay.setAttribute('data-ios-alert', 'true');
       
-      // Adicionar o alerta ao corpo da página
+      // Adicionar o popup ao corpo da página
       if (document.body) {
         document.body.appendChild(alertOverlay);
-        console.log('iOS: Alerta adicionado ao body');
+        console.log('Popup adicionado ao body');
       } else {
-        console.error('iOS: document.body não está disponível');
+        console.error('document.body não está disponível');
       }
       
       // Remover automaticamente após 30 segundos (caso o usuário não interaja)
       setTimeout(() => {
         if (document.body && document.body.contains(alertOverlay)) {
           document.body.removeChild(alertOverlay);
-          console.log('iOS: Alerta removido automaticamente após timeout');
+          console.log('Popup removido automaticamente após timeout');
         }
       }, 30000);
       
-      console.log('iOS: Função showIOSAlert concluída com sucesso');
     } catch (error) {
-      console.error('iOS: ERRO CRÍTICO ao mostrar alerta:', error);
-      
-      // Tentar método alternativo em caso de falha
-      try {
-        if (typeof window.alert === 'function') {
-          window.alert('Descanso finalizado! Hora de iniciar próxima série.');
-          console.log('iOS: Alerta alternativo mostrado após erro');
-        }
-      } catch (e) {
-        console.error('iOS: Falha total ao mostrar alertas:', e);
-      }
+      console.error('Erro ao mostrar popup:', error);
     }
   };
 
@@ -1410,12 +1255,7 @@ export default function WorkoutMode() {
       localStorage.setItem('appTreino_restTimerStart', now.toString());
       localStorage.setItem('appTreino_restTimerDuration', intDuration.toString());
       localStorage.setItem('appTreino_restTimerEnd', restTimerEndRef.current.toString());
-      localStorage.setItem('appTreino_backgroundTimestamp', '0'); // Inicializar com 0 se não estiver em background
-      
-      // Se for um tempo curto, avisar o usuário
-      if (intDuration <= 15) {
-        alert(`O timer é curto (${intDuration}s). Para melhor funcionamento, mantenha o app aberto.`);
-      }
+      localStorage.setItem('appTreino_backgroundTimestamp', '0');
     }
     
     // Salvar o estado após iniciar o temporizador de descanso
