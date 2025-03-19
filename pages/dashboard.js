@@ -14,10 +14,14 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user) {
       fetchData();
+    } else {
+      setLoading(false);
     }
   }, [user]);
 
   const fetchData = async () => {
+    if (!user) return;
+    
     setLoading(true);
     try {
       // Buscar listas de treinos
