@@ -35,6 +35,7 @@ export default function WorkoutMode() {
   const [showWeightDecreaseAlert, setShowWeightDecreaseAlert] = useState(false);
   const [setRepsHistory, setSetRepsHistory] = useState({}); // Armazenar histórico de repetições por série
   const [notificationPermission, setNotificationPermission] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
   
   // Estado para cronômetros
   const [totalWorkoutTime, setTotalWorkoutTime] = useState(0);
@@ -45,6 +46,18 @@ export default function WorkoutMode() {
   const exerciseTimerEndRef = useRef(null);
   const restTimerEndRef = useRef(null);
   const lastUpdatedTimeRef = useRef(null);
+  const backgroundTimeRef = useRef(null);
+
+  // Detectar se é um dispositivo iOS
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Verificar se estamos em um dispositivo iOS
+      const ua = window.navigator.userAgent;
+      const iOS = !!ua.match(/iPad/i) || !!ua.match(/iPhone/i);
+      setIsIOS(iOS);
+      console.log('Dispositivo iOS detectado:', iOS);
+    }
+  }, []);
 
   // Função para salvar estado dos timers no localStorage
   const saveTimersState = () => {
@@ -77,7 +90,8 @@ export default function WorkoutMode() {
           timerActive,
           restTimerActive,
           sessionId,
-          workoutId: id
+          workoutId: id,
+          backgroundTime: backgroundTimeRef.current
         };
         
         localStorage.setItem('appTreino_timerState', JSON.stringify(timerState));
@@ -233,10 +247,46 @@ export default function WorkoutMode() {
     // Função para verificar e sincronizar estado quando o app voltar ao foco
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && isWorkoutActive) {
+        // Quando a página fica visível novamente, calcular tempo em background para iOS
+        if (isIOS && backgroundTimeRef.current) {
+          const now = Date.now();
+          const timeInBackground = now - backgroundTimeRef.current;
+          console.log(`App esteve em background por ${timeInBackground/1000}s`);
+          
+          // Ajustar os temporizadores para iOS
+          if (restTimerActive && restTimerEndRef.current) {
+            // Avançar o tempo de término do temporizador de descanso para compensar o tempo em background
+            restTimerEndRef.current += timeInBackground;
+            console.log('Ajustado temporizador de descanso para iOS');
+          }
+          
+          // Verificar se o temporizador de descanso deve ter finalizado durante o tempo em background
+          if (restTimerActive && restTimerEndRef.current) {
+            const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
+            if (remaining <= 0) {
+              setRestTimerActive(false);
+              setRestTimeRemaining(0);
+              restTimerEndRef.current = null;
+              sendRestFinishedNotification();
+              console.log('Temporizador de descanso finalizado enquanto em background');
+            } else {
+              setRestTimeRemaining(remaining);
+            }
+          }
+          
+          backgroundTimeRef.current = null;
+        }
+        
         // Quando a página fica visível novamente, verificar o estado
         console.log('App voltou ao foco, sincronizando timers');
         loadTimersState();
       } else if (document.visibilityState === 'hidden' && isWorkoutActive) {
+        // Quando a página fica oculta, registrar o momento em que foi para background (iOS)
+        if (isIOS) {
+          backgroundTimeRef.current = Date.now();
+          console.log('App em segundo plano, registrando hora para iOS:', new Date(backgroundTimeRef.current).toLocaleTimeString());
+        }
+        
         // Quando a página fica oculta, salvar o estado atual
         console.log('App em segundo plano, salvando estado dos timers');
         saveTimersState();
@@ -253,6 +303,49 @@ export default function WorkoutMode() {
     };
     
     window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Adicionar listeners específicos para iOS
+    const handlePageHide = () => {
+      if (isIOS && isWorkoutActive) {
+        backgroundTimeRef.current = Date.now();
+        console.log('iOS: App escondido (pagehide), registrando hora:', new Date(backgroundTimeRef.current).toLocaleTimeString());
+        saveTimersState();
+      }
+    };
+    
+    const handlePageShow = () => {
+      if (isIOS && isWorkoutActive && backgroundTimeRef.current) {
+        const now = Date.now();
+        const timeInBackground = now - backgroundTimeRef.current;
+        console.log(`iOS: App mostrado (pageshow), esteve em background por ${timeInBackground/1000}s`);
+        
+        // Ajustar os temporizadores para iOS
+        if (restTimerActive && restTimerEndRef.current) {
+          // Avançar o tempo de término do temporizador de descanso para compensar o tempo em background
+          restTimerEndRef.current += timeInBackground;
+          
+          // Verificar se deve ter terminado
+          const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
+          if (remaining <= 0) {
+            setRestTimerActive(false);
+            setRestTimeRemaining(0);
+            restTimerEndRef.current = null;
+            sendRestFinishedNotification();
+          } else {
+            setRestTimeRemaining(remaining);
+          }
+        }
+        
+        backgroundTimeRef.current = null;
+        loadTimersState();
+      }
+    };
+    
+    // No iOS, esses eventos são mais confiáveis que visibilitychange
+    if (isIOS) {
+      window.addEventListener('pagehide', handlePageHide);
+      window.addEventListener('pageshow', handlePageShow);
+    }
     
     // Sincronizar a cada 1 segundo para manter os timers precisos mesmo em background
     const autoSyncInterval = setInterval(() => {
@@ -288,10 +381,16 @@ export default function WorkoutMode() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      
+      if (isIOS) {
+        window.removeEventListener('pagehide', handlePageHide);
+        window.removeEventListener('pageshow', handlePageShow);
+      }
+      
       clearInterval(autoSyncInterval);
       clearInterval(autoSaveInterval);
     };
-  }, [isWorkoutActive, restTimerActive, restTimeRemaining]);
+  }, [isWorkoutActive, restTimerActive, restTimeRemaining, isIOS]);
 
   // Função para iniciar o timer de descanso de forma confiável
   const startRestTimer = (duration) => {
@@ -781,43 +880,88 @@ export default function WorkoutMode() {
     
     try {
       const currentExercise = exercises[currentExerciseIndex];
-      const notification = new Notification('Descanso finalizado!', {
-        body: `Hora de começar a próxima série de ${currentExercise.name}`,
-        icon: '/icon-192x192.png', // Caminho atualizado para o ícone
-        vibrate: [200, 100, 200],
-        tag: 'rest-finished',
-        requireInteraction: true // Requer interação do usuário para fechar
-      });
+      const notificationTitle = 'Descanso finalizado!';
+      const notificationBody = `Hora de começar a próxima série de ${currentExercise.name}`;
       
-      // Quando o usuário clicar na notificação, trazer o app para o primeiro plano
-      notification.onclick = function() {
-        window.focus();
-        notification.close();
-      };
-      
-      // Tocar um som de alerta com tratamento de erros aprimorado
-      try {
-        const audio = new Audio('/sounds/notification.mp3');
-        audio.volume = 0.7; // Reduzir volume para 70%
+      // Se for iOS e o app estiver instalado como PWA, usamos uma abordagem diferente
+      if (isIOS && window.navigator.standalone) {
+        // Vibrar o dispositivo se possível
+        if ('vibrate' in navigator) {
+          navigator.vibrate([200, 100, 200]);
+        }
         
-        // Pré-carregar o áudio antes de tocar
-        audio.addEventListener('canplaythrough', () => {
-          const playPromise = audio.play();
+        // Adicionar um alerta visual na interface
+        // Este código pode ser expandido para mostrar uma UI específica
+        console.log('Notificação em iOS PWA instalado:', notificationTitle, notificationBody);
+        
+        // Tocar um som mais alto em iOS
+        try {
+          const audio = new Audio('/sounds/notification.mp3');
+          audio.volume = 1.0; // Volume máximo para iOS
           
-          if (playPromise !== undefined) {
-            playPromise.catch(e => {
-              console.log('Erro ao tentar reproduzir som:', e.message);
-            });
-          }
+          // Tentar reproduzir o som imediatamente quando o app voltar ao foco
+          const playSound = () => {
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+              playPromise.catch(e => {
+                console.log('Erro ao tentar reproduzir som no iOS:', e.message);
+              });
+            }
+          };
+          
+          // Reproduzir som agora
+          playSound();
+          
+          // E também quando a página ficar visível
+          document.addEventListener('visibilitychange', function onVisChange() {
+            if (document.visibilityState === 'visible') {
+              playSound();
+              document.removeEventListener('visibilitychange', onVisChange);
+            }
+          });
+        } catch (audioError) {
+          console.log('Erro ao inicializar áudio no iOS:', audioError);
+        }
+      } else {
+        // Abordagem padrão para outros navegadores
+        const notification = new Notification(notificationTitle, {
+          body: notificationBody,
+          icon: '/icon-192x192.png',
+          vibrate: [200, 100, 200],
+          tag: 'rest-finished',
+          requireInteraction: true // Requer interação do usuário para fechar
         });
         
-        // Lidar com erro de carregamento
-        audio.addEventListener('error', (e) => {
-          console.log('Erro ao carregar o som:', 
-            e.target.error ? e.target.error.message : 'Erro desconhecido');
-        });
-      } catch (audioError) {
-        console.log('Erro ao inicializar áudio:', audioError);
+        // Quando o usuário clicar na notificação, trazer o app para o primeiro plano
+        notification.onclick = function() {
+          window.focus();
+          notification.close();
+        };
+        
+        // Tocar um som de alerta com tratamento de erros aprimorado
+        try {
+          const audio = new Audio('/sounds/notification.mp3');
+          audio.volume = 0.7; // Reduzir volume para 70%
+          
+          // Pré-carregar o áudio antes de tocar
+          audio.addEventListener('canplaythrough', () => {
+            const playPromise = audio.play();
+            
+            if (playPromise !== undefined) {
+              playPromise.catch(e => {
+                console.log('Erro ao tentar reproduzir som:', e.message);
+              });
+            }
+          });
+          
+          // Lidar com erro de carregamento
+          audio.addEventListener('error', (e) => {
+            console.log('Erro ao carregar o som:', 
+              e.target.error ? e.target.error.message : 'Erro desconhecido');
+          });
+        } catch (audioError) {
+          console.log('Erro ao inicializar áudio:', audioError);
+        }
       }
     } catch (error) {
       console.error('Erro ao enviar notificação:', error);
