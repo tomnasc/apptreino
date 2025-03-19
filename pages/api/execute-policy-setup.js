@@ -38,18 +38,25 @@ export default async function handler(req, res) {
       $$;
     `;
 
-    // Executar a criação da função exec_sql
-    const { error: fnError } = await supabase.rpc('exec_sql', {
-      sql_query: createExecSqlFn
-    }).catch(() => {
-      // Se a função não existir, executar diretamente via SQL
-      return supabase.from('_exec_sql').rpc('query', { query: createExecSqlFn });
-    });
-
-    if (fnError) {
+    // Executar a criação da função exec_sql - versão corrigida sem usar .catch()
+    try {
+      const { error: fnError } = await supabase.rpc('exec_sql', {
+        sql_query: createExecSqlFn
+      });
+      
+      if (fnError) {
+        console.log('Erro na primeira tentativa, tentando método alternativo...');
+        throw fnError; // Forçar o fluxo para o bloco catch
+      }
+    } catch (error) {
       console.log('Tentando criar função exec_sql via SQL direto...');
       // Tentar executar SQL diretamente se a função RPC falhar
-      await supabase.from('_exec_sql').rpc('query', { query: createExecSqlFn });
+      try {
+        await supabase.from('_exec_sql').rpc('query', { query: createExecSqlFn });
+      } catch (sqlError) {
+        console.log('Ignorando erro de SQL direto e continuando...');
+        // Continuar mesmo que isso falhe, pois a função pode já existir
+      }
     }
 
     // Script para criar a tabela workout_session_details
