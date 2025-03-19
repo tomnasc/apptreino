@@ -34,6 +34,7 @@ export default function WorkoutMode() {
   const [showWeightIncreaseAlert, setShowWeightIncreaseAlert] = useState(false);
   const [showWeightDecreaseAlert, setShowWeightDecreaseAlert] = useState(false);
   const [setRepsHistory, setSetRepsHistory] = useState({}); // Armazenar histórico de repetições por série
+  const [notificationPermission, setNotificationPermission] = useState(false);
   
   // Estado para cronômetros
   const [totalWorkoutTime, setTotalWorkoutTime] = useState(0);
@@ -195,7 +196,8 @@ export default function WorkoutMode() {
             setRestTimerActive(false);
             setRestTimeRemaining(0);
             restTimerEndRef.current = null;
-            // Tocar som de alerta se disponível
+            // Enviar notificação para trazer o app para o primeiro plano
+            sendRestFinishedNotification();
           } else {
             // Atualizar o tempo restante (arredondado para uma casa decimal)
             const newRestTime = Number(remaining.toFixed(1));
@@ -264,6 +266,8 @@ export default function WorkoutMode() {
           setRestTimerActive(false);
           setRestTimeRemaining(0);
           restTimerEndRef.current = null;
+          // Enviar notificação para trazer o app para o primeiro plano
+          sendRestFinishedNotification();
         } else {
           // Atualizar o tempo restante (arredondado para uma casa decimal)
           const newRestTime = Number(remaining.toFixed(1));
@@ -750,6 +754,52 @@ export default function WorkoutMode() {
     } catch (error) {
       console.error('Erro ao retomar treino:', error);
       setError('Ocorreu um erro ao retomar o treino. Por favor, tente novamente.');
+    }
+  };
+
+  // Solicitar permissão para notificações ao iniciar a aplicação
+  useEffect(() => {
+    // Verificar se o navegador suporta notificações
+    if ('Notification' in window) {
+      // Verificar permissão atual
+      if (Notification.permission === 'granted') {
+        setNotificationPermission(true);
+      } else if (Notification.permission !== 'denied') {
+        // Se ainda não negou, solicitar permissão
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            setNotificationPermission(true);
+          }
+        });
+      }
+    }
+  }, []);
+
+  // Função para enviar notificação
+  const sendRestFinishedNotification = () => {
+    if (!notificationPermission) return;
+    
+    try {
+      const currentExercise = exercises[currentExerciseIndex];
+      const notification = new Notification('Descanso finalizado!', {
+        body: `Hora de começar a próxima série de ${currentExercise.name}`,
+        icon: '/icons/icon-192x192.png', // Caminho para o ícone do app
+        vibrate: [200, 100, 200],
+        tag: 'rest-finished',
+        requireInteraction: true // Requer interação do usuário para fechar
+      });
+      
+      // Quando o usuário clicar na notificação, trazer o app para o primeiro plano
+      notification.onclick = function() {
+        window.focus();
+        notification.close();
+      };
+      
+      // Tocar um som de alerta
+      const audio = new Audio('/sounds/notification.mp3');
+      audio.play().catch(e => console.log('Erro ao tocar som:', e));
+    } catch (error) {
+      console.error('Erro ao enviar notificação:', error);
     }
   };
 

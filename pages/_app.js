@@ -1,20 +1,48 @@
-import '../styles/globals.css';
-import { createBrowserClient } from '@supabase/ssr';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import { SessionContextProvider } from '@supabase/auth-helpers-react';
+import { Toaster } from 'react-hot-toast';
+import Head from 'next/head';
+import '../styles/globals.css';
 
 function MyApp({ Component, pageProps }) {
-  const [supabaseClient] = useState(() => 
-    createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    )
-  );
+  const [supabaseClient] = useState(() => createBrowserSupabaseClient());
+
+  // Define a favicon e meta tags
+  useEffect(() => {
+    // Verifique se o service worker é suportado
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        // Desregistrar service workers existentes para evitar problemas
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for (let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      });
+    }
+  }, []);
 
   return (
-    <SessionContextProvider supabaseClient={supabaseClient}>
-      <Component {...pageProps} />
-    </SessionContextProvider>
+    <>
+      <Head>
+        <title>App Treino - Seu assistente de treinos</title>
+        <meta name="description" content="Aplicativo para acompanhamento e gerenciamento de treinos" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <link rel="icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
+        <meta name="theme-color" content="#ffffff" />
+      </Head>
+      <SessionContextProvider
+        supabaseClient={supabaseClient}
+        initialSession={pageProps.initialSession}
+      >
+        <Component {...pageProps} />
+        <Toaster position="bottom-center" />
+      </SessionContextProvider>
+    </>
   );
 }
 
