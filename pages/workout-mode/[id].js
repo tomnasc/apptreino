@@ -188,6 +188,9 @@ export default function WorkoutMode() {
       localStorage.setItem('appTreino_restTimerDuration', intDuration.toString());
       localStorage.setItem('appTreino_restTimerEnd', restTimerEndRef.current.toString());
       localStorage.setItem('appTreino_backgroundTimestamp', '0'); // Inicializar com 0 se não estiver em background
+      
+      // Agendar notificação para quando o timer terminar
+      scheduleIOSNotification(intDuration * 1000);
     }
     
     // Salvar o estado após iniciar o temporizador de descanso
@@ -240,6 +243,10 @@ export default function WorkoutMode() {
               showIOSAlert(); // Mostrar alerta diretamente sem passar pela função sendRestFinishedNotification
               console.log('iOS: Alerta visual chamado diretamente ao voltar ao foco');
             } else {
+              // Agendar uma notificação no tempo exato em que o timer vai terminar
+              const timeUntilEnd = remaining * 1000;
+              scheduleIOSNotification(timeUntilEnd);
+              
               // Atualizar o tempo restante com valor preciso do localStorage
               setRestTimeRemaining(remaining);
               // Atualizar referência local para manter consistência
@@ -259,6 +266,12 @@ export default function WorkoutMode() {
           // Salvar estado atual dos timers antes de ir para segundo plano
           if (restTimerActive && restTimerEndRef.current) {
             localStorage.setItem('appTreino_restTimerEnd', restTimerEndRef.current.toString());
+            
+            // Agendar uma notificação para quando o timer terminar
+            const timeUntilEnd = restTimerEndRef.current - now;
+            if (timeUntilEnd > 0) {
+              scheduleIOSNotification(timeUntilEnd);
+            }
           }
         }
       };
@@ -857,16 +870,77 @@ export default function WorkoutMode() {
       // Verificar permissão atual
       if (Notification.permission === 'granted') {
         setNotificationPermission(true);
+        
+        // Se for iOS, tentar registrar para notificações push se possível
+        if (isIOS) {
+          registerForPushNotifications();
+        }
       } else if (Notification.permission !== 'denied') {
         // Se ainda não negou, solicitar permissão
         Notification.requestPermission().then(permission => {
           if (permission === 'granted') {
             setNotificationPermission(true);
+            
+            // Se for iOS, tentar registrar para notificações push se possível
+            if (isIOS) {
+              registerForPushNotifications();
+            }
           }
         });
       }
     }
-  }, []);
+  }, [isIOS]);
+  
+  // Função para registrar para notificações push no iOS
+  const registerForPushNotifications = () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.log('Notificações push não são suportadas neste navegador');
+      return;
+    }
+    
+    try {
+      console.log('Tentando registrar para notificações push');
+      
+      // Registrar service worker para notificações push
+      navigator.serviceWorker.register('/push-sw.js')
+        .then(registration => {
+          console.log('Service Worker registrado com sucesso:', registration);
+          
+          // Solicitar permissão para notificações push
+          return registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(
+              'BFnrxGZ2-TzxWgXNiP-GG_Wo-Nau0r_07i9RgQIHGdx4Wy3PoZwMx00XvoFJkP4Bx1pZ6sKCtjsZZpbTUoxnMpw'
+            )
+          });
+        })
+        .then(subscription => {
+          console.log('Inscrito para notificações push:', subscription);
+          // Aqui você poderia enviar o subscription para seu servidor
+        })
+        .catch(err => {
+          console.error('Erro ao registrar para notificações push:', err);
+        });
+    } catch (error) {
+      console.error('Erro ao configurar notificações push:', error);
+    }
+  };
+  
+  // Função auxiliar para converter a chave pública em formato adequado
+  const urlBase64ToUint8Array = (base64String) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+      .replace(/\-/g, '+')
+      .replace(/_/g, '/');
+    
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
 
   // Função para enviar notificação
   const sendRestFinishedNotification = () => {
@@ -1210,6 +1284,64 @@ export default function WorkoutMode() {
       } catch (e) {
         console.error('iOS: Falha total ao mostrar alertas:', e);
       }
+    }
+  };
+
+  // Função para agendar uma notificação no iOS após um determinado tempo
+  const scheduleIOSNotification = (delay) => {
+    if (!notificationPermission) return;
+    
+    try {
+      console.log(`Agendando notificação para daqui a ${Math.floor(delay / 1000)} segundos`);
+      
+      // Usar setTimeout para agendar a notificação
+      const notificationTimer = setTimeout(() => {
+        console.log('Executando notificação agendada');
+        
+        // Verificar se ainda estamos em segundo plano
+        if (document.visibilityState === 'hidden') {
+          try {
+            // Criar notificação do sistema
+            if ('Notification' in window) {
+              const exerciseName = exercises[currentExerciseIndex]?.name || 'exercício';
+              
+              const notification = new Notification('Descanso Finalizado!', {
+                body: `Hora de começar a próxima série de ${exerciseName}`,
+                icon: '/icon-192x192.png',
+                badge: '/icon-192x192.png',
+                tag: 'rest-timer-end',
+                renotify: true,
+                requireInteraction: true,
+                silent: false
+              });
+              
+              notification.onclick = function() {
+                window.focus();
+                notification.close();
+                console.log('Notificação clicada, app em foco');
+              };
+              
+              console.log('Notificação enviada enquanto app estava em segundo plano');
+            }
+            
+            // Tentar vibrar o dispositivo
+            if ('vibrate' in navigator) {
+              navigator.vibrate([300, 100, 300, 100, 300]);
+              console.log('Vibração enviada');
+            }
+          } catch (notifError) {
+            console.error('Erro ao enviar notificação agendada:', notifError);
+          }
+        } else {
+          console.log('App já está em primeiro plano, não enviando notificação');
+        }
+      }, delay);
+      
+      // Armazenar o ID do timer para poder cancelá-lo se necessário
+      return notificationTimer;
+    } catch (error) {
+      console.error('Erro ao agendar notificação:', error);
+      return null;
     }
   };
 
