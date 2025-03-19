@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import Layout from '../components/Layout';
 import Link from 'next/link';
+import { toast } from 'react-hot-toast';
 
 export default function DashboardPage() {
   const supabase = useSupabaseClient();
@@ -10,6 +11,7 @@ export default function DashboardPage() {
   const [recentWorkouts, setRecentWorkouts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
+  const [isConfiguring, setIsConfiguring] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -82,6 +84,41 @@ export default function DashboardPage() {
       month: '2-digit',
       year: 'numeric',
     });
+  };
+
+  // Função para executar a configuração das políticas
+  const handleConfigureDataCollection = async () => {
+    try {
+      if (window.confirm('Deseja definir as políticas de segurança para coleta detalhada de dados de treino?')) {
+        setIsConfiguring(true);
+        
+        const response = await fetch('/api/execute-policy-setup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.message || 'Erro ao configurar políticas');
+        }
+        
+        toast.success('Configuração concluída com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao configurar:', error);
+      // Exibir mensagem de erro mais amigável, evitando mostrar [object Object]
+      let errorMessage = 'Erro ao configurar políticas';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast.error(errorMessage);
+      alert('Erro: ' + errorMessage);
+    } finally {
+      setIsConfiguring(false);
+    }
   };
 
   return (
@@ -333,33 +370,7 @@ export default function DashboardPage() {
 
         <div className="mt-8 mb-4 flex justify-end">
           <button
-            onClick={async () => {
-              const confirmed = window.confirm('Deseja configurar as políticas de segurança para a coleta de dados detalhados de treino?');
-              if (confirmed) {
-                try {
-                  setLoadingData(true);
-                  const response = await fetch('/api/execute-policy-setup', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json'
-                    }
-                  });
-                  
-                  const result = await response.json();
-                  
-                  if (response.ok) {
-                    alert('Configuração realizada com sucesso! Agora você pode coletar dados detalhados dos treinos.');
-                  } else {
-                    alert(`Erro: ${result.error}\n${result.details || ''}`);
-                  }
-                } catch (error) {
-                  console.error('Erro ao configurar políticas:', error);
-                  alert('Ocorreu um erro ao configurar as políticas de segurança. Consulte o console para mais detalhes.');
-                } finally {
-                  setLoadingData(false);
-                }
-              }
-            }}
+            onClick={handleConfigureDataCollection}
             className="text-gray-600 text-sm flex items-center hover:text-blue-600 transition-colors bg-white hover:bg-blue-50 border border-gray-300 rounded px-3 py-1"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1">

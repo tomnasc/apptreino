@@ -79,6 +79,18 @@ export default async function handler(req, res) {
         UNIQUE(session_id, exercise_id, set_index)
       );
       
+      -- Verificar se a coluna exercise_name existe na tabela e adicioná-la se não existir
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT FROM information_schema.columns 
+          WHERE table_name = 'workout_session_details' AND column_name = 'exercise_name'
+        ) THEN
+          ALTER TABLE workout_session_details ADD COLUMN exercise_name TEXT;
+        END IF;
+      END
+      $$;
+      
       ALTER TABLE workout_session_details ENABLE ROW LEVEL SECURITY;
     `;
 
@@ -144,35 +156,71 @@ export default async function handler(req, res) {
 
     // Executar script para criar a tabela
     console.log('Criando tabela workout_session_details...');
-    const { error: tableError } = await supabase.rpc('exec_sql', {
-      sql_query: createTableSql
-    });
+    try {
+      const { data: tableData, error: tableError } = await supabase.rpc('exec_sql', {
+        sql_query: createTableSql
+      });
 
-    if (tableError) {
-      console.error('Erro ao criar tabela:', tableError);
-      return res.status(500).json({ error: 'Erro ao criar tabela', details: tableError });
+      if (tableError) {
+        console.error('Erro ao criar tabela:', JSON.stringify(tableError));
+        return res.status(500).json({ 
+          error: 'Erro ao criar tabela', 
+          message: tableError.message || 'Erro desconhecido',
+          code: tableError.code || 'UNKNOWN'
+        });
+      }
+    } catch (tableExecError) {
+      console.error('Exceção ao criar tabela:', tableExecError.message);
+      return res.status(500).json({ 
+        error: 'Exceção ao criar tabela', 
+        message: tableExecError.message || 'Erro desconhecido'
+      });
     }
 
     // Executar script para criar a view
     console.log('Criando view workout_session_averages...');
-    const { error: viewError } = await supabase.rpc('exec_sql', {
-      sql_query: createViewSql
-    });
+    try {
+      const { data: viewData, error: viewError } = await supabase.rpc('exec_sql', {
+        sql_query: createViewSql
+      });
 
-    if (viewError) {
-      console.error('Erro ao criar view:', viewError);
-      return res.status(500).json({ error: 'Erro ao criar view', details: viewError });
+      if (viewError) {
+        console.error('Erro ao criar view:', JSON.stringify(viewError));
+        return res.status(500).json({ 
+          error: 'Erro ao criar view', 
+          message: viewError.message || 'Erro desconhecido',
+          code: viewError.code || 'UNKNOWN'
+        });
+      }
+    } catch (viewExecError) {
+      console.error('Exceção ao criar view:', viewExecError.message);
+      return res.status(500).json({ 
+        error: 'Exceção ao criar view', 
+        message: viewExecError.message || 'Erro desconhecido'
+      });
     }
 
     // Executar script para configurar as políticas
     console.log('Configurando políticas de segurança...');
-    const { error: policiesError } = await supabase.rpc('exec_sql', {
-      sql_query: setupPoliciesSql
-    });
+    try {
+      const { data: policiesData, error: policiesError } = await supabase.rpc('exec_sql', {
+        sql_query: setupPoliciesSql
+      });
 
-    if (policiesError) {
-      console.error('Erro ao configurar políticas:', policiesError);
-      return res.status(500).json({ error: 'Erro ao configurar políticas', details: policiesError });
+      if (policiesError) {
+        console.error('Erro ao configurar políticas:', JSON.stringify(policiesError));
+        return res.status(500).json({ 
+          error: 'Erro ao configurar políticas', 
+          message: policiesError.message || 'Erro desconhecido',
+          code: policiesError.code || 'UNKNOWN'
+        });
+      }
+    } catch (policyExecError) {
+      console.error('Exceção ao configurar políticas:', policyExecError.message);
+      return res.status(500).json({ 
+        error: 'Exceção ao configurar políticas', 
+        message: policyExecError.message || 'Erro desconhecido'
+      });
     }
 
     return res.status(200).json({ 
@@ -182,7 +230,10 @@ export default async function handler(req, res) {
       policies: 'Políticas de segurança configuradas'
     });
   } catch (error) {
-    console.error('Erro geral:', error);
-    return res.status(500).json({ error: 'Erro interno', details: error.message });
+    console.error('Erro geral:', error.message);
+    return res.status(500).json({ 
+      error: 'Erro interno', 
+      message: error.message || 'Erro desconhecido'
+    });
   }
 } 
