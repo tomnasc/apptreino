@@ -43,12 +43,14 @@ export default function WorkoutMode() {
   const workoutStartRef = useRef(null);
   const exerciseTimerEndRef = useRef(null);
   const restTimerEndRef = useRef(null);
+  const lastUpdatedTimeRef = useRef(null);
 
   // Função para salvar estado dos timers no localStorage
   const saveTimersState = () => {
     if (typeof window !== 'undefined') {
       try {
         const now = Date.now();
+        lastUpdatedTimeRef.current = now;
         
         // Calcular os tempos absolutos de término para cada timer
         let exerciseEndTime = null;
@@ -89,69 +91,63 @@ export default function WorkoutMode() {
   const loadTimersState = () => {
     if (typeof window !== 'undefined') {
       try {
-        const timerStateJson = localStorage.getItem('appTreino_timerState');
-        if (!timerStateJson) return;
-        
-        const timerState = JSON.parse(timerStateJson);
-        const now = Date.now();
-        
-        // Verificar se o timer está ativo e se pertence à sessão atual
-        if (timerState.isWorkoutActive && 
-            timerState.sessionId === sessionId && 
-            timerState.workoutId === id) {
+        const savedState = localStorage.getItem('appTreino_timerState');
+        if (savedState) {
+          const state = JSON.parse(savedState);
+          const now = Date.now();
+          lastUpdatedTimeRef.current = now;
           
-          // Restaurar dados do treino se necessário
-          if (timerState.currentExerciseIndex !== currentExerciseIndex) {
-            setCurrentExerciseIndex(timerState.currentExerciseIndex);
-          }
-          
-          if (timerState.currentSetIndex !== currentSetIndex) {
-            setCurrentSetIndex(timerState.currentSetIndex);
-          }
-          
-          // Restaurar tempos de treino
-          if (timerState.workoutStartTime) {
-            const startTime = new Date(timerState.workoutStartTime);
-            if (!workoutStartTime || workoutStartTime.getTime() !== startTime.getTime()) {
-              setWorkoutStartTime(startTime);
+          // Verificar se o estado é válido e corresponde à sessão atual
+          if (state.workoutId === id && state.sessionId === sessionId && state.isWorkoutActive) {
+            console.log('Carregando estado dos timers do localStorage');
+            
+            // Restaurar o tempo de treino total
+            if (state.workoutStartTime) {
+              const elapsed = Math.floor((now - state.workoutStartTime) / 1000);
+              setTotalWorkoutTime(elapsed);
+              setWorkoutStartTime(new Date(state.workoutStartTime));
+              workoutStartRef.current = state.workoutStartTime;
             }
-            setTotalWorkoutTime(Math.floor((now - timerState.workoutStartTime) / 1000));
-          }
-          
-          // Restaurar timer de exercício
-          if (timerState.exerciseEndTime) {
-            const remaining = Math.max(0, Math.ceil((timerState.exerciseEndTime - now) / 1000));
-            if (remaining > 0) {
-              setTimeRemaining(remaining);
-              setTimerActive(true);
-            } else if (timerState.timerActive) {
-              // O timer acabou enquanto estava em segundo plano
-              handleSetCompleted();
+            
+            // Restaurar o tempo de exercício
+            if (state.exerciseEndTime && state.timerActive) {
+              const remaining = Math.max(0, (state.exerciseEndTime - now) / 1000);
+              if (remaining > 0) {
+                setTimeRemaining(remaining);
+                setTimerActive(true);
+                exerciseTimerEndRef.current = state.exerciseEndTime;
+              } else {
+                setTimeRemaining(0);
+                setTimerActive(false);
+              }
             }
-          }
-          
-          // Restaurar timer de descanso
-          if (timerState.restEndTime) {
-            const remaining = Math.max(0, Math.ceil((timerState.restEndTime - now) / 1000));
-            if (remaining > 0) {
-              setRestTimeRemaining(remaining);
-              setRestTimerActive(true);
-            } else if (timerState.restTimerActive) {
-              // O tempo de descanso acabou enquanto estava em segundo plano
-              setRestTimerActive(false);
-              setRestTimeRemaining(0);
+            
+            // Restaurar o tempo de descanso com maior precisão
+            if (state.restEndTime && state.restTimerActive) {
+              const remaining = Math.max(0, (state.restEndTime - now) / 1000);
+              console.log(`Tempo de descanso restante: ${remaining}s`);
+              if (remaining > 0) {
+                setRestTimeRemaining(remaining);
+                setRestTimerActive(true);
+                restTimerEndRef.current = state.restEndTime;
+              } else {
+                // O temporizador deveria ter terminado enquanto estava em segundo plano
+                setRestTimeRemaining(0);
+                setRestTimerActive(false);
+                restTimerEndRef.current = null;
+              }
             }
+            
+            // Restaurar índices
+            setCurrentExerciseIndex(state.currentExerciseIndex);
+            setCurrentSetIndex(state.currentSetIndex);
+          } else {
+            // Se o estado não corresponder, limpar
+            localStorage.removeItem('appTreino_timerState');
           }
-          
-          console.log('Estado dos timers carregado do localStorage', {
-            workoutTime: Math.floor((now - timerState.workoutStartTime) / 1000),
-            exerciseRemaining: timerState.exerciseEndTime ? Math.max(0, Math.ceil((timerState.exerciseEndTime - now) / 1000)) : null,
-            restRemaining: timerState.restEndTime ? Math.max(0, Math.ceil((timerState.restEndTime - now) / 1000)) : null
-          });
         }
-      } catch (e) {
-        console.error('Erro ao carregar estado dos timers:', e);
-        localStorage.removeItem('appTreino_timerState');
+      } catch (error) {
+        console.error('Erro ao carregar o estado dos timers:', error);
       }
     }
   };
@@ -164,7 +160,7 @@ export default function WorkoutMode() {
         clearInterval(mainIntervalRef.current);
       }
       
-      // Criar novo intervalo para atualizar todos os timers a cada 100ms
+      // Criar novo intervalo para atualizar todos os timers a cada segundo
       mainIntervalRef.current = setInterval(() => {
         const now = Date.now();
         
@@ -177,43 +173,34 @@ export default function WorkoutMode() {
         // Atualizar tempo de exercício
         if (timerActive && timeRemaining > 0) {
           setTimeRemaining(prev => {
-            const newTime = prev - 0.1;
+            const newTime = prev - 1;
             if (newTime <= 0) {
               handleSetCompleted();
               return 0;
             }
-            return Math.max(0, parseFloat(newTime.toFixed(1)));
+            return Math.max(0, newTime);
           });
         }
         
         // Atualizar tempo de descanso usando tempo absoluto
-        if (restTimerActive && restTimeRemaining > 0) {
-          if (restTimerEndRef.current) {
-            // Calcular o tempo restante com base no tempo absoluto de término
-            const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
-            setRestTimeRemaining(remaining);
+        if (restTimerActive && restTimerEndRef.current) {
+          const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
+          
+          // Apenas atualizar se houver mudança significativa (maior que 0.5 segundos)
+          if (Math.abs(remaining - restTimeRemaining) > 0.5) {
+            setRestTimeRemaining(Math.ceil(remaining));
             
+            // Se o temporizador de descanso acabou
             if (remaining <= 0) {
               setRestTimerActive(false);
               setRestTimeRemaining(0);
               restTimerEndRef.current = null;
+              // Tocar som de alerta se disponível
+              console.log('Tempo de descanso finalizado!');
             }
-          } else {
-            // Se não tivermos um tempo de término absoluto, decremente normalmente
-            setRestTimeRemaining(prev => {
-              const newTime = prev - 0.1;
-              if (newTime <= 0) {
-                setRestTimerActive(false);
-                return 0;
-              }
-              return Math.max(0, parseFloat(newTime.toFixed(1)));
-            });
           }
         }
-        
-        // Salvar o estado atual no localStorage
-        saveTimersState();
-      }, 500); // Aumentado para 500ms para maior estabilidade
+      }, 1000);
       
       return () => {
         if (mainIntervalRef.current) {
@@ -233,15 +220,63 @@ export default function WorkoutMode() {
         localStorage.removeItem('appTreino_timerState');
       }
     }
-  }, [isWorkoutActive, timerActive, restTimerActive]);
+  }, [isWorkoutActive]);
+
+  // Sincronizar o estado dos timers quando a visibilidade da página muda
+  useEffect(() => {
+    // Função para verificar e sincronizar estado quando o app voltar ao foco
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isWorkoutActive) {
+        // Quando a página fica visível novamente, verificar o estado
+        console.log('App voltou ao foco, sincronizando timers');
+        loadTimersState();
+      } else if (document.visibilityState === 'hidden' && isWorkoutActive) {
+        // Quando a página fica oculta, salvar o estado atual
+        console.log('App em segundo plano, salvando estado dos timers');
+        saveTimersState();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Adicionar listener para event beforeunload para salvar estado antes de fechar
+    const handleBeforeUnload = () => {
+      if (isWorkoutActive) {
+        saveTimersState();
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Adicionar listener para salvar o estado a cada 5 segundos para maior segurança
+    const autoSaveInterval = setInterval(() => {
+      if (isWorkoutActive) {
+        saveTimersState();
+      }
+    }, 5000);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      clearInterval(autoSaveInterval);
+    };
+  }, [isWorkoutActive]);
 
   // Função para iniciar o timer de descanso
   const startRestTimer = (duration) => {
-    setRestTimeRemaining(duration);
+    // Arredondar para cima a duração para garantir valores inteiros de segundos
+    const intDuration = Math.ceil(duration);
+    setRestTimeRemaining(intDuration);
     setRestTimerActive(true);
+    
     const now = Date.now();
-    restTimerEndRef.current = now + (duration * 1000);
-    console.log('Temporizador de descanso iniciado, terminará em:', new Date(restTimerEndRef.current).toLocaleTimeString());
+    restTimerEndRef.current = now + (intDuration * 1000);
+    
+    console.log(`Temporizador de descanso iniciado por ${intDuration}s, terminará em:`, 
+      new Date(restTimerEndRef.current).toLocaleTimeString());
+    
+    // Salvar o estado imediatamente após iniciar o temporizador de descanso
+    setTimeout(saveTimersState, 100);
   };
 
   // Remover registro do service worker que está causando problemas
@@ -690,47 +725,6 @@ export default function WorkoutMode() {
       setError('Ocorreu um erro ao retomar o treino. Por favor, tente novamente.');
     }
   };
-
-  // Sincronizar o estado dos timers quando a visibilidade da página muda
-  useEffect(() => {
-    // Função para verificar e sincronizar estado quando o app voltar ao foco
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isWorkoutActive) {
-        // Quando a página fica visível novamente, verificar o estado
-        console.log('App voltou ao foco, sincronizando timers');
-        loadTimersState();
-      } else if (document.visibilityState === 'hidden' && isWorkoutActive) {
-        // Quando a página fica oculta, salvar o estado atual
-        console.log('App em segundo plano, salvando estado dos timers');
-        saveTimersState();
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Adicionar listener para event beforeunload para salvar estado antes de fechar
-    const handleBeforeUnload = () => {
-      if (isWorkoutActive) {
-        saveTimersState();
-      }
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [isWorkoutActive]);
-
-  // Atualizar o tempo de término do temporizador de descanso quando é ativado
-  useEffect(() => {
-    if (restTimerActive && restTimeRemaining > 0) {
-      const now = Date.now();
-      restTimerEndRef.current = now + (restTimeRemaining * 1000);
-      console.log('Temporizador de descanso definido para terminar em:', new Date(restTimerEndRef.current).toLocaleTimeString());
-    }
-  }, [restTimerActive]);
 
   if (loading) {
     return (
