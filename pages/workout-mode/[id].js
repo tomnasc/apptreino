@@ -237,7 +237,8 @@ export default function WorkoutMode() {
               localStorage.removeItem('appTreino_restTimerStart');
               localStorage.removeItem('appTreino_restTimerDuration');
               localStorage.removeItem('appTreino_restTimerEnd');
-              sendRestFinishedNotification();
+              showIOSAlert(); // Mostrar alerta diretamente sem passar pela função sendRestFinishedNotification
+              console.log('iOS: Alerta visual chamado diretamente ao voltar ao foco');
             } else {
               // Atualizar o tempo restante com valor preciso do localStorage
               setRestTimeRemaining(remaining);
@@ -287,7 +288,19 @@ export default function WorkoutMode() {
               localStorage.removeItem('appTreino_restTimerStart');
               localStorage.removeItem('appTreino_restTimerDuration');
               localStorage.removeItem('appTreino_restTimerEnd');
-              sendRestFinishedNotification();
+              console.log('iOS: Chamando showIOSAlert diretamente do intervalo');
+              showIOSAlert(); // Mostrar alerta diretamente
+              try {
+                // Tentar alerta nativo (funciona em algumas versões do iOS)
+                if (typeof window.alert === 'function') {
+                  setTimeout(() => {
+                    window.alert('Descanso Finalizado! Hora de começar a próxima série.');
+                    console.log('iOS: Alerta nativo mostrado');
+                  }, 100);
+                }
+              } catch (e) {
+                console.log('iOS: Erro ao mostrar alerta nativo:', e);
+              }
             } else {
               // Atualizar o tempo restante com precisão de 1 casa decimal
               const newRestTime = Number(remaining.toFixed(1));
@@ -995,110 +1008,209 @@ export default function WorkoutMode() {
 
   // Função para mostrar alerta visual específico para iOS
   const showIOSAlert = () => {
-    console.log('Mostrando alerta visual para iOS');
+    console.log('Mostrando alerta visual para iOS - INÍCIO DA FUNÇÃO');
     
-    // Criar um elemento de overlay para o alerta
-    const alertOverlay = document.createElement('div');
-    alertOverlay.style.position = 'fixed';
-    alertOverlay.style.top = '0';
-    alertOverlay.style.left = '0';
-    alertOverlay.style.width = '100%';
-    alertOverlay.style.height = '100%';
-    alertOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-    alertOverlay.style.zIndex = '9999';
-    alertOverlay.style.display = 'flex';
-    alertOverlay.style.flexDirection = 'column';
-    alertOverlay.style.justifyContent = 'center';
-    alertOverlay.style.alignItems = 'center';
-    alertOverlay.style.padding = '20px';
-    alertOverlay.style.animation = 'fadeIn 0.3s ease-in-out';
-    
-    // Definir CSS para animação
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
+    try {
+      // Vibrar o dispositivo duas vezes para aumentar a atenção (tentar várias vezes)
+      if ('vibrate' in navigator) {
+        navigator.vibrate([500, 200, 500, 200, 500]);
+        console.log('iOS: Vibração enviada');
+        
+        // Tentar vibrar novamente após um pequeno atraso
+        setTimeout(() => {
+          navigator.vibrate([500, 200, 500]);
+          console.log('iOS: Segunda vibração enviada');
+        }, 2000);
       }
-      @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-        100% { transform: scale(1); }
-      }
-    `;
-    document.head.appendChild(style);
-    
-    // Conteúdo do alerta
-    const alertBox = document.createElement('div');
-    alertBox.style.backgroundColor = '#fff';
-    alertBox.style.borderRadius = '12px';
-    alertBox.style.padding = '20px';
-    alertBox.style.maxWidth = '85%';
-    alertBox.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.5)';
-    alertBox.style.animation = 'pulse 1.5s infinite';
-    
-    // Título do alerta
-    const alertTitle = document.createElement('h2');
-    alertTitle.style.fontSize = '22px';
-    alertTitle.style.fontWeight = 'bold';
-    alertTitle.style.marginBottom = '15px';
-    alertTitle.style.textAlign = 'center';
-    alertTitle.style.color = '#4338ca'; // indigo-700
-    alertTitle.textContent = 'Descanso Finalizado!';
-    
-    // Mensagem do alerta
-    const alertMessage = document.createElement('p');
-    alertMessage.style.fontSize = '18px';
-    alertMessage.style.marginBottom = '20px';
-    alertMessage.style.textAlign = 'center';
-    alertMessage.style.color = '#1f2937'; // gray-800
-    
-    const currentExercise = exercises[currentExerciseIndex];
-    alertMessage.textContent = `Hora de começar a próxima série de ${currentExercise.name}`;
-    
-    // Botão de fechar
-    const closeButton = document.createElement('button');
-    closeButton.style.backgroundColor = '#4f46e5'; // indigo-600
-    closeButton.style.color = 'white';
-    closeButton.style.border = 'none';
-    closeButton.style.borderRadius = '9999px';
-    closeButton.style.padding = '12px 24px';
-    closeButton.style.fontSize = '16px';
-    closeButton.style.fontWeight = 'bold';
-    closeButton.style.cursor = 'pointer';
-    closeButton.style.width = '100%';
-    closeButton.style.marginTop = '10px';
-    closeButton.textContent = 'Iniciar Próxima Série';
-    
-    // Adicionar evento para fechar o alerta
-    closeButton.addEventListener('click', () => {
-      document.body.removeChild(alertOverlay);
       
-      // Tentar reproduzir o som ao clicar (iOS requer interação do usuário)
+      // Tocar um som mais alto em iOS
       try {
+        // Criar e configurar áudio com volume alto
         const audio = new Audio('/sounds/notification.mp3');
-        audio.volume = 1.0;
-        audio.play().catch(e => console.log('Erro ao reproduzir som após clique:', e));
-      } catch (error) {
-        console.log('Erro ao tocar som após interação:', error);
+        audio.volume = 1.0; // Volume máximo
+        console.log('iOS: Tentando reproduzir som');
+        
+        // Tentar reproduzir imediatamente e novamente após um atraso
+        audio.play().catch(e => console.log('iOS: Erro ao reproduzir som:', e));
+        
+        // Tentar novamente após um atraso
+        setTimeout(() => {
+          audio.play().catch(e => console.log('iOS: Erro ao reproduzir som (tentativa 2):', e));
+        }, 1000);
+      } catch (audioError) {
+        console.error('iOS: Erro ao inicializar áudio:', audioError);
       }
-    });
-    
-    // Montar o alerta
-    alertBox.appendChild(alertTitle);
-    alertBox.appendChild(alertMessage);
-    alertBox.appendChild(closeButton);
-    alertOverlay.appendChild(alertBox);
-    
-    // Adicionar o alerta ao corpo da página
-    document.body.appendChild(alertOverlay);
-    
-    // Remover automaticamente após 30 segundos (caso o usuário não interaja)
-    setTimeout(() => {
-      if (document.body.contains(alertOverlay)) {
-        document.body.removeChild(alertOverlay);
+      
+      // Criar um elemento de overlay para o alerta
+      const alertOverlay = document.createElement('div');
+      alertOverlay.style.position = 'fixed';
+      alertOverlay.style.top = '0';
+      alertOverlay.style.left = '0';
+      alertOverlay.style.width = '100%';
+      alertOverlay.style.height = '100%';
+      alertOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+      alertOverlay.style.zIndex = '9999';
+      alertOverlay.style.display = 'flex';
+      alertOverlay.style.flexDirection = 'column';
+      alertOverlay.style.justifyContent = 'center';
+      alertOverlay.style.alignItems = 'center';
+      alertOverlay.style.padding = '20px';
+      alertOverlay.style.animation = 'fadeIn 0.3s ease-in-out';
+      console.log('iOS: Elemento de overlay criado');
+      
+      // Definir CSS para animação
+      const style = document.createElement('style');
+      style.textContent = `
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes pulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+          100% { transform: scale(1); }
+        }
+      `;
+      document.head.appendChild(style);
+      console.log('iOS: Estilos de animação adicionados');
+      
+      // Conteúdo do alerta
+      const alertBox = document.createElement('div');
+      alertBox.style.backgroundColor = '#ff3b30'; // Cor mais vibrante (vermelho iOS)
+      alertBox.style.borderRadius = '12px';
+      alertBox.style.padding = '20px';
+      alertBox.style.maxWidth = '85%';
+      alertBox.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.5)';
+      alertBox.style.animation = 'pulse 1.5s infinite';
+      
+      // Título do alerta
+      const alertTitle = document.createElement('h2');
+      alertTitle.style.fontSize = '24px';
+      alertTitle.style.fontWeight = 'bold';
+      alertTitle.style.marginBottom = '15px';
+      alertTitle.style.textAlign = 'center';
+      alertTitle.style.color = 'white';
+      alertTitle.textContent = 'DESCANSO FINALIZADO!';
+      
+      // Mensagem do alerta
+      const alertMessage = document.createElement('p');
+      alertMessage.style.fontSize = '18px';
+      alertMessage.style.marginBottom = '20px';
+      alertMessage.style.textAlign = 'center';
+      alertMessage.style.color = 'white';
+      
+      let exerciseName = 'próximo exercício';
+      try {
+        const currentExercise = exercises[currentExerciseIndex];
+        if (currentExercise && currentExercise.name) {
+          exerciseName = currentExercise.name;
+        }
+      } catch (e) {
+        console.log('iOS: Erro ao obter nome do exercício:', e);
       }
-    }, 30000);
+      
+      alertMessage.textContent = `Hora de começar a próxima série de ${exerciseName}`;
+      
+      // Botão de fechar
+      const closeButton = document.createElement('button');
+      closeButton.style.backgroundColor = 'white';
+      closeButton.style.color = '#ff3b30';
+      closeButton.style.border = 'none';
+      closeButton.style.borderRadius = '9999px';
+      closeButton.style.padding = '14px 24px';
+      closeButton.style.fontSize = '18px';
+      closeButton.style.fontWeight = 'bold';
+      closeButton.style.cursor = 'pointer';
+      closeButton.style.width = '100%';
+      closeButton.style.marginTop = '10px';
+      closeButton.textContent = 'INICIAR PRÓXIMA SÉRIE';
+      console.log('iOS: Elementos do alerta criados');
+      
+      // Adicionar evento para fechar o alerta
+      closeButton.addEventListener('click', () => {
+        if (document.body.contains(alertOverlay)) {
+          document.body.removeChild(alertOverlay);
+          console.log('iOS: Alerta fechado pelo botão');
+          
+          // Tentar reproduzir o som ao clicar (iOS requer interação do usuário)
+          try {
+            const audio = new Audio('/sounds/notification.mp3');
+            audio.volume = 1.0;
+            audio.play().catch(e => console.log('Erro ao reproduzir som após clique:', e));
+          } catch (error) {
+            console.log('Erro ao tocar som após interação:', error);
+          }
+        }
+      });
+      
+      // Adicionar evento de toque em qualquer lugar para fechar
+      alertOverlay.addEventListener('click', (event) => {
+        // Prevenir que o clique dentro do alerta feche-o
+        if (event.target === alertOverlay) {
+          document.body.removeChild(alertOverlay);
+          console.log('iOS: Alerta fechado por toque fora');
+        }
+      });
+      
+      // Montar o alerta
+      alertBox.appendChild(alertTitle);
+      alertBox.appendChild(alertMessage);
+      alertBox.appendChild(closeButton);
+      alertOverlay.appendChild(alertBox);
+      console.log('iOS: Estrutura do alerta montada');
+      
+      // Remover alertas existentes antes de adicionar um novo
+      const existingAlerts = document.querySelectorAll('[data-ios-alert="true"]');
+      existingAlerts.forEach(alert => {
+        if (document.body.contains(alert)) {
+          document.body.removeChild(alert);
+          console.log('iOS: Alerta existente removido');
+        }
+      });
+      
+      // Adicionar atributo de identificação
+      alertOverlay.setAttribute('data-ios-alert', 'true');
+      
+      // Adicionar o alerta ao corpo da página
+      if (document.body) {
+        document.body.appendChild(alertOverlay);
+        console.log('iOS: Alerta adicionado ao body');
+      } else {
+        console.error('iOS: document.body não está disponível');
+      }
+      
+      // Mostrar um alerta nativo também (pode funcionar mesmo em segundo plano)
+      try {
+        setTimeout(() => {
+          window.alert('Descanso Finalizado!');
+          console.log('iOS: Alerta nativo mostrado como backup');
+        }, 500);
+      } catch (alertError) {
+        console.log('iOS: Erro ao mostrar alerta nativo:', alertError);
+      }
+      
+      // Remover automaticamente após 30 segundos (caso o usuário não interaja)
+      setTimeout(() => {
+        if (document.body && document.body.contains(alertOverlay)) {
+          document.body.removeChild(alertOverlay);
+          console.log('iOS: Alerta removido automaticamente após timeout');
+        }
+      }, 30000);
+      
+      console.log('iOS: Função showIOSAlert concluída com sucesso');
+    } catch (error) {
+      console.error('iOS: ERRO CRÍTICO ao mostrar alerta:', error);
+      
+      // Tentar método alternativo em caso de falha
+      try {
+        if (typeof window.alert === 'function') {
+          window.alert('Descanso finalizado! Hora de iniciar próxima série.');
+          console.log('iOS: Alerta alternativo mostrado após erro');
+        }
+      } catch (e) {
+        console.error('iOS: Falha total ao mostrar alertas:', e);
+      }
+    }
   };
 
   if (loading) {
