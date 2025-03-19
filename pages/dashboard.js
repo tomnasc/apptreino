@@ -99,21 +99,41 @@ export default function DashboardPage() {
           }
         });
         
-        const result = await response.json();
+        let result;
+        try {
+          result = await response.json();
+        } catch (jsonError) {
+          console.error('Erro ao processar JSON da resposta:', jsonError);
+          throw new Error('Erro ao processar resposta do servidor');
+        }
         
         if (!response.ok) {
-          throw new Error(result.message || 'Erro ao configurar políticas');
+          console.error('Resposta de erro do servidor:', result);
+          throw new Error(
+            result && result.message 
+              ? result.message 
+              : 'Erro ao configurar políticas. Verifique o console para detalhes.'
+          );
         }
         
         toast.success('Configuração concluída com sucesso!');
+        alert('Configuração concluída! Agora você pode coletar dados detalhados dos treinos.');
       }
     } catch (error) {
       console.error('Erro ao configurar:', error);
-      // Exibir mensagem de erro mais amigável, evitando mostrar [object Object]
+      // Tratamento avançado para qualquer tipo de erro
       let errorMessage = 'Erro ao configurar políticas';
+      
       if (error instanceof Error) {
-        errorMessage = error.message;
+        errorMessage = error.message || errorMessage;
+      } else if (typeof error === 'object' && error !== null) {
+        errorMessage = JSON.stringify(error) || errorMessage;
+      } else if (error === null || error === undefined) {
+        errorMessage = 'Erro desconhecido';
+      } else {
+        errorMessage = String(error);
       }
+      
       toast.error(errorMessage);
       alert('Erro: ' + errorMessage);
     } finally {
