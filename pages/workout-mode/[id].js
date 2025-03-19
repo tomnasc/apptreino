@@ -169,92 +169,6 @@ export default function WorkoutMode() {
     }
   };
 
-  // Temporizador absoluto para iOS - usado para verificar o tempo quando o app volta ao foco
-  useEffect(() => {
-    // Identificar iOS de forma mais abrangente
-    const detectIOS = () => {
-      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-      if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
-        return true;
-      }
-      return /iOS/.test(userAgent);
-    };
-    
-    if (typeof window !== 'undefined') {
-      setIsIOS(detectIOS());
-    }
-    
-    if (isIOS) {
-      console.log('Dispositivo iOS detectado, usando temporizador absoluto');
-      
-      // Temporizador específico para iOS
-      const checkTimerOnFocus = () => {
-        if (document.visibilityState === 'visible' && isWorkoutActive) {
-          console.log('iOS: Aplicativo voltou ao foco, verificando temporizadores');
-          
-          const now = Date.now();
-          
-          // Verificar timer de descanso
-          if (restTimerActive && restTimerEndRef.current) {
-            const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
-            console.log(`iOS: Tempo de descanso restante: ${remaining.toFixed(1)}s`);
-            
-            if (remaining <= 0) {
-              console.log('iOS: Timer de descanso finalizado enquanto em segundo plano');
-              setRestTimerActive(false);
-              setRestTimeRemaining(0);
-              restTimerEndRef.current = null;
-              sendRestFinishedNotification();
-            } else {
-              // Atualizar o tempo restante
-              setRestTimeRemaining(remaining);
-            }
-          }
-        }
-      };
-      
-      // Salvar timestamp quando o app vai para segundo plano
-      const saveTimestampOnBlur = () => {
-        if (document.visibilityState === 'hidden' && isWorkoutActive) {
-          console.log('iOS: Aplicativo em segundo plano, salvando timestamp');
-          localStorage.setItem('appTreino_backgroundTimestamp', Date.now().toString());
-          saveTimersState();
-        }
-      };
-      
-      // Eventos para detectar mudanças de foco no iOS
-      document.addEventListener('visibilitychange', checkTimerOnFocus);
-      document.addEventListener('visibilitychange', saveTimestampOnBlur);
-      window.addEventListener('focus', checkTimerOnFocus);
-      window.addEventListener('blur', saveTimestampOnBlur);
-      window.addEventListener('pageshow', checkTimerOnFocus);
-      window.addEventListener('pagehide', saveTimestampOnBlur);
-      
-      // Verificar a cada 3 segundos (mesmo em segundo plano, para recuperar mais rápido)
-      const absoluteInterval = setInterval(() => {
-        if (isWorkoutActive) {
-          // Salvar estado no localStorage continuamente
-          saveTimersState();
-          
-          // Se o aplicativo estiver visível, verificar os temporizadores
-          if (document.visibilityState === 'visible') {
-            checkTimerOnFocus();
-          }
-        }
-      }, 3000);
-      
-      return () => {
-        document.removeEventListener('visibilitychange', checkTimerOnFocus);
-        document.removeEventListener('visibilitychange', saveTimestampOnBlur);
-        window.removeEventListener('focus', checkTimerOnFocus);
-        window.removeEventListener('blur', saveTimestampOnBlur);
-        window.removeEventListener('pageshow', checkTimerOnFocus);
-        window.removeEventListener('pagehide', saveTimestampOnBlur);
-        clearInterval(absoluteInterval);
-      };
-    }
-  }, [isIOS, isWorkoutActive, restTimerActive]);
-
   // Função específica para iniciar o timer de descanso no iOS
   const startRestTimer = (duration) => {
     // Arredondar para cima a duração para garantir valores inteiros de segundos
@@ -268,18 +182,132 @@ export default function WorkoutMode() {
     console.log(`Temporizador de descanso iniciado por ${intDuration}s, terminará em:`, 
       new Date(restTimerEndRef.current).toLocaleTimeString());
     
-    // Salvar o estado imediatamente após iniciar o temporizador de descanso
-    setTimeout(() => {
-      saveTimersState();
-      
-      // Para iOS, armazenar um timestamp separado para maior segurança
-      if (isIOS) {
-        localStorage.setItem('appTreino_restTimerStart', now.toString());
-        localStorage.setItem('appTreino_restTimerDuration', intDuration.toString());
-        localStorage.setItem('appTreino_restTimerEnd', restTimerEndRef.current.toString());
-      }
-    }, 100);
+    // Para iOS, armazenar timestamps absolutos no localStorage para maior precisão
+    if (isIOS) {
+      localStorage.setItem('appTreino_restTimerStart', now.toString());
+      localStorage.setItem('appTreino_restTimerDuration', intDuration.toString());
+      localStorage.setItem('appTreino_restTimerEnd', restTimerEndRef.current.toString());
+      localStorage.setItem('appTreino_backgroundTimestamp', '0'); // Inicializar com 0 se não estiver em background
+    }
+    
+    // Salvar o estado após iniciar o temporizador de descanso
+    saveTimersState();
   };
+
+  // Temporizador absoluto para iOS - usado para verificar o tempo quando o app volta ao foco
+  useEffect(() => {
+    // Identificar iOS de forma mais abrangente
+    const detectIOS = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+      if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+        return true;
+      }
+      return /iOS/.test(userAgent);
+    };
+    
+    if (typeof window !== 'undefined') {
+      const isIOSDevice = detectIOS();
+      setIsIOS(isIOSDevice);
+      console.log('Detectando iOS:', isIOSDevice);
+    }
+    
+    if (isIOS) {
+      console.log('Dispositivo iOS detectado, configurando temporizador absoluto');
+      
+      // Temporizador específico para iOS
+      const checkTimerOnFocus = () => {
+        if (document.visibilityState === 'visible' && isWorkoutActive) {
+          console.log('iOS: Aplicativo voltou ao foco, verificando temporizadores');
+          
+          const now = Date.now();
+          
+          // Verificar timer de descanso usando valores absolutos do localStorage para maior precisão
+          const endTimeStr = localStorage.getItem('appTreino_restTimerEnd');
+          
+          if (endTimeStr && restTimerActive) {
+            const endTime = parseInt(endTimeStr);
+            const remaining = Math.max(0, (endTime - now) / 1000);
+            console.log(`iOS: Tempo de descanso restante: ${remaining.toFixed(1)}s (end: ${new Date(endTime).toLocaleTimeString()})`);
+            
+            if (remaining <= 0) {
+              console.log('iOS: Timer de descanso finalizado enquanto em segundo plano');
+              setRestTimerActive(false);
+              setRestTimeRemaining(0);
+              restTimerEndRef.current = null;
+              localStorage.removeItem('appTreino_restTimerStart');
+              localStorage.removeItem('appTreino_restTimerDuration');
+              localStorage.removeItem('appTreino_restTimerEnd');
+              sendRestFinishedNotification();
+            } else {
+              // Atualizar o tempo restante com valor preciso do localStorage
+              setRestTimeRemaining(remaining);
+              // Atualizar referência local para manter consistência
+              restTimerEndRef.current = endTime;
+            }
+          }
+        }
+      };
+      
+      // Salvar timestamp quando o app vai para segundo plano
+      const saveTimestampOnBlur = () => {
+        if (document.visibilityState === 'hidden' && isWorkoutActive) {
+          console.log('iOS: Aplicativo em segundo plano, salvando timestamp');
+          const now = Date.now();
+          localStorage.setItem('appTreino_backgroundTimestamp', now.toString());
+          
+          // Salvar estado atual dos timers antes de ir para segundo plano
+          if (restTimerActive && restTimerEndRef.current) {
+            localStorage.setItem('appTreino_restTimerEnd', restTimerEndRef.current.toString());
+          }
+        }
+      };
+      
+      // Eventos para detectar mudanças de foco no iOS
+      document.addEventListener('visibilitychange', checkTimerOnFocus);
+      document.addEventListener('visibilitychange', saveTimestampOnBlur);
+      window.addEventListener('focus', checkTimerOnFocus);
+      window.addEventListener('blur', saveTimestampOnBlur);
+      window.addEventListener('pageshow', checkTimerOnFocus);
+      window.addEventListener('pagehide', saveTimestampOnBlur);
+      
+      // Verificar a cada 1 segundo (mais frequente para maior precisão)
+      const absoluteInterval = setInterval(() => {
+        if (isWorkoutActive) {
+          // Se o aplicativo estiver visível, atualizar os valores do timer
+          if (document.visibilityState === 'visible' && restTimerActive && restTimerEndRef.current) {
+            const now = Date.now();
+            const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
+            
+            // Verificar se o timer acabou
+            if (remaining <= 0) {
+              console.log('iOS: Tempo de descanso finalizado!');
+              setRestTimerActive(false);
+              setRestTimeRemaining(0);
+              restTimerEndRef.current = null;
+              localStorage.removeItem('appTreino_restTimerStart');
+              localStorage.removeItem('appTreino_restTimerDuration');
+              localStorage.removeItem('appTreino_restTimerEnd');
+              sendRestFinishedNotification();
+            } else {
+              // Atualizar o tempo restante com precisão de 1 casa decimal
+              const newRestTime = Number(remaining.toFixed(1));
+              setRestTimeRemaining(newRestTime);
+            }
+          }
+        }
+      }, 1000);
+      
+      return () => {
+        document.removeEventListener('visibilitychange', checkTimerOnFocus);
+        document.removeEventListener('visibilitychange', saveTimestampOnBlur);
+        window.removeEventListener('focus', checkTimerOnFocus);
+        window.removeEventListener('blur', saveTimestampOnBlur);
+        window.removeEventListener('pageshow', checkTimerOnFocus);
+        window.removeEventListener('pagehide', saveTimestampOnBlur);
+        clearInterval(absoluteInterval);
+      };
+    }
+  }, [isIOS, isWorkoutActive, restTimerActive]);
 
   // Efeito para inicializar o intervalo principal com maior estabilidade
   useEffect(() => {
@@ -289,8 +317,8 @@ export default function WorkoutMode() {
         clearInterval(mainIntervalRef.current);
       }
       
-      // Definir o intervalo de atualização para 500ms para maior precisão
-      const INTERVAL_MS = 500;
+      // Definir o intervalo de atualização para 1000ms (1s) para evitar oscilações
+      const INTERVAL_MS = 1000;
       
       // Criar novo intervalo para atualizar todos os timers frequentemente
       mainIntervalRef.current = setInterval(() => {
@@ -310,12 +338,12 @@ export default function WorkoutMode() {
               handleSetCompleted();
               return 0;
             }
-            return Math.max(0, Number(newTime.toFixed(1)));
+            return Math.max(0, Math.floor(newTime));
           });
         }
         
-        // Atualizar tempo de descanso usando tempo absoluto sempre que o intervalo for executado
-        if (restTimerActive && restTimerEndRef.current) {
+        // Atualizar tempo de descanso, evitando atualizações em iOS (que usa sua própria lógica)
+        if (restTimerActive && restTimerEndRef.current && !isIOS) {
           const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
           
           // Verificar se o timer acabou
@@ -327,27 +355,13 @@ export default function WorkoutMode() {
             // Enviar notificação para trazer o app para o primeiro plano
             sendRestFinishedNotification();
           } else {
-            // Atualizar o tempo restante (arredondado para uma casa decimal)
-            const newRestTime = Number(remaining.toFixed(1));
-            if (Math.abs(newRestTime - restTimeRemaining) >= 0.1) {
-              setRestTimeRemaining(newRestTime);
-            }
+            // Atualizar o tempo restante (usando floor para evitar flutuações)
+            setRestTimeRemaining(Math.floor(remaining));
           }
         }
         
-        // No iOS, garantir que os temporizadores são atualizados com base nos timestamps absolutos
-        if (isIOS && restTimerActive) {
-          const restTimerEnd = localStorage.getItem('appTreino_restTimerEnd');
-          if (restTimerEnd) {
-            const endTime = parseInt(restTimerEnd, 10);
-            if (!isNaN(endTime)) {
-              restTimerEndRef.current = endTime;
-            }
-          }
-        }
-        
-        // Salvar estado continuamente
-        if (isIOS) {
+        // Salvar estado continuamente apenas se não for iOS (iOS tem sua própria lógica)
+        if (!isIOS) {
           saveTimersState();
         }
       }, INTERVAL_MS);
