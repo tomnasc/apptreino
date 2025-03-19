@@ -3,6 +3,7 @@ import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import Layout from '../components/Layout';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
+import { checkUserAccess } from '../utils/checkUserAccess';
 
 export default function DashboardPage() {
   const supabase = useSupabaseClient();
@@ -12,14 +13,43 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
   const [isConfiguring, setIsConfiguring] = useState(false);
+  const [userAccessInfo, setUserAccessInfo] = useState({
+    hasAccess: true,
+    message: '',
+    daysLeft: null,
+    planType: 'free'
+  });
 
   useEffect(() => {
     if (user) {
       fetchData();
-    } else {
-      setLoading(false);
+      checkAccess();
     }
   }, [user]);
+
+  // Verificar acesso do usuário
+  const checkAccess = async () => {
+    if (!user) return;
+    
+    try {
+      // Verificar o acesso usando o utilitário
+      const accessInfo = await checkUserAccess(user);
+      
+      // Buscar o perfil do usuário para saber o plano
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('plan_type')
+        .eq('id', user.id)
+        .single();
+      
+      setUserAccessInfo({
+        ...accessInfo,
+        planType: profile?.plan_type || 'free'
+      });
+    } catch (error) {
+      console.error('Erro ao verificar acesso:', error);
+    }
+  };
 
   const fetchData = async () => {
     if (!user) return;
@@ -143,6 +173,55 @@ export default function DashboardPage() {
 
   return (
     <Layout title="Dashboard">
+      {/* Banner de plano/período de teste */}
+      {userAccessInfo.planType !== 'admin' && (
+        <div className={`mb-6 px-4 py-3 rounded-lg shadow-sm ${
+          userAccessInfo.planType === 'paid' 
+            ? 'bg-green-50 border border-green-200'
+            : userAccessInfo.hasAccess
+              ? 'bg-blue-50 border border-blue-200'
+              : 'bg-red-50 border border-red-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className={`text-sm font-medium ${
+                userAccessInfo.planType === 'paid'
+                  ? 'text-green-800'
+                  : userAccessInfo.hasAccess
+                    ? 'text-blue-800'
+                    : 'text-red-800'
+              }`}>
+                {userAccessInfo.planType === 'paid'
+                  ? 'Plano Premium'
+                  : 'Plano Gratuito'}
+              </h3>
+              <p className={`text-xs ${
+                userAccessInfo.planType === 'paid'
+                  ? 'text-green-600'
+                  : userAccessInfo.hasAccess
+                    ? 'text-blue-600'
+                    : 'text-red-600'
+              }`}>
+                {userAccessInfo.message}
+              </p>
+            </div>
+            
+            {userAccessInfo.planType === 'free' && (
+              <button
+                className={`px-3 py-1 text-xs font-medium rounded-md ${
+                  userAccessInfo.hasAccess
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-red-600 hover:bg-red-700 text-white'
+                }`}
+                onClick={() => alert('Recurso de upgrade para ser implementado')}
+              >
+                {userAccessInfo.hasAccess ? 'Upgrade para Premium' : 'Renovar Acesso'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      
       <div className="space-y-6">
         <div className="bg-white shadow rounded-lg p-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">
@@ -401,6 +480,26 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
+      
+      {/* Incluir limitação para usuários com acesso expirado */}
+      {userAccessInfo.hasAccess ? (
+        <>
+          {/* Conteúdo normal do dashboard */}
+        </>
+      ) : (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <h3 className="text-lg font-medium text-red-800 mb-2">Seu período de teste expirou</h3>
+          <p className="text-sm text-red-600 mb-4">
+            Para continuar utilizando todos os recursos do App Treino, faça upgrade para o plano Premium.
+          </p>
+          <button
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md"
+            onClick={() => alert('Recurso de upgrade para ser implementado')}
+          >
+            Fazer Upgrade Agora
+          </button>
+        </div>
+      )}
     </Layout>
   );
 } 

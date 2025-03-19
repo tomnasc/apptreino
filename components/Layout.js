@@ -10,6 +10,7 @@ export default function Layout({ children, title = 'App Treino', hideNavigation 
   const supabaseClient = useSupabaseClient();
   const [session, setSession] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (!supabaseClient) return;
@@ -20,6 +21,9 @@ export default function Layout({ children, title = 'App Treino', hideNavigation 
       
       if (!session) {
         router.push('/login');
+      } else {
+        // Verificar se o usuário é administrador
+        checkUserRole(session.user.id);
       }
     };
     
@@ -30,12 +34,39 @@ export default function Layout({ children, title = 'App Treino', hideNavigation 
         setSession(session);
         if (!session) {
           router.push('/login');
+        } else {
+          // Verificar se o usuário é administrador ao mudar de sessão
+          checkUserRole(session.user.id);
         }
       }
     );
     
     return () => subscription.unsubscribe();
   }, [supabaseClient, router]);
+
+  // Verificar o tipo de plano do usuário
+  const checkUserRole = async (userId) => {
+    try {
+      const { data, error } = await supabaseClient
+        .from('user_profiles')
+        .select('plan_type')
+        .eq('id', userId)
+        .single();
+      
+      if (error) {
+        console.error('Erro ao verificar perfil do usuário:', error);
+        return;
+      }
+      
+      if (data && data.plan_type === 'admin') {
+        setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
+      }
+    } catch (err) {
+      console.error('Erro ao consultar perfil:', err);
+    }
+  };
 
   const handleSignOut = async () => {
     if (!supabaseClient) return;
@@ -100,6 +131,17 @@ export default function Layout({ children, title = 'App Treino', hideNavigation 
                 >
                   Feedback
                 </Link>
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    className={`${router.pathname.startsWith('/admin')
+                      ? 'border-blue-500 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                  >
+                    Admin
+                  </Link>
+                )}
               </nav>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:items-center">
@@ -193,6 +235,17 @@ export default function Layout({ children, title = 'App Treino', hideNavigation 
               >
                 Feedback
               </Link>
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className={`${router.pathname.startsWith('/admin')
+                    ? 'bg-blue-50 border-blue-500 text-blue-700'
+                    : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'
+                    } block pl-3 pr-4 py-2 border-l-4 text-base font-medium`}
+                >
+                  Admin
+                </Link>
+              )}
               <button
                 onClick={handleSignOut}
                 className="block w-full text-left pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
