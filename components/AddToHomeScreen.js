@@ -3,27 +3,31 @@ import { useState, useEffect } from 'react';
 export default function AddToHomeScreen() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
   const [isInStandaloneMode, setIsInStandaloneMode] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
 
   useEffect(() => {
-    // Verificar se é iOS
-    const ua = window.navigator.userAgent;
-    const iOS = /iPad|iPhone|iPod/.test(ua) || 
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    
-    setIsIOS(iOS);
-    
-    // Verificar se já está em modo standalone
+    // Verificar se já está em modo standalone (instalado)
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
       window.navigator.standalone || document.referrer.includes('android-app://');
     
     setIsInStandaloneMode(isStandalone);
     
-    // Mostrar o prompt apenas para iOS que ainda não está instalado
-    setShowPrompt(iOS && !isStandalone);
+    // Detectar plataforma
+    const ua = window.navigator.userAgent;
+    const iOS = /iPad|iPhone|iPod/.test(ua) || 
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     
-    // Salvar na localStorage para não mostrar na próxima visita
+    const android = /Android/.test(ua);
+    
+    setIsIOS(iOS);
+    setIsAndroid(android);
+    
+    // Mostrar o prompt apenas se for um dispositivo móvel e não estiver instalado
+    setShowPrompt((iOS || android) && !isStandalone);
+    
+    // Não mostrar se o usuário já fechou o prompt anteriormente
     const hasPrompted = localStorage.getItem('homeScreenPromptShown');
     if (hasPrompted) {
       setShowPrompt(false);
@@ -88,6 +92,21 @@ export default function AddToHomeScreen() {
             <li>Role para baixo e toque em <strong>"Adicionar à Tela de Início"</strong></li>
             <li>Toque em <strong>"Adicionar"</strong> no canto superior direito</li>
           </ol>
+        </div>
+      )}
+      
+      {isAndroid && (
+        <div className="bg-gray-100 rounded-lg p-3 text-sm">
+          <p className="font-semibold mb-1">No Chrome:</p>
+          <ol className="list-decimal ml-5 space-y-1">
+            <li>Toque no menu (3 pontos) <span className="inline-block">⋮</span> no canto superior direito</li>
+            <li>Selecione <strong>"Adicionar à tela inicial"</strong> ou <strong>"Instalar aplicativo"</strong></li>
+            <li>Toque em <strong>"Instalar"</strong> na janela de confirmação</li>
+          </ol>
+          
+          <p className="mt-2 text-xs text-gray-600">
+            Nota: Se não vir esta opção, aguarde alguns segundos e tente novamente, ou use este app mais algumas vezes para que o Chrome permita a instalação.
+          </p>
         </div>
       )}
       
