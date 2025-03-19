@@ -37,7 +37,6 @@ export default function WorkoutMode() {
   
   // Estado para cronômetros
   const [totalWorkoutTime, setTotalWorkoutTime] = useState(0);
-  const wakeLockRef = useRef(null);
   
   // Referências para os intervalos e tempos absolutos
   const mainIntervalRef = useRef(null);
@@ -157,33 +156,7 @@ export default function WorkoutMode() {
     }
   };
 
-  // Sincronizar sempre que o app voltar ao foco
-  useEffect(() => {
-    // Função para verificar e sincronizar estado quando o app voltar ao foco
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isWorkoutActive) {
-        // Quando a página fica visível novamente, verificar o estado
-        console.log('App voltou ao foco, sincronizando timers');
-        loadTimersState();
-      } else if (document.visibilityState === 'hidden' && isWorkoutActive) {
-        // Quando a página fica oculta, salvar o estado atual
-        console.log('App em segundo plano, salvando estado dos timers');
-        saveTimersState();
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', loadTimersState);
-    window.addEventListener('beforeunload', saveTimersState);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', loadTimersState);
-      window.removeEventListener('beforeunload', saveTimersState);
-    };
-  }, [isWorkoutActive, workoutStartTime, timerActive, restTimerActive]);
-
-  // Efeito para inicializar o intervalo principal
+  // Efeito para inicializar o intervalo principal com maior estabilidade
   useEffect(() => {
     if (isWorkoutActive) {
       // Limpar qualquer intervalo existente
@@ -240,7 +213,7 @@ export default function WorkoutMode() {
         
         // Salvar o estado atual no localStorage
         saveTimersState();
-      }, 100);
+      }, 500); // Aumentado para 500ms para maior estabilidade
       
       return () => {
         if (mainIntervalRef.current) {
@@ -260,16 +233,7 @@ export default function WorkoutMode() {
         localStorage.removeItem('appTreino_timerState');
       }
     }
-  }, [isWorkoutActive, timerActive, restTimerActive, timeRemaining, restTimeRemaining, workoutStartTime]);
-
-  // Atualizar o tempo de término do temporizador de descanso quando é ativado
-  useEffect(() => {
-    if (restTimerActive && restTimeRemaining > 0) {
-      const now = Date.now();
-      restTimerEndRef.current = now + (restTimeRemaining * 1000);
-      console.log('Temporizador de descanso definido para terminar em:', new Date(restTimerEndRef.current).toLocaleTimeString());
-    }
-  }, [restTimerActive]);
+  }, [isWorkoutActive, timerActive, restTimerActive]);
 
   // Função para iniciar o timer de descanso
   const startRestTimer = (duration) => {
@@ -302,90 +266,6 @@ export default function WorkoutMode() {
       loadTimersState();
     }
   }, [sessionId]);
-
-  // Função para adquirir o WakeLock
-  const requestWakeLock = async () => {
-    try {
-      if ('wakeLock' in navigator && document.visibilityState === 'visible') {
-        // Solicitar o WakeLock para manter a tela ativa apenas quando a página estiver visível
-        wakeLockRef.current = await navigator.wakeLock.request('screen');
-        console.log('WakeLock ativado para manter a tela ligada');
-        
-        // Adicionar um listener para reativar o WakeLock se o usuário retornar ao aplicativo
-        wakeLockRef.current.addEventListener('release', () => {
-          console.log('WakeLock foi liberado');
-          // Tentar reativar o WakeLock apenas se o treino estiver ativo e a página estiver visível
-          if (isWorkoutActive && document.visibilityState === 'visible') {
-            setTimeout(() => {
-              requestWakeLock();
-            }, 500); // Pequeno atraso para garantir que a página esteja completamente visível
-          }
-        });
-      } else if (!('wakeLock' in navigator)) {
-        console.log('WakeLock API não é suportada neste navegador');
-      } else {
-        console.log('Não é possível ativar o WakeLock quando a página não está visível');
-      }
-    } catch (err) {
-      console.error('Erro ao ativar o WakeLock:', err);
-    }
-  };
-
-  // Função para liberar o WakeLock
-  const releaseWakeLock = () => {
-    if (wakeLockRef.current) {
-      wakeLockRef.current.release()
-        .then(() => {
-          wakeLockRef.current = null;
-          console.log('WakeLock liberado com sucesso');
-        })
-        .catch((err) => {
-          console.error('Erro ao liberar o WakeLock:', err);
-        });
-    }
-  };
-
-  // Ativar/desativar o WakeLock quando o treino iniciar/terminar
-  useEffect(() => {
-    if (isWorkoutActive && document.visibilityState === 'visible') {
-      requestWakeLock();
-    } else {
-      releaseWakeLock();
-    }
-    
-    // Adicionar um listener para o evento visibilitychange
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isWorkoutActive) {
-        // Reativar o WakeLock quando o documento se torna visível novamente
-        setTimeout(() => {
-          requestWakeLock();
-        }, 500); // Pequeno atraso para garantir que a página esteja completamente visível
-        
-        // Recarregar o estado dos timers
-        loadTimersState();
-      } else if (document.visibilityState === 'hidden' && isWorkoutActive) {
-        // Salvar o estado dos timers quando a página ficar oculta
-        saveTimersState();
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Adicionar listener para event beforeunload para salvar estado antes de fechar
-    const handleBeforeUnload = () => {
-      if (isWorkoutActive) {
-        saveTimersState();
-      }
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      releaseWakeLock();
-    };
-  }, [isWorkoutActive, timerActive, restTimerActive, timeRemaining, restTimeRemaining, workoutStartTime]);
 
   useEffect(() => {
     if (id && user) {
@@ -448,9 +328,6 @@ export default function WorkoutMode() {
       setCurrentSetIndex(0);
       setCompletedSets({});
       setSetRepsHistory({});
-      
-      // Ativar o WakeLock para manter a tela ligada
-      await requestWakeLock();
       
       // Iniciar o tempo de treino
       const startTime = new Date();
@@ -519,9 +396,6 @@ export default function WorkoutMode() {
     try {
       const endTime = new Date();
       const durationInSeconds = Math.floor((endTime - workoutStartTime) / 1000);
-      
-      // Liberar o WakeLock ao finalizar o treino
-      releaseWakeLock();
       
       // Atualizar a sessão de treino
       const { error } = await supabase
@@ -816,6 +690,47 @@ export default function WorkoutMode() {
       setError('Ocorreu um erro ao retomar o treino. Por favor, tente novamente.');
     }
   };
+
+  // Sincronizar o estado dos timers quando a visibilidade da página muda
+  useEffect(() => {
+    // Função para verificar e sincronizar estado quando o app voltar ao foco
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isWorkoutActive) {
+        // Quando a página fica visível novamente, verificar o estado
+        console.log('App voltou ao foco, sincronizando timers');
+        loadTimersState();
+      } else if (document.visibilityState === 'hidden' && isWorkoutActive) {
+        // Quando a página fica oculta, salvar o estado atual
+        console.log('App em segundo plano, salvando estado dos timers');
+        saveTimersState();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Adicionar listener para event beforeunload para salvar estado antes de fechar
+    const handleBeforeUnload = () => {
+      if (isWorkoutActive) {
+        saveTimersState();
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isWorkoutActive]);
+
+  // Atualizar o tempo de término do temporizador de descanso quando é ativado
+  useEffect(() => {
+    if (restTimerActive && restTimeRemaining > 0) {
+      const now = Date.now();
+      restTimerEndRef.current = now + (restTimeRemaining * 1000);
+      console.log('Temporizador de descanso definido para terminar em:', new Date(restTimerEndRef.current).toLocaleTimeString());
+    }
+  }, [restTimerActive]);
 
   if (loading) {
     return (
