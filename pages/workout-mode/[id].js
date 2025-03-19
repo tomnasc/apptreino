@@ -48,6 +48,10 @@ export default function WorkoutMode() {
   const lastUpdatedTimeRef = useRef(null);
   const backgroundTimeRef = useRef(null);
 
+  // Referência para o áudio de fundo
+  const backgroundAudioRef = useRef(null);
+  const audioContextRef = useRef(null);
+
   // Detectar se é um dispositivo iOS
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -58,6 +62,81 @@ export default function WorkoutMode() {
       console.log('Dispositivo iOS detectado:', iOS);
     }
   }, []);
+
+  // Inicializar a referência de áudio
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isIOS) {
+      // Criar elementos de áudio para iOS
+      try {
+        // Audiocontext para iOS (permite continuar em segundo plano)
+        if (window.AudioContext || window.webkitAudioContext) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          audioContextRef.current = new AudioContext();
+          console.log('AudioContext criado para iOS');
+        }
+        
+        // Inicializar o elemento de áudio para usar em segundo plano
+        const audio = new Audio();
+        audio.src = '/sounds/notification.mp3';
+        audio.loop = false;
+        audio.volume = 1.0;
+        
+        // Configurar atributos para aumentar chances de reprodução em segundo plano
+        audio.setAttribute('playsinline', '');
+        audio.setAttribute('webkit-playsinline', '');
+        audio.preload = 'auto';
+
+        // Evento que executa quando o arquivo termina de carregar
+        audio.oncanplaythrough = () => {
+          console.log('Áudio carregado e pronto para reprodução');
+        };
+        
+        // Lidar com erros de áudio
+        audio.onerror = (e) => {
+          console.error('Erro ao carregar áudio:', e);
+        };
+        
+        // Configurar manipulador para quando o áudio terminar
+        audio.onended = () => {
+          console.log('Áudio de notificação terminou');
+        };
+        
+        backgroundAudioRef.current = audio;
+        
+        // Pré-carregar o áudio com um "toque silencioso" para inicializar o sistema de áudio
+        document.addEventListener('touchstart', function initAudio() {
+          console.log('Inicializando sistema de áudio com interação do usuário');
+          audio.volume = 0.01;
+          audio.play().then(() => {
+            setTimeout(() => {
+              audio.pause();
+              audio.currentTime = 0;
+              audio.volume = 1.0;
+              console.log('Sistema de áudio inicializado com sucesso');
+            }, 100);
+          }).catch(e => {
+            console.log('Erro ao inicializar sistema de áudio:', e);
+          });
+          document.removeEventListener('touchstart', initAudio);
+        }, { once: true });
+      } catch (error) {
+        console.error('Erro ao configurar áudio para iOS:', error);
+      }
+    }
+    
+    return () => {
+      // Limpar recursos de áudio
+      if (backgroundAudioRef.current) {
+        backgroundAudioRef.current.pause();
+        backgroundAudioRef.current = null;
+      }
+      
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(e => console.log('Erro ao fechar AudioContext:', e));
+        audioContextRef.current = null;
+      }
+    };
+  }, [isIOS]);
 
   // Função para salvar estado dos timers no localStorage
   const saveTimersState = () => {
@@ -189,8 +268,55 @@ export default function WorkoutMode() {
       localStorage.setItem('appTreino_restTimerEnd', restTimerEndRef.current.toString());
       localStorage.setItem('appTreino_backgroundTimestamp', '0'); // Inicializar com 0 se não estiver em background
       
-      // Agendar notificação para quando o timer terminar
-      scheduleIOSNotification(intDuration * 1000);
+      // Programar a reprodução de áudio para quando o timer terminar (mesmo em segundo plano)
+      try {
+        // Adicionar permissão explícita para notificações de áudio em segundo plano
+        if (backgroundAudioRef.current) {
+          console.log(`Programando áudio para tocar em ${intDuration} segundos`);
+          
+          // Criar um Web Worker dedicado para tentar contornar a limitação de setTimeout no iOS
+          const workerBlob = new Blob([`
+            self.onmessage = function(e) {
+              const duration = e.data.duration;
+              console.log("Web Worker: Iniciando timer para " + duration + " segundos");
+              
+              // Usar setTimeout dentro do worker
+              setTimeout(function() {
+                self.postMessage({type: 'timer_end'});
+                console.log("Web Worker: Timer concluído após " + duration + " segundos");
+              }, duration * 1000);
+            };
+          `], { type: 'application/javascript' });
+
+          const workerUrl = URL.createObjectURL(workerBlob);
+          const worker = new Worker(workerUrl);
+          
+          worker.onmessage = function(e) {
+            if (e.data.type === 'timer_end') {
+              console.log('Web Worker: Mensagem recebida de timer concluído');
+              
+              // Verificar se estamos em segundo plano
+              if (document.visibilityState === 'hidden') {
+                // Tentar reproduzir o áudio mesmo em segundo plano
+                playBackgroundNotificationSound();
+              }
+            }
+          };
+          
+          // Iniciar o worker
+          worker.postMessage({duration: intDuration});
+          console.log('Web Worker iniciado para temporizador de áudio em segundo plano');
+          
+          // Backup usando setTimeout normal
+          setTimeout(() => {
+            if (document.visibilityState === 'hidden') {
+              playBackgroundNotificationSound();
+            }
+          }, intDuration * 1000);
+        }
+      } catch (error) {
+        console.error('Erro ao programar áudio em segundo plano:', error);
+      }
     }
     
     // Salvar o estado após iniciar o temporizador de descanso
@@ -1294,14 +1420,28 @@ export default function WorkoutMode() {
     try {
       console.log(`Agendando notificação para daqui a ${Math.floor(delay / 1000)} segundos`);
       
-      // Usar setTimeout para agendar a notificação
+      // Usar áudio para iOS
+      if (isIOS && backgroundAudioRef.current) {
+        const currentTime = Date.now();
+        const scheduledTime = currentTime + delay;
+        
+        // Armazenar timestamp para quando o áudio deve tocar
+        localStorage.setItem('appTreino_audioNotificationTime', scheduledTime.toString());
+        
+        console.log(`Áudio agendado para tocar às ${new Date(scheduledTime).toLocaleTimeString()}`);
+      }
+      
+      // Usar setTimeout para agendar a notificação padrão
       const notificationTimer = setTimeout(() => {
         console.log('Executando notificação agendada');
         
         // Verificar se ainda estamos em segundo plano
         if (document.visibilityState === 'hidden') {
           try {
-            // Criar notificação do sistema
+            // Primeiro tentar reproduzir áudio (funciona melhor no iOS)
+            playBackgroundNotificationSound();
+            
+            // Criar notificação do sistema como backup
             if ('Notification' in window) {
               const exerciseName = exercises[currentExerciseIndex]?.name || 'exercício';
               
@@ -1344,6 +1484,73 @@ export default function WorkoutMode() {
       return null;
     }
   };
+
+  // Função para tocar áudio em segundo plano no iOS
+  const playBackgroundNotificationSound = () => {
+    try {
+      if (backgroundAudioRef.current) {
+        console.log('Tentando reproduzir áudio de notificação em segundo plano');
+        
+        // Redefinir a posição do áudio
+        backgroundAudioRef.current.currentTime = 0;
+        
+        // Configurar volume máximo
+        backgroundAudioRef.current.volume = 1.0;
+        
+        // Tentar reproduzir
+        const playPromise = backgroundAudioRef.current.play();
+        
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            console.log('Áudio de segundo plano reproduzido com sucesso');
+            
+            // Vibrar o dispositivo se possível
+            if ('vibrate' in navigator) {
+              navigator.vibrate([500, 200, 500, 200, 500]);
+              console.log('Vibração enviada com o áudio');
+            }
+          }).catch(e => {
+            console.error('Erro ao reproduzir áudio em segundo plano:', e);
+          });
+        }
+      } else {
+        console.error('Referência de áudio não inicializada');
+      }
+    } catch (error) {
+      console.error('Erro ao tentar tocar áudio em segundo plano:', error);
+    }
+  };
+
+  useEffect(() => {
+    // Verificar áudio a cada segundo para superar limitações do iOS
+    if (isIOS && typeof window !== 'undefined') {
+      // Intervalo para verificar se o áudio deve tocar
+      const audioCheckInterval = setInterval(() => {
+        try {
+          const notificationTimeStr = localStorage.getItem('appTreino_audioNotificationTime');
+          if (notificationTimeStr) {
+            const notificationTime = parseInt(notificationTimeStr);
+            const now = Date.now();
+            
+            // Verificar se está na hora de tocar o áudio
+            if (now >= notificationTime) {
+              console.log('Hora de tocar o áudio de notificação!');
+              playBackgroundNotificationSound();
+              
+              // Limpar o timestamp após tocar
+              localStorage.removeItem('appTreino_audioNotificationTime');
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao verificar tempo de áudio:', error);
+        }
+      }, 1000);
+      
+      return () => {
+        clearInterval(audioCheckInterval);
+      };
+    }
+  }, [isIOS]);
 
   if (loading) {
     return (
