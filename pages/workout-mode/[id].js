@@ -795,9 +795,30 @@ export default function WorkoutMode() {
         notification.close();
       };
       
-      // Tocar um som de alerta
-      const audio = new Audio('/sounds/notification.mp3');
-      audio.play().catch(e => console.log('Erro ao tocar som:', e));
+      // Tocar um som de alerta com tratamento de erros aprimorado
+      try {
+        const audio = new Audio('/sounds/notification.mp3');
+        audio.volume = 0.7; // Reduzir volume para 70%
+        
+        // Pré-carregar o áudio antes de tocar
+        audio.addEventListener('canplaythrough', () => {
+          const playPromise = audio.play();
+          
+          if (playPromise !== undefined) {
+            playPromise.catch(e => {
+              console.log('Erro ao tentar reproduzir som:', e.message);
+            });
+          }
+        });
+        
+        // Lidar com erro de carregamento
+        audio.addEventListener('error', (e) => {
+          console.log('Erro ao carregar o som:', 
+            e.target.error ? e.target.error.message : 'Erro desconhecido');
+        });
+      } catch (audioError) {
+        console.log('Erro ao inicializar áudio:', audioError);
+      }
     } catch (error) {
       console.error('Erro ao enviar notificação:', error);
     }
