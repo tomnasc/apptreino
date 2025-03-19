@@ -84,6 +84,35 @@ export default function WorkoutReport() {
         setSessionDetails([]);
       }
       
+      // Buscar médias de tempo de execução e descanso da view
+      try {
+        const { data: averagesData, error: averagesError } = await supabase
+          .from('workout_session_averages')
+          .select('*')
+          .eq('session_id', id);
+        
+        if (averagesError) {
+          console.error('Erro ao buscar médias de tempo:', averagesError);
+          // Continuar mesmo se falhar a busca das médias
+        } else {
+          // Adicionar as médias aos exercícios correspondentes
+          const updatedExercises = exercisesData.map(exercise => {
+            const exerciseAverage = averagesData?.find(avg => avg.exercise_id === exercise.id);
+            return {
+              ...exercise,
+              avgExecutionTime: exerciseAverage?.avg_execution_time,
+              avgRestTime: exerciseAverage?.avg_rest_time,
+              totalSets: exerciseAverage?.total_sets
+            };
+          });
+          
+          setExercises(updatedExercises || exercisesData);
+        }
+      } catch (averagesError) {
+        console.error('Erro ao buscar médias de tempo:', averagesError);
+        // Continuar mesmo se falhar a busca das médias
+      }
+      
     } catch (error) {
       console.error('Erro ao buscar dados do relatório:', error);
       setError('Não foi possível carregar o relatório de treino.');
@@ -251,6 +280,25 @@ export default function WorkoutReport() {
                   {sessionDetails && sessionDetails.filter(d => d.exercise_id === exercise.id).length > 0 ? (
                     <div className="mt-3">
                       <h4 className="text-sm font-medium text-gray-700 mb-2">Detalhes de Execução</h4>
+                      
+                      {/* Mostrar médias de tempo de execução e descanso */}
+                      {exercise.avgExecutionTime && exercise.avgRestTime && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                          <div className="bg-blue-50 rounded p-3 border border-blue-100">
+                            <h5 className="text-xs font-medium text-blue-700 mb-1">Tempo Médio de Execução</h5>
+                            <p className="text-xl font-bold text-blue-600">
+                              {Math.round(exercise.avgExecutionTime)}s
+                            </p>
+                          </div>
+                          <div className="bg-indigo-50 rounded p-3 border border-indigo-100">
+                            <h5 className="text-xs font-medium text-indigo-700 mb-1">Tempo Médio de Descanso</h5>
+                            <p className="text-xl font-bold text-indigo-600">
+                              {Math.round(exercise.avgRestTime)}s
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
