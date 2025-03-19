@@ -160,7 +160,10 @@ export default function WorkoutMode() {
         clearInterval(mainIntervalRef.current);
       }
       
-      // Criar novo intervalo para atualizar todos os timers a cada segundo
+      // Definir o intervalo de atualização para 500ms para maior precisão
+      const INTERVAL_MS = 500;
+      
+      // Criar novo intervalo para atualizar todos os timers frequentemente
       mainIntervalRef.current = setInterval(() => {
         const now = Date.now();
         
@@ -173,34 +176,35 @@ export default function WorkoutMode() {
         // Atualizar tempo de exercício
         if (timerActive && timeRemaining > 0) {
           setTimeRemaining(prev => {
-            const newTime = prev - 1;
+            const newTime = prev - (INTERVAL_MS / 1000);
             if (newTime <= 0) {
               handleSetCompleted();
               return 0;
             }
-            return Math.max(0, newTime);
+            return Math.max(0, Number(newTime.toFixed(1)));
           });
         }
         
-        // Atualizar tempo de descanso usando tempo absoluto
+        // Atualizar tempo de descanso usando tempo absoluto sempre que o intervalo for executado
         if (restTimerActive && restTimerEndRef.current) {
           const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
           
-          // Apenas atualizar se houver mudança significativa (maior que 0.5 segundos)
-          if (Math.abs(remaining - restTimeRemaining) > 0.5) {
-            setRestTimeRemaining(Math.ceil(remaining));
-            
-            // Se o temporizador de descanso acabou
-            if (remaining <= 0) {
-              setRestTimerActive(false);
-              setRestTimeRemaining(0);
-              restTimerEndRef.current = null;
-              // Tocar som de alerta se disponível
-              console.log('Tempo de descanso finalizado!');
+          // Verificar se o timer acabou
+          if (remaining <= 0) {
+            console.log('Tempo de descanso finalizado!');
+            setRestTimerActive(false);
+            setRestTimeRemaining(0);
+            restTimerEndRef.current = null;
+            // Tocar som de alerta se disponível
+          } else {
+            // Atualizar o tempo restante (arredondado para uma casa decimal)
+            const newRestTime = Number(remaining.toFixed(1));
+            if (Math.abs(newRestTime - restTimeRemaining) >= 0.1) {
+              setRestTimeRemaining(newRestTime);
             }
           }
         }
-      }, 1000);
+      }, INTERVAL_MS);
       
       return () => {
         if (mainIntervalRef.current) {
@@ -222,7 +226,7 @@ export default function WorkoutMode() {
     }
   }, [isWorkoutActive]);
 
-  // Sincronizar o estado dos timers quando a visibilidade da página muda
+  // Sincronizar o estado dos timers quando a visibilidade da página muda ou a cada X segundos
   useEffect(() => {
     // Função para verificar e sincronizar estado quando o app voltar ao foco
     const handleVisibilityChange = () => {
@@ -248,7 +252,29 @@ export default function WorkoutMode() {
     
     window.addEventListener('beforeunload', handleBeforeUnload);
     
-    // Adicionar listener para salvar o estado a cada 5 segundos para maior segurança
+    // Sincronizar a cada 1 segundo para manter os timers precisos mesmo em background
+    const autoSyncInterval = setInterval(() => {
+      if (isWorkoutActive && restTimerActive && restTimerEndRef.current) {
+        const now = Date.now();
+        const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
+        
+        // Verificar se o timer acabou
+        if (remaining <= 0) {
+          console.log('Tempo de descanso finalizado durante sincronização!');
+          setRestTimerActive(false);
+          setRestTimeRemaining(0);
+          restTimerEndRef.current = null;
+        } else {
+          // Atualizar o tempo restante (arredondado para uma casa decimal)
+          const newRestTime = Number(remaining.toFixed(1));
+          if (Math.abs(newRestTime - restTimeRemaining) >= 0.1) {
+            setRestTimeRemaining(newRestTime);
+          }
+        }
+      }
+    }, 1000);
+    
+    // Salvar estado a cada 5 segundos para maior segurança
     const autoSaveInterval = setInterval(() => {
       if (isWorkoutActive) {
         saveTimersState();
@@ -258,11 +284,12 @@ export default function WorkoutMode() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      clearInterval(autoSyncInterval);
       clearInterval(autoSaveInterval);
     };
-  }, [isWorkoutActive]);
+  }, [isWorkoutActive, restTimerActive, restTimeRemaining]);
 
-  // Função para iniciar o timer de descanso
+  // Função para iniciar o timer de descanso de forma confiável
   const startRestTimer = (duration) => {
     // Arredondar para cima a duração para garantir valores inteiros de segundos
     const intDuration = Math.ceil(duration);
