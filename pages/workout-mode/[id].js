@@ -248,81 +248,6 @@ export default function WorkoutMode() {
     }
   };
 
-  // Função específica para iniciar o timer de descanso no iOS
-  const startRestTimer = (duration) => {
-    // Arredondar para cima a duração para garantir valores inteiros de segundos
-    const intDuration = Math.ceil(duration);
-    setRestTimeRemaining(intDuration);
-    setRestTimerActive(true);
-    
-    const now = Date.now();
-    restTimerEndRef.current = now + (intDuration * 1000);
-    
-    console.log(`Temporizador de descanso iniciado por ${intDuration}s, terminará em:`, 
-      new Date(restTimerEndRef.current).toLocaleTimeString());
-    
-    // Para iOS, armazenar timestamps absolutos no localStorage para maior precisão
-    if (isIOS) {
-      localStorage.setItem('appTreino_restTimerStart', now.toString());
-      localStorage.setItem('appTreino_restTimerDuration', intDuration.toString());
-      localStorage.setItem('appTreino_restTimerEnd', restTimerEndRef.current.toString());
-      localStorage.setItem('appTreino_backgroundTimestamp', '0'); // Inicializar com 0 se não estiver em background
-      
-      // Programar a reprodução de áudio para quando o timer terminar (mesmo em segundo plano)
-      try {
-        // Adicionar permissão explícita para notificações de áudio em segundo plano
-        if (backgroundAudioRef.current) {
-          console.log(`Programando áudio para tocar em ${intDuration} segundos`);
-          
-          // Criar um Web Worker dedicado para tentar contornar a limitação de setTimeout no iOS
-          const workerBlob = new Blob([`
-            self.onmessage = function(e) {
-              const duration = e.data.duration;
-              console.log("Web Worker: Iniciando timer para " + duration + " segundos");
-              
-              // Usar setTimeout dentro do worker
-              setTimeout(function() {
-                self.postMessage({type: 'timer_end'});
-                console.log("Web Worker: Timer concluído após " + duration + " segundos");
-              }, duration * 1000);
-            };
-          `], { type: 'application/javascript' });
-
-          const workerUrl = URL.createObjectURL(workerBlob);
-          const worker = new Worker(workerUrl);
-          
-          worker.onmessage = function(e) {
-            if (e.data.type === 'timer_end') {
-              console.log('Web Worker: Mensagem recebida de timer concluído');
-              
-              // Verificar se estamos em segundo plano
-              if (document.visibilityState === 'hidden') {
-                // Tentar reproduzir o áudio mesmo em segundo plano
-                playBackgroundNotificationSound();
-              }
-            }
-          };
-          
-          // Iniciar o worker
-          worker.postMessage({duration: intDuration});
-          console.log('Web Worker iniciado para temporizador de áudio em segundo plano');
-          
-          // Backup usando setTimeout normal
-          setTimeout(() => {
-            if (document.visibilityState === 'hidden') {
-              playBackgroundNotificationSound();
-            }
-          }, intDuration * 1000);
-        }
-      } catch (error) {
-        console.error('Erro ao programar áudio em segundo plano:', error);
-      }
-    }
-    
-    // Salvar o estado após iniciar o temporizador de descanso
-    saveTimersState();
-  };
-
   // Temporizador absoluto para iOS - usado para verificar o tempo quando o app volta ao foco
   useEffect(() => {
     // Identificar iOS de forma mais abrangente
@@ -341,9 +266,9 @@ export default function WorkoutMode() {
     }
     
     if (isIOS) {
-      console.log('Dispositivo iOS detectado, configurando temporizador absoluto');
+      console.log('Dispositivo iOS detectado, configurando sistema de verificação de retorno');
       
-      // Temporizador específico para iOS
+      // Temporizador específico para iOS que verifica quando o app volta ao foco
       const checkTimerOnFocus = () => {
         if (document.visibilityState === 'visible' && isWorkoutActive) {
           console.log('iOS: Aplicativo voltou ao foco, verificando temporizadores');
@@ -366,13 +291,18 @@ export default function WorkoutMode() {
               localStorage.removeItem('appTreino_restTimerStart');
               localStorage.removeItem('appTreino_restTimerDuration');
               localStorage.removeItem('appTreino_restTimerEnd');
-              showIOSAlert(); // Mostrar alerta diretamente sem passar pela função sendRestFinishedNotification
-              console.log('iOS: Alerta visual chamado diretamente ao voltar ao foco');
-            } else {
-              // Agendar uma notificação no tempo exato em que o timer vai terminar
-              const timeUntilEnd = remaining * 1000;
-              scheduleIOSNotification(timeUntilEnd);
               
+              // Usar uma combinação de métodos para chamar atenção do usuário
+              vibrarDispositivoIntensamente();
+              reproduzirSomAlto();
+              window.alert("DESCANSO FINALIZADO!\n\nÉ hora de começar a próxima série!");
+              console.log('iOS: Combinação de alertas mostrada ao voltar ao foco');
+              
+              // Mostrar um alerta visual na interface principal
+              setTimeout(() => {
+                showIOSAlert();
+              }, 500);
+            } else {
               // Atualizar o tempo restante com valor preciso do localStorage
               setRestTimeRemaining(remaining);
               // Atualizar referência local para manter consistência
@@ -385,20 +315,70 @@ export default function WorkoutMode() {
       // Salvar timestamp quando o app vai para segundo plano
       const saveTimestampOnBlur = () => {
         if (document.visibilityState === 'hidden' && isWorkoutActive) {
-          console.log('iOS: Aplicativo em segundo plano, salvando timestamp');
+          console.log('iOS: Aplicativo em segundo plano, salvando timestamp preciso');
           const now = Date.now();
           localStorage.setItem('appTreino_backgroundTimestamp', now.toString());
           
           // Salvar estado atual dos timers antes de ir para segundo plano
           if (restTimerActive && restTimerEndRef.current) {
             localStorage.setItem('appTreino_restTimerEnd', restTimerEndRef.current.toString());
+            console.log(`iOS: Timer terminará em: ${new Date(restTimerEndRef.current).toLocaleTimeString()}`);
             
-            // Agendar uma notificação para quando o timer terminar
-            const timeUntilEnd = restTimerEndRef.current - now;
-            if (timeUntilEnd > 0) {
-              scheduleIOSNotification(timeUntilEnd);
+            // Mostrar mensagem antes de ir para segundo plano
+            try {
+              const timeRemaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
+              if (timeRemaining <= 5) {
+                alert("O timer está prestes a terminar! Volte rapidamente ao app.");
+              }
+            } catch (e) {
+              console.log('Erro ao mostrar alerta de tempo restante:', e);
             }
           }
+        }
+      };
+      
+      // Função para vibrar o dispositivo de forma intensa
+      const vibrarDispositivoIntensamente = () => {
+        if ('vibrate' in navigator) {
+          // Padrão de vibração longo e repetitivo
+          navigator.vibrate([1000, 300, 1000, 300, 1000, 300, 1000]);
+          console.log('Vibração intensa ativada');
+          
+          // Repetir a vibração após um curto intervalo
+          setTimeout(() => {
+            navigator.vibrate([1000, 300, 1000, 300, 1000]);
+          }, 5000);
+        }
+      };
+      
+      // Função para reproduzir som alto
+      const reproduzirSomAlto = () => {
+        try {
+          // Criar múltiplos elementos de áudio para aumentar o volume percebido
+          const audio1 = new Audio('/sounds/notification.mp3');
+          const audio2 = new Audio('/sounds/notification.mp3');
+          
+          // Configurar para volume máximo
+          audio1.volume = 1.0;
+          audio2.volume = 1.0;
+          
+          // Pequeno atraso entre os sons para aumentar percepção
+          audio1.play().catch(e => console.log('Erro ao reproduzir áudio 1:', e));
+          
+          setTimeout(() => {
+            audio2.play().catch(e => console.log('Erro ao reproduzir áudio 2:', e));
+          }, 300);
+          
+          // Repetir o som após alguns segundos
+          setTimeout(() => {
+            const audio3 = new Audio('/sounds/notification.mp3');
+            audio3.volume = 1.0;
+            audio3.play().catch(e => console.log('Erro ao reproduzir áudio 3:', e));
+          }, 1500);
+          
+          console.log('Reprodução de som alto ativada');
+        } catch (e) {
+          console.error('Erro ao reproduzir som alto:', e);
         }
       };
       
@@ -410,44 +390,45 @@ export default function WorkoutMode() {
       window.addEventListener('pageshow', checkTimerOnFocus);
       window.addEventListener('pagehide', saveTimestampOnBlur);
       
-      // Verificar a cada 1 segundo (mais frequente para maior precisão)
-      const absoluteInterval = setInterval(() => {
-        if (isWorkoutActive) {
-          // Se o aplicativo estiver visível, atualizar os valores do timer
-          if (document.visibilityState === 'visible' && restTimerActive && restTimerEndRef.current) {
-            const now = Date.now();
-            const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
+      // Verificar a cada 1 segundo enquanto o app estiver visível
+      const visibleInterval = setInterval(() => {
+        if (isWorkoutActive && document.visibilityState === 'visible' && restTimerActive && restTimerEndRef.current) {
+          const now = Date.now();
+          const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
+          
+          // Verificar se o timer acabou
+          if (remaining <= 0) {
+            console.log('iOS: Tempo de descanso finalizado enquanto app visível');
+            setRestTimerActive(false);
+            setRestTimeRemaining(0);
+            restTimerEndRef.current = null;
+            localStorage.removeItem('appTreino_restTimerStart');
+            localStorage.removeItem('appTreino_restTimerDuration');
+            localStorage.removeItem('appTreino_restTimerEnd');
             
-            // Verificar se o timer acabou
-            if (remaining <= 0) {
-              console.log('iOS: Tempo de descanso finalizado!');
-              setRestTimerActive(false);
-              setRestTimeRemaining(0);
-              restTimerEndRef.current = null;
-              localStorage.removeItem('appTreino_restTimerStart');
-              localStorage.removeItem('appTreino_restTimerDuration');
-              localStorage.removeItem('appTreino_restTimerEnd');
-              console.log('iOS: Chamando showIOSAlert diretamente do intervalo');
-              showIOSAlert(); // Mostrar alerta diretamente
-              try {
-                // Tentar alerta nativo (funciona em algumas versões do iOS)
-                if (typeof window.alert === 'function') {
-                  setTimeout(() => {
-                    window.alert('Descanso Finalizado! Hora de começar a próxima série.');
-                    console.log('iOS: Alerta nativo mostrado');
-                  }, 100);
-                }
-              } catch (e) {
-                console.log('iOS: Erro ao mostrar alerta nativo:', e);
+            // Alertas quando o app está em primeiro plano
+            vibrarDispositivoIntensamente();
+            reproduzirSomAlto();
+            showIOSAlert();
+          } else {
+            // Atualizar o tempo restante com precisão de 1 casa decimal
+            const newRestTime = Number(remaining.toFixed(1));
+            setRestTimeRemaining(newRestTime);
+            
+            // Avisar visualmente quando o timer está próximo do fim
+            if (remaining <= 5 && remaining > 4.8) {
+              // Flash visual ou outra indicação quando está nos últimos 5 segundos
+              const body = document.querySelector('body');
+              if (body) {
+                body.style.backgroundColor = '#fff8e8';
+                setTimeout(() => {
+                  body.style.backgroundColor = '';
+                }, 300);
               }
-            } else {
-              // Atualizar o tempo restante com precisão de 1 casa decimal
-              const newRestTime = Number(remaining.toFixed(1));
-              setRestTimeRemaining(newRestTime);
             }
           }
         }
-      }, 1000);
+      }, 100); // Intervalo menor para maior precisão quando visível
       
       return () => {
         document.removeEventListener('visibilitychange', checkTimerOnFocus);
@@ -456,7 +437,7 @@ export default function WorkoutMode() {
         window.removeEventListener('blur', saveTimestampOnBlur);
         window.removeEventListener('pageshow', checkTimerOnFocus);
         window.removeEventListener('pagehide', saveTimestampOnBlur);
-        clearInterval(absoluteInterval);
+        clearInterval(visibleInterval);
       };
     }
   }, [isIOS, isWorkoutActive, restTimerActive]);
@@ -1248,7 +1229,7 @@ export default function WorkoutMode() {
       alertOverlay.style.left = '0';
       alertOverlay.style.width = '100%';
       alertOverlay.style.height = '100%';
-      alertOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+      alertOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.85)';
       alertOverlay.style.zIndex = '9999';
       alertOverlay.style.display = 'flex';
       alertOverlay.style.flexDirection = 'column';
@@ -1258,7 +1239,7 @@ export default function WorkoutMode() {
       alertOverlay.style.animation = 'fadeIn 0.3s ease-in-out';
       console.log('iOS: Elemento de overlay criado');
       
-      // Definir CSS para animação
+      // Definir CSS para animação mais chamativa
       const style = document.createElement('style');
       style.textContent = `
         @keyframes fadeIn {
@@ -1266,9 +1247,14 @@ export default function WorkoutMode() {
           to { opacity: 1; }
         }
         @keyframes pulse {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-          100% { transform: scale(1); }
+          0% { transform: scale(1); background-color: #ff3b30; }
+          50% { transform: scale(1.05); background-color: #ff0000; }
+          100% { transform: scale(1); background-color: #ff3b30; }
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+          20%, 40%, 60%, 80% { transform: translateX(10px); }
         }
       `;
       document.head.appendChild(style);
@@ -1278,26 +1264,28 @@ export default function WorkoutMode() {
       const alertBox = document.createElement('div');
       alertBox.style.backgroundColor = '#ff3b30'; // Cor mais vibrante (vermelho iOS)
       alertBox.style.borderRadius = '12px';
-      alertBox.style.padding = '20px';
+      alertBox.style.padding = '25px';
       alertBox.style.maxWidth = '85%';
       alertBox.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.5)';
-      alertBox.style.animation = 'pulse 1.5s infinite';
+      alertBox.style.animation = 'pulse 1s infinite, shake 0.5s';
       
       // Título do alerta
       const alertTitle = document.createElement('h2');
-      alertTitle.style.fontSize = '24px';
+      alertTitle.style.fontSize = '28px';
       alertTitle.style.fontWeight = 'bold';
       alertTitle.style.marginBottom = '15px';
       alertTitle.style.textAlign = 'center';
       alertTitle.style.color = 'white';
+      alertTitle.style.textTransform = 'uppercase';
       alertTitle.textContent = 'DESCANSO FINALIZADO!';
       
       // Mensagem do alerta
       const alertMessage = document.createElement('p');
-      alertMessage.style.fontSize = '18px';
-      alertMessage.style.marginBottom = '20px';
+      alertMessage.style.fontSize = '20px';
+      alertMessage.style.marginBottom = '25px';
       alertMessage.style.textAlign = 'center';
       alertMessage.style.color = 'white';
+      alertMessage.style.fontWeight = 'bold';
       
       let exerciseName = 'próximo exercício';
       try {
@@ -1309,7 +1297,7 @@ export default function WorkoutMode() {
         console.log('iOS: Erro ao obter nome do exercício:', e);
       }
       
-      alertMessage.textContent = `Hora de começar a próxima série de ${exerciseName}`;
+      alertMessage.textContent = `HORA DE COMEÇAR A PRÓXIMA SÉRIE DE ${exerciseName.toUpperCase()}`;
       
       // Botão de fechar
       const closeButton = document.createElement('button');
@@ -1317,12 +1305,13 @@ export default function WorkoutMode() {
       closeButton.style.color = '#ff3b30';
       closeButton.style.border = 'none';
       closeButton.style.borderRadius = '9999px';
-      closeButton.style.padding = '14px 24px';
-      closeButton.style.fontSize = '18px';
+      closeButton.style.padding = '16px 24px';
+      closeButton.style.fontSize = '20px';
       closeButton.style.fontWeight = 'bold';
       closeButton.style.cursor = 'pointer';
       closeButton.style.width = '100%';
-      closeButton.style.marginTop = '10px';
+      closeButton.style.marginTop = '15px';
+      closeButton.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
       closeButton.textContent = 'INICIAR PRÓXIMA SÉRIE';
       console.log('iOS: Elementos do alerta criados');
       
@@ -1379,16 +1368,6 @@ export default function WorkoutMode() {
         console.error('iOS: document.body não está disponível');
       }
       
-      // Mostrar um alerta nativo também (pode funcionar mesmo em segundo plano)
-      try {
-        setTimeout(() => {
-          window.alert('Descanso Finalizado!');
-          console.log('iOS: Alerta nativo mostrado como backup');
-        }, 500);
-      } catch (alertError) {
-        console.log('iOS: Erro ao mostrar alerta nativo:', alertError);
-      }
-      
       // Remover automaticamente após 30 segundos (caso o usuário não interaja)
       setTimeout(() => {
         if (document.body && document.body.contains(alertOverlay)) {
@@ -1413,112 +1392,34 @@ export default function WorkoutMode() {
     }
   };
 
-  // Função para agendar uma notificação no iOS após um determinado tempo
-  const scheduleIOSNotification = (delay) => {
-    if (!notificationPermission) return;
+  // Função específica para iniciar o timer de descanso no iOS
+  const startRestTimer = (duration) => {
+    // Arredondar para cima a duração para garantir valores inteiros de segundos
+    const intDuration = Math.ceil(duration);
+    setRestTimeRemaining(intDuration);
+    setRestTimerActive(true);
     
-    try {
-      console.log(`Agendando notificação para daqui a ${Math.floor(delay / 1000)} segundos`);
+    const now = Date.now();
+    restTimerEndRef.current = now + (intDuration * 1000);
+    
+    console.log(`Temporizador de descanso iniciado por ${intDuration}s, terminará em:`, 
+      new Date(restTimerEndRef.current).toLocaleTimeString());
+    
+    // Para iOS, armazenar timestamps absolutos no localStorage para maior precisão
+    if (isIOS) {
+      localStorage.setItem('appTreino_restTimerStart', now.toString());
+      localStorage.setItem('appTreino_restTimerDuration', intDuration.toString());
+      localStorage.setItem('appTreino_restTimerEnd', restTimerEndRef.current.toString());
+      localStorage.setItem('appTreino_backgroundTimestamp', '0'); // Inicializar com 0 se não estiver em background
       
-      // Usar áudio para iOS
-      if (isIOS && backgroundAudioRef.current) {
-        const currentTime = Date.now();
-        const scheduledTime = currentTime + delay;
-        
-        // Armazenar timestamp para quando o áudio deve tocar
-        localStorage.setItem('appTreino_audioNotificationTime', scheduledTime.toString());
-        
-        console.log(`Áudio agendado para tocar às ${new Date(scheduledTime).toLocaleTimeString()}`);
+      // Se for um tempo curto, avisar o usuário
+      if (intDuration <= 15) {
+        alert(`O timer é curto (${intDuration}s). Para melhor funcionamento, mantenha o app aberto.`);
       }
-      
-      // Usar setTimeout para agendar a notificação padrão
-      const notificationTimer = setTimeout(() => {
-        console.log('Executando notificação agendada');
-        
-        // Verificar se ainda estamos em segundo plano
-        if (document.visibilityState === 'hidden') {
-          try {
-            // Primeiro tentar reproduzir áudio (funciona melhor no iOS)
-            playBackgroundNotificationSound();
-            
-            // Criar notificação do sistema como backup
-            if ('Notification' in window) {
-              const exerciseName = exercises[currentExerciseIndex]?.name || 'exercício';
-              
-              const notification = new Notification('Descanso Finalizado!', {
-                body: `Hora de começar a próxima série de ${exerciseName}`,
-                icon: '/icon-192x192.png',
-                badge: '/icon-192x192.png',
-                tag: 'rest-timer-end',
-                renotify: true,
-                requireInteraction: true,
-                silent: false
-              });
-              
-              notification.onclick = function() {
-                window.focus();
-                notification.close();
-                console.log('Notificação clicada, app em foco');
-              };
-              
-              console.log('Notificação enviada enquanto app estava em segundo plano');
-            }
-            
-            // Tentar vibrar o dispositivo
-            if ('vibrate' in navigator) {
-              navigator.vibrate([300, 100, 300, 100, 300]);
-              console.log('Vibração enviada');
-            }
-          } catch (notifError) {
-            console.error('Erro ao enviar notificação agendada:', notifError);
-          }
-        } else {
-          console.log('App já está em primeiro plano, não enviando notificação');
-        }
-      }, delay);
-      
-      // Armazenar o ID do timer para poder cancelá-lo se necessário
-      return notificationTimer;
-    } catch (error) {
-      console.error('Erro ao agendar notificação:', error);
-      return null;
     }
-  };
-
-  // Função para tocar áudio em segundo plano no iOS
-  const playBackgroundNotificationSound = () => {
-    try {
-      if (backgroundAudioRef.current) {
-        console.log('Tentando reproduzir áudio de notificação em segundo plano');
-        
-        // Redefinir a posição do áudio
-        backgroundAudioRef.current.currentTime = 0;
-        
-        // Configurar volume máximo
-        backgroundAudioRef.current.volume = 1.0;
-        
-        // Tentar reproduzir
-        const playPromise = backgroundAudioRef.current.play();
-        
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            console.log('Áudio de segundo plano reproduzido com sucesso');
-            
-            // Vibrar o dispositivo se possível
-            if ('vibrate' in navigator) {
-              navigator.vibrate([500, 200, 500, 200, 500]);
-              console.log('Vibração enviada com o áudio');
-            }
-          }).catch(e => {
-            console.error('Erro ao reproduzir áudio em segundo plano:', e);
-          });
-        }
-      } else {
-        console.error('Referência de áudio não inicializada');
-      }
-    } catch (error) {
-      console.error('Erro ao tentar tocar áudio em segundo plano:', error);
-    }
+    
+    // Salvar o estado após iniciar o temporizador de descanso
+    saveTimersState();
   };
 
   useEffect(() => {
