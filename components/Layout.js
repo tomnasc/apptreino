@@ -3,8 +3,9 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import AddToHomeScreen from './AddToHomeScreen';
 
-export default function Layout({ children, title = 'App Treino' }) {
+export default function Layout({ children, title = 'App Treino', hideNavigation = false }) {
   const router = useRouter();
   const supabaseClient = useSupabaseClient();
   const [session, setSession] = useState(null);
@@ -191,13 +192,17 @@ export default function Layout({ children, title = 'App Treino' }) {
         </div>
       </main>
 
-      <footer className="bg-white border-t border-gray-200">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-sm text-gray-500">
-            © {new Date().getFullYear()} App Treino - Todos os direitos reservados
-          </p>
-        </div>
-      </footer>
+      <AddToHomeScreen />
+
+      {!hideNavigation && (
+        <footer className="bg-white border-t border-gray-200">
+          <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <p className="text-center text-sm text-gray-500">
+              © {new Date().getFullYear()} App Treino - Todos os direitos reservados
+            </p>
+          </div>
+        </footer>
+      )}
     </div>
   );
 } 

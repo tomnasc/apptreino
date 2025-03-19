@@ -8,17 +8,18 @@ import '../styles/globals.css';
 function MyApp({ Component, pageProps }) {
   const [supabaseClient] = useState(() => createPagesBrowserClient());
 
-  // Define a favicon e meta tags
+  // Registrar service worker para PWA
   useEffect(() => {
-    // Verifique se o service worker é suportado
-    if ('serviceWorker' in navigator) {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        // Desregistrar service workers existentes para evitar problemas
-        navigator.serviceWorker.getRegistrations().then(registrations => {
-          for (let registration of registrations) {
-            registration.unregister();
-          }
-        });
+        navigator.serviceWorker
+          .register('/service-worker.js')
+          .then(registration => {
+            console.log('Service Worker registrado com sucesso:', registration);
+          })
+          .catch(error => {
+            console.error('Erro ao registrar Service Worker:', error);
+          });
       });
     }
   }, []);
@@ -29,11 +30,14 @@ function MyApp({ Component, pageProps }) {
         <title>App Treino - Seu assistente de treinos</title>
         <meta name="description" content="Aplicativo para acompanhamento e gerenciamento de treinos" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="App Treino" />
         <link rel="icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-        <meta name="theme-color" content="#ffffff" />
+        <meta name="theme-color" content="#3b82f6" />
       </Head>
       <SessionContextProvider
         supabaseClient={supabaseClient}
