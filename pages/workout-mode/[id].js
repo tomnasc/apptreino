@@ -817,6 +817,46 @@ export default function WorkoutMode() {
     handleSetCompleted();
   };
 
+  // Função para pular o exercício atual e movê-lo para o final da ficha
+  const skipExercise = () => {
+    // Confirmar com o usuário 
+    if (!confirm('Deseja realmente pular este exercício? Ele será movido para o final da ficha.')) {
+      return;
+    }
+
+    // Se estamos no último exercício, não há para onde pular
+    if (currentExerciseIndex >= exercises.length - 1) {
+      alert('Este é o último exercício da ficha.');
+      return;
+    }
+
+    // Copiar a lista de exercícios
+    const updatedExercises = [...exercises];
+    
+    // Remover o exercício atual
+    const skippedExercise = updatedExercises.splice(currentExerciseIndex, 1)[0];
+    
+    // Adicionar o exercício ao final da lista
+    updatedExercises.push(skippedExercise);
+    
+    // Atualizar o estado com a nova lista de exercícios
+    setExercises(updatedExercises);
+    
+    // Não precisamos incrementar o índice porque ao remover o exercício atual,
+    // o próximo exercício já passa para a posição atual automaticamente
+    
+    // Resetar contadores relacionados ao exercício
+    setCurrentSetIndex(0);
+    setRepsCompleted(0);
+    if (updatedExercises[currentExerciseIndex].time) {
+      setTimeRemaining(updatedExercises[currentExerciseIndex].time);
+      setTimerActive(false);
+    }
+
+    // Atualizar o tempo inicial da série
+    setCurrentSetStartTime(new Date());
+  };
+
   const toggleVideo = () => {
     setShowVideo(!showVideo);
   };
@@ -1611,15 +1651,29 @@ export default function WorkoutMode() {
                       </button>
                     </div>
                     
-                    <button 
-                      onClick={() => setRepsCompleted(0)}
-                      className="w-full py-2 text-gray-500 hover:text-gray-700 text-sm flex items-center justify-center"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                      </svg>
-                      Resetar contador
-                    </button>
+                    <div className="flex justify-between">
+                      <button 
+                        onClick={() => setRepsCompleted(0)}
+                        className="py-2 text-gray-500 hover:text-gray-700 text-sm flex items-center justify-center"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                        Resetar contador
+                      </button>
+                      
+                      {currentExerciseIndex < exercises.length - 1 && (
+                        <button 
+                          onClick={skipExercise}
+                          className="py-2 text-orange-500 hover:text-orange-700 text-sm flex items-center justify-center"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.688c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 0 1 0 1.953l-7.108 4.062A1.125 1.125 0 0 1 3 16.81V8.688ZM12.75 8.688c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 0 1 0 1.953l-7.108 4.062a1.125 1.125 0 0 1-1.683-.977V8.688Z" />
+                          </svg>
+                          Pular exercício
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
                 
@@ -1630,27 +1684,38 @@ export default function WorkoutMode() {
                       <span className="text-gray-500">segundos</span>
                     </div>
                     
-                    {!timerActive ? (
-                      <button 
-                        onClick={() => {
-                          console.log('Iniciando cronômetro de exercício');
-                          setTimerActive(true);
-                        }}
-                        className="px-6 py-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-bold shadow transition-all"
-                      >
-                        Iniciar Cronômetro
-                      </button>
-                    ) : (
-                      <button 
-                        onClick={() => {
-                          console.log('Parando cronômetro de exercício');
-                          setTimerActive(false);
-                        }}
-                        className="px-6 py-3 rounded-full bg-red-500 hover:bg-red-600 text-white font-bold shadow transition-all"
-                      >
-                        Parar Cronômetro
-                      </button>
-                    )}
+                    <div className="flex flex-col sm:flex-row gap-3 w-full justify-center items-center">
+                      {!timerActive ? (
+                        <button 
+                          onClick={() => {
+                            console.log('Iniciando cronômetro de exercício');
+                            setTimerActive(true);
+                          }}
+                          className="px-6 py-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-bold shadow transition-all"
+                        >
+                          Iniciar Cronômetro
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => {
+                            console.log('Parando cronômetro de exercício');
+                            setTimerActive(false);
+                          }}
+                          className="px-6 py-3 rounded-full bg-red-500 hover:bg-red-600 text-white font-bold shadow transition-all"
+                        >
+                          Parar Cronômetro
+                        </button>
+                      )}
+                      
+                      {currentExerciseIndex < exercises.length - 1 && (
+                        <button 
+                          onClick={skipExercise}
+                          className="px-6 py-3 rounded-full bg-orange-500 hover:bg-orange-600 text-white font-semibold shadow transition-all text-sm"
+                        >
+                          Pular Exercício
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 
