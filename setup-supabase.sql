@@ -65,8 +65,29 @@ DROP POLICY IF EXISTS "Usuários podem atualizar seu próprio perfil" ON user_pr
 CREATE POLICY "Usuários podem atualizar seu próprio perfil"
   ON user_profiles
   FOR UPDATE
-  USING (id = auth.uid())
-  WITH CHECK (id = auth.uid() AND plan_type = OLD.plan_type);
+  USING (id = auth.uid());
+
+-- Adicionar trigger para prevenir alteração do plan_type por usuários comuns
+CREATE OR REPLACE FUNCTION prevent_plan_type_change()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Se não for admin e tentar mudar o tipo de plano, reverte para o valor original
+  IF NOT EXISTS (
+    SELECT 1 FROM user_profiles 
+    WHERE id = auth.uid() AND plan_type = 'admin'
+  ) AND NEW.plan_type != OLD.plan_type THEN
+    RAISE EXCEPTION 'Não é permitido alterar o tipo de plano';
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS prevent_plan_change ON user_profiles;
+CREATE TRIGGER prevent_plan_change
+  BEFORE UPDATE ON user_profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION prevent_plan_type_change();
 
 -- Administradores podem atualizar todos os perfis
 DROP POLICY IF EXISTS "Administradores podem atualizar todos os perfis" ON user_profiles;
