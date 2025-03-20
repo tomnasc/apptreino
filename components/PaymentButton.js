@@ -9,26 +9,40 @@ export default function PaymentButton({ className, buttonText = 'Assinar Premium
       setLoading(true);
       toast.loading('Preparando checkout...', { id: 'checkout' });
       
-      const response = await fetch('/api/create-checkout-session', {
+      // Usar o novo endpoint simplificado
+      const response = await fetch('/api/create-checkout-session-simple', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
       });
       
-      const data = await response.json();
+      // Obter dados da resposta com tratamento de erro melhorado
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('Erro ao processar resposta JSON:', jsonError);
+        toast.error('Erro ao processar resposta do servidor', { id: 'checkout' });
+        setLoading(false);
+        return;
+      }
       
-      if (response.ok && data.url) {
+      // Verificar resposta
+      if (response.ok && data?.url) {
         // Redirecionar para a página de checkout do Stripe
         toast.dismiss('checkout');
+        console.log('Redirecionando para:', data.url);
         window.location.href = data.url;
       } else {
-        console.error('Erro ao criar sessão de checkout:', data.error);
-        toast.error('Não foi possível iniciar o checkout', { id: 'checkout' });
+        // Exibir erro detalhado
+        const errorMessage = data?.details || data?.error || 'Erro desconhecido';
+        console.error('Erro ao criar sessão de checkout:', errorMessage, data);
+        toast.error(`Erro no checkout: ${errorMessage}`, { id: 'checkout' });
         setLoading(false);
       }
     } catch (error) {
-      console.error('Erro ao iniciar checkout:', error);
+      console.error('Exceção ao iniciar checkout:', error);
       toast.error('Erro ao conectar ao serviço de pagamento', { id: 'checkout' });
       setLoading(false);
     }
