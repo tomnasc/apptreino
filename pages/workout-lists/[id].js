@@ -312,18 +312,23 @@ export default function EditWorkoutList() {
     try {
       setError(null);
       
+      // Verificar se temos uma chave de API definida
+      const apiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
+      
+      // Se não tivermos uma chave de API, vamos direto para a abordagem alternativa
+      if (!apiKey) {
+        console.log('Chave da API do YouTube não encontrada. Usando abordagem alternativa.');
+        await searchYoutubeWithoutAPI(query);
+        return;
+      }
+      
       // Buscar resultados do YouTube para o exercício
-      const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q=${encodeURIComponent(query + ' exercício')}&type=video&key=${process.env.NEXT_PUBLIC_YOUTUBE_API_KEY}`);
+      const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q=${encodeURIComponent(query + ' exercício')}&type=video&key=${apiKey}`);
       
       if (!response.ok) {
-        // Se não tivermos chave de API, usamos uma abordagem alternativa
-        // Buscando pelo primeiro resultado do YouTube para o exercício usando scraping
-        const videoId = await searchYoutubeWithoutAPI(query);
-        if (videoId) {
-          setVideoUrl(`https://www.youtube.com/watch?v=${videoId}`);
-        } else {
-          setError('Não foi possível encontrar um vídeo para este exercício. Por favor, tente inserir manualmente.');
-        }
+        // Se a API retornar erro, usamos a abordagem alternativa
+        console.error('Erro na API do YouTube:', response.status, response.statusText);
+        await searchYoutubeWithoutAPI(query);
         return;
       }
       
@@ -338,17 +343,8 @@ export default function EditWorkoutList() {
     } catch (error) {
       console.error('Erro ao buscar vídeos:', error);
       
-      // Abordagem alternativa se a API falhar
-      try {
-        const videoId = await searchYoutubeWithoutAPI(query);
-        if (videoId) {
-          setVideoUrl(`https://www.youtube.com/watch?v=${videoId}`);
-        } else {
-          setError('Não foi possível encontrar um vídeo. Por favor, tente inserir manualmente.');
-        }
-      } catch (e) {
-        setError('Erro ao buscar vídeos do YouTube. Por favor, tente novamente ou insira manualmente.');
-      }
+      // Abordagem alternativa se ocorrer qualquer erro
+      await searchYoutubeWithoutAPI(query);
     }
   };
   
