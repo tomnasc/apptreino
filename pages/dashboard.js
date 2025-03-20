@@ -33,7 +33,7 @@ export default function DashboardPage() {
     
     try {
       // Verificar o acesso usando o utilitário
-      const accessInfo = await checkUserAccess(user);
+      const accessInfo = await checkUserAccess(user, supabase);
       
       // Buscar o perfil do usuário para saber o plano
       const { data: profile } = await supabase
@@ -64,7 +64,10 @@ export default function DashboardPage() {
         .order('created_at', { ascending: false })
         .limit(5);
 
-      if (listsError) throw listsError;
+      if (listsError) {
+        console.error('Erro ao buscar listas de treinos:', listsError);
+        throw listsError;
+      }
       setWorkoutLists(listsData || []);
 
       // Buscar treinos recentes
@@ -75,10 +78,23 @@ export default function DashboardPage() {
         .order('created_at', { ascending: false })
         .limit(5);
 
-      if (workoutsError) throw workoutsError;
-      setRecentWorkouts(workoutsData || []);
+      if (workoutsError) {
+        console.error('Erro ao buscar sessões de treinos:', workoutsError);
+        throw workoutsError;
+      }
+      
+      // Garantir que os dados são válidos antes de atribuir ao state
+      if (Array.isArray(workoutsData)) {
+        setRecentWorkouts(workoutsData || []);
+      } else {
+        console.warn('Dados de sessões de treino não são um array:', workoutsData);
+        setRecentWorkouts([]);
+      }
     } catch (error) {
-      console.error('Erro ao buscar dados:', error);
+      console.error('Erro ao buscar dados:', error.message || error);
+      toast.error('Não foi possível carregar seus dados. Por favor, tente novamente.');
+      setWorkoutLists([]);
+      setRecentWorkouts([]);
     } finally {
       setLoading(false);
     }
@@ -482,11 +498,7 @@ export default function DashboardPage() {
       </div>
       
       {/* Incluir limitação para usuários com acesso expirado */}
-      {userAccessInfo.hasAccess ? (
-        <>
-          {/* Conteúdo normal do dashboard */}
-        </>
-      ) : (
+      {!userAccessInfo.hasAccess && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <h3 className="text-lg font-medium text-red-800 mb-2">Seu período de teste expirou</h3>
           <p className="text-sm text-red-600 mb-4">

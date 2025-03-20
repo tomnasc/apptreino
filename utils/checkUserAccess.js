@@ -3,20 +3,22 @@
  * com base no tipo de plano e na data de expiração
  */
 
-import { createClient } from '@supabase/supabase-js';
-
-// Cria o cliente Supabase usando as variáveis de ambiente públicas
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Removendo a importação do createClient e criação de cliente
+// import { createClient } from '@supabase/supabase-js';
+// 
+// // Cria o cliente Supabase usando as variáveis de ambiente públicas
+// const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+// const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
  * Verifica se o usuário tem acesso às funcionalidades do aplicativo
  * 
  * @param {Object} user - Objeto de usuário do Supabase
+ * @param {Object} supabaseClient - Cliente Supabase (opcional)
  * @returns {Promise<{hasAccess: boolean, message: string, daysLeft: number|null}>}
  */
-export async function checkUserAccess(user) {
+export async function checkUserAccess(user, supabaseClient = null) {
   if (!user) {
     return {
       hasAccess: false,
@@ -26,6 +28,17 @@ export async function checkUserAccess(user) {
   }
 
   try {
+    // Usar o cliente Supabase fornecido ou importar dinamicamente se não for fornecido
+    let supabase = supabaseClient;
+    
+    if (!supabase) {
+      // Importa o createClient apenas se necessário
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+      supabase = createClient(supabaseUrl, supabaseAnonKey);
+    }
+
     // Buscar o perfil do usuário
     const { data: profile, error } = await supabase
       .from('user_profiles')
