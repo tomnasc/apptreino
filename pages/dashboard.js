@@ -530,7 +530,7 @@ export default function DashboardPage() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <h3 className="text-lg font-medium text-red-800 mb-2">Seu período de teste expirou</h3>
           <p className="text-sm text-red-600 mb-4">
-            Para continuar utilizando todos os recursos do App Treino, faça upgrade para o plano Premium.
+            Para continuar utilizando todos os recursos do TreinoPro, faça upgrade para o plano Premium.
           </p>
           <button
             className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md"

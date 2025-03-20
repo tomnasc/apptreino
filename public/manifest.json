@@ -1,6 +1,6 @@
 {
-  "name": "App Treino",
-  "short_name": "App Treino",
+  "name": "TreinoPro",
+  "short_name": "TreinoPro",
   "description": "Aplicativo para gerenciamento de treinos de academia",
   "start_url": "/",
   "display": "standalone",

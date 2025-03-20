@@ -1,5 +1,5 @@
 // Service Worker para gerenciar temporizadores em segundo plano
-const CACHE_NAME = 'app-treino-timer-cache-v1';
+const CACHE_NAME = 'treinopro-timer-cache-v1';
 
 // Variáveis para controlar os temporizadores
 let exerciseTimer = null;

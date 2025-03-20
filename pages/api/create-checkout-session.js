@@ -54,8 +54,8 @@ export default async function handler(req, res) {
           price_data: {
             currency: 'brl',
             product_data: {
-              name: 'Plano Premium App Treino',
-              description: 'Acesso a todos os recursos do App Treino por 1 ano',
+              name: 'Plano Premium TreinoPro',
+              description: 'Acesso a todos os recursos do TreinoPro por 1 ano',
             },
             unit_amount: 9900, // R$ 99,00 (em centavos)
             recurring: {

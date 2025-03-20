@@ -103,7 +103,7 @@ export default function PaymentSuccessPage() {
             <>
               <p className="text-gray-600 mb-4">
                 Seu pagamento foi processado com sucesso e sua conta foi atualizada para o plano Premium!
-                Agora você tem acesso a todos os recursos do App Treino.
+                Agora você tem acesso a todos os recursos do TreinoPro.
               </p>
               <p className="text-sm text-gray-500 mb-6">
                 Você será redirecionado ao dashboard em 5 segundos...

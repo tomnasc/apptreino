@@ -173,7 +173,8 @@ export default function WorkoutMode() {
           backgroundTime: backgroundTimeRef.current
         };
         
-        localStorage.setItem('appTreino_timerState', JSON.stringify(timerState));
+        // Salvar estado para persistência (caso o usuário saia e volte)
+        localStorage.setItem('treinoPro_timerState', JSON.stringify(timerState));
         console.log('Estado dos timers salvo no localStorage');
       } catch (error) {
         console.error('Erro ao salvar o estado dos timers:', error);
@@ -185,7 +186,7 @@ export default function WorkoutMode() {
   const loadTimersState = () => {
     if (typeof window !== 'undefined') {
       try {
-        const savedState = localStorage.getItem('appTreino_timerState');
+        const savedState = localStorage.getItem('treinoPro_timerState');
         if (savedState) {
           const state = JSON.parse(savedState);
           const now = Date.now();
@@ -239,7 +240,7 @@ export default function WorkoutMode() {
             setCurrentSetIndex(state.currentSetIndex);
           } else {
             // Se o estado não corresponder, limpar
-            localStorage.removeItem('appTreino_timerState');
+            localStorage.removeItem('treinoPro_timerState');
           }
         }
       } catch (error) {
@@ -276,7 +277,7 @@ export default function WorkoutMode() {
           const now = Date.now();
           
           // Verificar timer de descanso usando valores absolutos do localStorage para maior precisão
-          const endTimeStr = localStorage.getItem('appTreino_restTimerEnd');
+          const endTimeStr = localStorage.getItem('treinoPro_restTimerEnd');
           
           if (endTimeStr && restTimerActive) {
             const endTime = parseInt(endTimeStr);
@@ -288,9 +289,9 @@ export default function WorkoutMode() {
               setRestTimerActive(false);
               setRestTimeRemaining(0);
               restTimerEndRef.current = null;
-              localStorage.removeItem('appTreino_restTimerStart');
-              localStorage.removeItem('appTreino_restTimerDuration');
-              localStorage.removeItem('appTreino_restTimerEnd');
+              localStorage.removeItem('treinoPro_restTimerStart');
+              localStorage.removeItem('treinoPro_restTimerDuration');
+              localStorage.removeItem('treinoPro_restTimerEnd');
               
               // Mostrar apenas o popup simples
               showIOSAlert();
@@ -310,11 +311,11 @@ export default function WorkoutMode() {
         if (document.visibilityState === 'hidden' && isWorkoutActive) {
           console.log('iOS: Aplicativo em segundo plano, salvando timestamp preciso');
           const now = Date.now();
-          localStorage.setItem('appTreino_backgroundTimestamp', now.toString());
+          localStorage.setItem('treinoPro_backgroundTimestamp', now.toString());
           
           // Salvar estado atual dos timers antes de ir para segundo plano
           if (restTimerActive && restTimerEndRef.current) {
-            localStorage.setItem('appTreino_restTimerEnd', restTimerEndRef.current.toString());
+            localStorage.setItem('treinoPro_restTimerEnd', restTimerEndRef.current.toString());
             console.log(`iOS: Timer terminará em: ${new Date(restTimerEndRef.current).toLocaleTimeString()}`);
           }
         }
@@ -340,9 +341,9 @@ export default function WorkoutMode() {
             setRestTimerActive(false);
             setRestTimeRemaining(0);
             restTimerEndRef.current = null;
-            localStorage.removeItem('appTreino_restTimerStart');
-            localStorage.removeItem('appTreino_restTimerDuration');
-            localStorage.removeItem('appTreino_restTimerEnd');
+            localStorage.removeItem('treinoPro_restTimerStart');
+            localStorage.removeItem('treinoPro_restTimerDuration');
+            localStorage.removeItem('treinoPro_restTimerEnd');
             
             // Apenas mostrar o popup simples
             showIOSAlert();
@@ -438,11 +439,11 @@ export default function WorkoutMode() {
       
       // Limpar o estado do timer no localStorage
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('appTreino_timerState');
-        localStorage.removeItem('appTreino_restTimerStart');
-        localStorage.removeItem('appTreino_restTimerDuration');
-        localStorage.removeItem('appTreino_restTimerEnd');
-        localStorage.removeItem('appTreino_backgroundTimestamp');
+        localStorage.removeItem('treinoPro_timerState');
+        localStorage.removeItem('treinoPro_restTimerStart');
+        localStorage.removeItem('treinoPro_restTimerDuration');
+        localStorage.removeItem('treinoPro_restTimerEnd');
+        localStorage.removeItem('treinoPro_backgroundTimestamp');
       }
     }
   }, [isWorkoutActive, isIOS]);
@@ -1295,10 +1296,10 @@ export default function WorkoutMode() {
     
     // Para iOS, armazenar timestamps absolutos no localStorage para maior precisão
     if (isIOS) {
-      localStorage.setItem('appTreino_restTimerStart', now.toString());
-      localStorage.setItem('appTreino_restTimerDuration', intDuration.toString());
-      localStorage.setItem('appTreino_restTimerEnd', restTimerEndRef.current.toString());
-      localStorage.setItem('appTreino_backgroundTimestamp', '0');
+      localStorage.setItem('treinoPro_restTimerStart', now.toString());
+      localStorage.setItem('treinoPro_restTimerDuration', intDuration.toString());
+      localStorage.setItem('treinoPro_restTimerEnd', restTimerEndRef.current.toString());
+      localStorage.setItem('treinoPro_backgroundTimestamp', '0');
     }
     
     // Salvar o estado após iniciar o temporizador de descanso
@@ -1311,7 +1312,7 @@ export default function WorkoutMode() {
       // Intervalo para verificar se o áudio deve tocar
       const audioCheckInterval = setInterval(() => {
         try {
-          const notificationTimeStr = localStorage.getItem('appTreino_audioNotificationTime');
+          const notificationTimeStr = localStorage.getItem('treinoPro_audioNotificationTime');
           if (notificationTimeStr) {
             const notificationTime = parseInt(notificationTimeStr);
             const now = Date.now();
@@ -1322,7 +1323,7 @@ export default function WorkoutMode() {
               playBackgroundNotificationSound();
               
               // Limpar o timestamp após tocar
-              localStorage.removeItem('appTreino_audioNotificationTime');
+              localStorage.removeItem('treinoPro_audioNotificationTime');
             }
           }
         } catch (error) {

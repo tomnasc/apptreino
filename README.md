@@ -1,4 +1,4 @@
-# App Treino
+# TreinoPro
 
 Um aplicativo completo para gerenciamento de treinos de academia, permitindo que usuários criem listas de exercícios personalizadas, acompanhem suas sessões de treino e visualizem estatísticas detalhadas de desempenho.
 
@@ -31,8 +31,8 @@ Um aplicativo completo para gerenciamento de treinos de academia, permitindo que
 
 1. Clone o repositório:
    ```bash
-   git clone https://github.com/seu-usuario/app-treino.git
-   cd app-treino
+   git clone https://github.com/seu-usuario/treinopro.git
+   cd treinopro
    ```
 
 2. Instale as dependências:

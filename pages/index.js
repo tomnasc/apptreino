@@ -17,13 +17,13 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4">
       <Head>
-        <title>App Treino - Gerencie seus treinos</title>
-        <meta name="description" content="Aplicativo para gerenciamento de treinos de academia" />
+        <title>TreinoPro - Gerencie seus treinos</title>
+        <meta name="description" content="Controle seus treinos de academia de forma simples e eficiente" />
       </Head>
 
       <main className="flex flex-col items-center justify-center w-full flex-1 px-4 sm:px-20 text-center">
-        <h1 className="text-4xl font-bold mb-6">
-          Bem-vindo ao <span className="text-blue-500">App Treino</span>
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-center">
+          Bem-vindo ao <span className="text-blue-500">TreinoPro</span>
         </h1>
         <p className="text-xl mb-8">
           Gerencie seus treinos de academia de forma simples e eficiente.
@@ -43,8 +43,8 @@ export default function Home() {
         </div>
       </main>
 
-      <footer className="w-full py-8 text-center border-t border-gray-200 mt-8">
-        <p className="text-gray-600">© {new Date().getFullYear()} App Treino - Todos os direitos reservados</p>
+      <footer className="py-4 text-center">
+        <p className="text-gray-600">© {new Date().getFullYear()} TreinoPro - Todos os direitos reservados</p>
       </footer>
     </div>
   );
