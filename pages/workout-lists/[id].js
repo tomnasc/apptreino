@@ -306,6 +306,68 @@ export default function EditWorkoutList() {
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
+  const searchYoutubeVideo = async (query) => {
+    if (!query.trim()) return;
+    
+    try {
+      setError(null);
+      
+      // Buscar resultados do YouTube para o exercício
+      const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q=${encodeURIComponent(query + ' exercício')}&type=video&key=${process.env.NEXT_PUBLIC_YOUTUBE_API_KEY}`);
+      
+      if (!response.ok) {
+        // Se não tivermos chave de API, usamos uma abordagem alternativa
+        // Buscando pelo primeiro resultado do YouTube para o exercício usando scraping
+        const videoId = await searchYoutubeWithoutAPI(query);
+        if (videoId) {
+          setVideoUrl(`https://www.youtube.com/watch?v=${videoId}`);
+        } else {
+          setError('Não foi possível encontrar um vídeo para este exercício. Por favor, tente inserir manualmente.');
+        }
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data.items && data.items.length > 0) {
+        const videoId = data.items[0].id.videoId;
+        setVideoUrl(`https://www.youtube.com/watch?v=${videoId}`);
+      } else {
+        setError('Nenhum vídeo encontrado para este exercício');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar vídeos:', error);
+      
+      // Abordagem alternativa se a API falhar
+      try {
+        const videoId = await searchYoutubeWithoutAPI(query);
+        if (videoId) {
+          setVideoUrl(`https://www.youtube.com/watch?v=${videoId}`);
+        } else {
+          setError('Não foi possível encontrar um vídeo. Por favor, tente inserir manualmente.');
+        }
+      } catch (e) {
+        setError('Erro ao buscar vídeos do YouTube. Por favor, tente novamente ou insira manualmente.');
+      }
+    }
+  };
+  
+  // Método alternativo para buscar vídeos sem API key
+  const searchYoutubeWithoutAPI = async (query) => {
+    try {
+      // Abre uma nova janela para realizar a busca diretamente no YouTube
+      window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(query + ' exercício')}`, '_blank');
+      
+      // Exibe uma mensagem para o usuário
+      alert('Uma busca foi aberta no YouTube. Por favor, copie o link do vídeo que você deseja usar e cole no campo.');
+      
+      return null;
+    } catch (error) {
+      console.error('Erro na busca sem API:', error);
+      return null;
+    }
+  };
+
   if (loading) {
     return (
       <Layout title="Carregando...">
@@ -533,14 +595,46 @@ export default function EditWorkoutList() {
                     <label htmlFor="videoUrl" className="block text-sm font-medium text-gray-700 mb-1">
                       Link do vídeo (YouTube)
                     </label>
-                    <input
-                      type="url"
-                      id="videoUrl"
-                      className="input"
-                      value={videoUrl}
-                      onChange={(e) => setVideoUrl(e.target.value)}
-                      placeholder="Ex: https://www.youtube.com/watch?v=..."
-                    />
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="url"
+                        id="videoUrl"
+                        className="input flex-grow"
+                        value={videoUrl}
+                        onChange={(e) => setVideoUrl(e.target.value)}
+                        placeholder="Ex: https://www.youtube.com/watch?v=..."
+                      />
+                      <button
+                        type="button"
+                        onClick={() => searchYoutubeVideo(exerciseName)}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md shadow-sm flex items-center"
+                        disabled={!exerciseName.trim()}
+                      >
+                        <svg 
+                          xmlns="http://www.w3.org/2000/svg" 
+                          className="h-5 w-5 mr-1" 
+                          viewBox="0 0 24 24" 
+                          fill="currentColor"
+                        >
+                          <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+                        </svg>
+                        Buscar vídeo
+                      </button>
+                    </div>
+                    {videoUrl && getYoutubeVideoId(videoUrl) && (
+                      <div className="mt-2 p-1 bg-gray-50 rounded border border-gray-200">
+                        <div className="flex items-center">
+                          <img 
+                            src={`https://img.youtube.com/vi/${getYoutubeVideoId(videoUrl)}/default.jpg`}
+                            alt="Thumbnail do vídeo"
+                            className="w-20 h-auto rounded"
+                          />
+                          <span className="ml-2 text-xs text-gray-500 truncate">
+                            Vídeo selecionado
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="mt-4 flex justify-end space-x-2">
