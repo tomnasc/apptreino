@@ -18,7 +18,24 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Cache aberto');
-        return cache.addAll(urlsToCache);
+        // Em vez de addAll, que falha se qualquer recurso falhar,
+        // vamos adicionar cada recurso individualmente
+        const cachePromises = urlsToCache.map(url => {
+          return fetch(url)
+            .then(response => {
+              if (!response.ok) {
+                throw new Error(`Falha ao buscar ${url}, status: ${response.status}`);
+              }
+              return cache.put(url, response);
+            })
+            .catch(err => {
+              console.warn(`Não foi possível adicionar ${url} ao cache: ${err.message}`);
+              // Não falha completamente se apenas um recurso falhar
+              return Promise.resolve();
+            });
+        });
+        
+        return Promise.all(cachePromises);
       })
   );
 });
@@ -33,6 +50,7 @@ self.addEventListener('activate', event => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
             return caches.delete(cacheName);
           }
+          return Promise.resolve();
         })
       );
     })
@@ -62,13 +80,20 @@ self.addEventListener('fetch', event => {
             if (event.request.method === 'GET' && response.status === 200) {
               cache.put(event.request, responseToCache);
             }
+          })
+          .catch(err => {
+            console.warn(`Erro ao salvar no cache: ${err.message}`);
           });
           
         return response;
       })
       .catch(() => {
         // Se a rede falhar, tenta buscar do cache
-        return caches.match(event.request);
+        return caches.match(event.request)
+          .catch(err => {
+            console.warn(`Erro ao buscar do cache: ${err.message}`);
+            return new Response('Recurso não disponível offline', { status: 503 });
+          });
       })
   );
 }); 
