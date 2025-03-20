@@ -61,24 +61,9 @@ export default function AdminUsers() {
         
       if (profilesError) throw profilesError;
       
-      // Buscar dados de autenticação para emails
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-      
-      if (authError) {
-        console.warn('Erro ao buscar dados de autenticação. Usando apenas dados de perfil.');
-        setUsers(profiles);
-      } else {
-        // Mesclar dados de perfil com emails
-        const mergedUsers = profiles.map(profile => {
-          const authUser = authUsers?.users?.find(au => au.id === profile.id);
-          return {
-            ...profile,
-            email: authUser?.email || 'Email não disponível'
-          };
-        });
-        
-        setUsers(mergedUsers);
-      }
+      // Não é possível usar auth.admin.listUsers no frontend (requer service_role key)
+      // Usamos apenas os dados dos perfis
+      setUsers(profiles || []);
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
       toast.error('Erro ao carregar lista de usuários');
@@ -255,7 +240,7 @@ export default function AdminUsers() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{user.email}</div>
+                      <div className="text-sm text-gray-500">{user.email || 'Email não disponível'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {editingUser?.id === user.id ? (
