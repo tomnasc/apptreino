@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 
-export default function PaymentButton({ className, buttonText = 'Assinar Premium', variant = 'primary' }) {
+export default function PaymentButton({ className, buttonText = 'Assinar Premium', variant = 'primary', priceId = 'price_1P4U5PLKjRFwjxJpXvD1hMiM' }) {
   const [loading, setLoading] = useState(false);
 
   const handlePaymentClick = async () => {
@@ -9,12 +9,13 @@ export default function PaymentButton({ className, buttonText = 'Assinar Premium
       setLoading(true);
       toast.loading('Preparando checkout...', { id: 'checkout' });
       
-      // Usar o novo endpoint simplificado
-      const response = await fetch('/api/create-checkout-session-simple', {
+      // Usar o endpoint que aceita priceId diretamente
+      const response = await fetch('/api/create-checkout-session-direct', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ priceId }),
       });
       
       // Obter dados da resposta com tratamento de erro melhorado
