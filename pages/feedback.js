@@ -62,18 +62,38 @@ export default function Feedback() {
     try {
       setSubmitting(true);
       
-      const { data, error } = await supabase
-        .from('user_feedback')
-        .insert({
-          user_id: user.id,
-          subject: formValues.subject,
-          category: formValues.category,
-          message: formValues.message
-        });
+      // Tentando usar 'subject' primeiro e, se falhar, tentar com 'title'
+      try {
+        const { data, error } = await supabase
+          .from('user_feedback')
+          .insert({
+            user_id: user.id,
+            subject: formValues.subject,
+            category: formValues.category,
+            message: formValues.message
+          });
+          
+        if (error) throw error;
         
-      if (error) throw error;
+        toast.success('Feedback enviado com sucesso! Obrigado pela sua contribuição.');
+      } catch (insertError) {
+        console.warn('Erro ao usar "subject", tentando com "title":', insertError);
+        
+        // Se falhou com 'subject', tente com 'title'
+        const { data, error } = await supabase
+          .from('user_feedback')
+          .insert({
+            user_id: user.id,
+            title: formValues.subject, // Usa o valor de subject mas na coluna title
+            category: formValues.category,
+            message: formValues.message
+          });
+          
+        if (error) throw error;
+        
+        toast.success('Feedback enviado com sucesso! Obrigado pela sua contribuição.');
+      }
       
-      toast.success('Feedback enviado com sucesso! Obrigado pela sua contribuição.');
       setFormValues({
         subject: '',
         category: 'sugestão',
@@ -228,7 +248,7 @@ export default function Feedback() {
                       }`}
                     >
                       <div className="flex justify-between items-start mb-2">
-                        <div className="font-medium text-gray-800">{feedback.subject}</div>
+                        <div className="font-medium text-gray-800">{feedback.subject || feedback.title || 'Sem assunto'}</div>
                         <span className={`text-xs px-2 py-1 rounded-full ${
                           feedback.response 
                             ? 'bg-green-100 text-green-800' 

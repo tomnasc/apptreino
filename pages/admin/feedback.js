@@ -261,7 +261,7 @@ export default function AdminFeedback() {
                   </div>
                   
                   <div className="mb-3">
-                    <div className="font-medium text-gray-800">{feedback.subject}</div>
+                    <div className="font-medium text-gray-800">{feedback.subject || feedback.title || 'Sem assunto'}</div>
                     <p className="text-gray-700 whitespace-pre-line">{feedback.message}</p>
                   </div>
                   
@@ -333,7 +333,7 @@ export default function AdminFeedback() {
                   <div className="font-medium">{getUserName(selectedFeedback.user_id)}</div>
                   <div className="text-xs text-gray-500">{formatDate(selectedFeedback.created_at)}</div>
                 </div>
-                <div className="font-medium text-gray-800 mb-2">{selectedFeedback.subject}</div>
+                <div className="font-medium text-gray-800 mb-2">{selectedFeedback.subject || selectedFeedback.title || 'Sem assunto'}</div>
                 <p className="text-gray-700 whitespace-pre-line">{selectedFeedback.message}</p>
               </div>
               
