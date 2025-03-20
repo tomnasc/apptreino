@@ -794,9 +794,12 @@ export default function WorkoutMode() {
     }
   };
 
+  // Atualizar o manipulador de repetições para trabalhar com entrada direta
   const handleRepsChange = (e) => {
+    // Converter para número inteiro e garantir que seja um valor válido
     const value = parseInt(e.target.value) || 0;
-    setRepsCompleted(value);
+    // Garantir que o valor esteja entre 0 e o máximo de repetições do exercício
+    setRepsCompleted(Math.min(Math.max(0, value), currentExercise?.reps || 0));
   };
 
   const handleRepsCompleted = () => {
@@ -1585,21 +1588,15 @@ export default function WorkoutMode() {
                       <div className="flex items-center justify-center p-2 bg-blue-50 rounded-lg text-center w-full md:w-auto">
                         <div className="font-medium text-gray-600 mr-2">Repetições realizadas:</div>
                         <div className="flex items-center">
-                          <button 
-                            onClick={() => setRepsCompleted(Math.max(0, repsCompleted - 1))}
-                            className="bg-white w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center mr-2 text-gray-500 hover:bg-gray-100"
-                            disabled={repsCompleted <= 0}
-                          >
-                            -
-                          </button>
-                          <span className="font-bold text-blue-700 text-xl px-3">{repsCompleted}</span>
-                          <button 
-                            onClick={() => setRepsCompleted(Math.min(currentExercise.reps, repsCompleted + 1))}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center ml-2 text-white ${repsCompleted >= currentExercise.reps ? 'bg-green-500 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'}`}
-                            disabled={repsCompleted >= currentExercise.reps}
-                          >
-                            +
-                          </button>
+                          <input
+                            type="number"
+                            min="0"
+                            max={currentExercise.reps}
+                            value={repsCompleted}
+                            onChange={handleRepsChange}
+                            className="w-16 h-10 px-2 rounded-md border border-gray-300 text-center font-bold text-blue-700 text-xl"
+                          />
+                          <span className="ml-2 text-gray-500">/ {currentExercise.reps}</span>
                         </div>
                       </div>
                       
