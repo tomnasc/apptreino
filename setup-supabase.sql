@@ -36,6 +36,23 @@ INSERT INTO app_settings (setting_key, setting_value, description)
 VALUES ('free_trial_days', '14', 'Número de dias para período de teste de usuários gratuitos')
 ON CONFLICT (setting_key) DO NOTHING;
 
+-- Criar tabela separada para indicar usuários admin (para evitar recursão)
+CREATE TABLE IF NOT EXISTS admin_users (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Função para verificar se o usuário atual é um admin
+CREATE OR REPLACE FUNCTION is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM admin_users
+    WHERE user_id = auth.uid()
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Habilitar RLS para tabela de perfis
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
@@ -53,14 +70,9 @@ DROP POLICY IF EXISTS "Administradores podem ver todos os perfis" ON user_profil
 CREATE POLICY "Administradores podem ver todos os perfis"
   ON user_profiles
   FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_profiles
-      WHERE id = auth.uid() AND plan_type = 'admin'
-    )
-  );
+  USING (is_admin());
 
--- Usuários podem atualizar seu próprio perfil (exceto plan_type)
+-- Usuários podem atualizar seu próprio perfil
 DROP POLICY IF EXISTS "Usuários podem atualizar seu próprio perfil" ON user_profiles;
 CREATE POLICY "Usuários podem atualizar seu próprio perfil"
   ON user_profiles
@@ -72,10 +84,7 @@ CREATE OR REPLACE FUNCTION prevent_plan_type_change()
 RETURNS TRIGGER AS $$
 BEGIN
   -- Se não for admin e tentar mudar o tipo de plano, reverte para o valor original
-  IF NOT EXISTS (
-    SELECT 1 FROM user_profiles 
-    WHERE id = auth.uid() AND plan_type = 'admin'
-  ) AND NEW.plan_type != OLD.plan_type THEN
+  IF NOT is_admin() AND NEW.plan_type != OLD.plan_type THEN
     RAISE EXCEPTION 'Não é permitido alterar o tipo de plano';
   END IF;
   
@@ -94,12 +103,23 @@ DROP POLICY IF EXISTS "Administradores podem atualizar todos os perfis" ON user_
 CREATE POLICY "Administradores podem atualizar todos os perfis"
   ON user_profiles
   FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_profiles
-      WHERE id = auth.uid() AND plan_type = 'admin'
-    )
-  );
+  USING (is_admin());
+
+-- Habilitar RLS para tabela de admin_users
+ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
+
+-- Políticas para admin_users
+DROP POLICY IF EXISTS "Apenas admins podem ver admin_users" ON admin_users;
+CREATE POLICY "Apenas admins podem ver admin_users"
+  ON admin_users
+  FOR SELECT
+  USING (is_admin());
+
+DROP POLICY IF EXISTS "Apenas admins podem gerenciar admin_users" ON admin_users;
+CREATE POLICY "Apenas admins podem gerenciar admin_users"
+  ON admin_users
+  FOR ALL
+  USING (is_admin());
 
 -- Configurar políticas para app_settings
 ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
@@ -109,12 +129,7 @@ DROP POLICY IF EXISTS "Administradores podem gerenciar configurações" ON app_s
 CREATE POLICY "Administradores podem gerenciar configurações"
   ON app_settings
   FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_profiles
-      WHERE id = auth.uid() AND plan_type = 'admin'
-    )
-  );
+  USING (is_admin());
 
 -- Todos os usuários podem ver configurações
 DROP POLICY IF EXISTS "Todos os usuários podem ver configurações" ON app_settings;
@@ -130,14 +145,26 @@ DECLARE
   user_plan user_plan_type;
   user_expiry TIMESTAMP WITH TIME ZONE;
   free_days INTEGER;
+  is_user_admin BOOLEAN;
 BEGIN
+  -- Verificar se é admin
+  SELECT EXISTS (
+    SELECT 1 FROM admin_users
+    WHERE user_id = auth.uid()
+  ) INTO is_user_admin;
+  
+  -- Administradores sempre têm acesso
+  IF is_user_admin THEN
+    RETURN TRUE;
+  END IF;
+  
   -- Obter o plano do usuário
   SELECT plan_type, expiry_date INTO user_plan, user_expiry
   FROM user_profiles
   WHERE id = auth.uid();
   
-  -- Administradores e usuários pagos sempre têm acesso
-  IF user_plan = 'admin' OR user_plan = 'paid' THEN
+  -- Usuários pagos sempre têm acesso
+  IF user_plan = 'paid' THEN
     RETURN TRUE;
   END IF;
   
@@ -216,4 +243,33 @@ INSERT INTO user_profiles (id, email, plan_type, start_date, expiry_date)
 SELECT id, email, 'free', NOW(), NOW() + INTERVAL '14 days'
 FROM auth.users
 WHERE id NOT IN (SELECT id FROM user_profiles)
-ON CONFLICT (id) DO NOTHING; 
+ON CONFLICT (id) DO NOTHING;
+
+-- Adicionar um usuário admin inicial (substitua pelo e-mail desejado)
+DO $$
+DECLARE
+  admin_id UUID;
+BEGIN
+  -- Procurar um usuário para tornar admin (exemplo com email específico)
+  -- Substitua 'admin@exemplo.com' pelo email desejado
+  SELECT id INTO admin_id FROM auth.users WHERE email = 'admin@exemplo.com' LIMIT 1;
+  
+  -- Se não encontrar, pegar o primeiro usuário registrado
+  IF admin_id IS NULL THEN
+    SELECT id INTO admin_id FROM auth.users ORDER BY created_at LIMIT 1;
+  END IF;
+  
+  -- Se tiver um usuário, defini-lo como admin
+  IF admin_id IS NOT NULL THEN
+    -- Adicionar na tabela admin_users
+    INSERT INTO admin_users (user_id)
+    VALUES (admin_id)
+    ON CONFLICT (user_id) DO NOTHING;
+    
+    -- Atualizar também na tabela de perfis
+    UPDATE user_profiles
+    SET plan_type = 'admin'
+    WHERE id = admin_id;
+  END IF;
+END
+$$; 
