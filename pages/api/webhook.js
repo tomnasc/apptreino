@@ -1,161 +1,219 @@
-import { createClient } from '@supabase/supabase-js';
-import Stripe from 'stripe';
 import { buffer } from 'micro';
+import Stripe from 'stripe';
+import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
-// Desativar o parsing de corpo padrão do Next.js
+// Desabilitar o parsing do corpo da requisição pelo Next.js
 export const config = {
   api: {
     bodyParser: false,
   },
 };
 
-// Função principal do webhook
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método não permitido' });
   }
 
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    return res.status(500).json({ error: 'Webhook secret não configurado' });
+  }
+
   try {
-    // Inicializar Stripe
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-    
-    // Obter o webhook secret
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    
-    // Obter o buffer bruto do corpo
-    const rawBody = await buffer(req);
-    
-    // Obter a assinatura do evento
+    // Obter o corpo da requisição como buffer
+    const buf = await buffer(req);
     const signature = req.headers['stripe-signature'];
     
-    if (!signature) {
-      return res.status(400).json({ error: 'Assinatura do webhook não fornecida' });
-    }
-    
-    // Verificar evento
+    // Verificar a assinatura do evento
     let event;
     try {
-      event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+      event = stripe.webhooks.constructEvent(
+        buf.toString(),
+        signature,
+        webhookSecret
+      );
     } catch (err) {
-      console.error(`Erro de verificação de webhook: ${err.message}`);
-      return res.status(400).json({ error: `Erro de verificação de webhook: ${err.message}` });
+      console.error(`Erro na assinatura do webhook: ${err.message}`);
+      return res.status(400).json({ error: 'Evento inválido' });
     }
-    
-    // Inicializar cliente Supabase
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY // Chave de serviço para operações administrativas
-    );
-    
-    // Lidar com os diferentes tipos de evento
+
+    // Criar cliente Supabase no servidor
+    const supabase = createServerSupabaseClient({ req, res });
+
+    // Processar eventos específicos
     switch (event.type) {
       case 'checkout.session.completed': {
-        const checkoutSession = event.data.object;
+        const session = event.data.object;
         
-        // Verificar se o pagamento foi bem-sucedido
-        if (checkoutSession.payment_status === 'paid') {
-          const userId = checkoutSession.client_reference_id || checkoutSession.metadata?.userId;
+        // Verificar se é um pagamento de assinatura
+        if (session.mode === 'subscription') {
+          const userId = session.client_reference_id || session.metadata?.userId;
           
           if (!userId) {
-            console.error('ID do usuário não encontrado no evento de checkout');
-            return res.status(400).json({ error: 'ID do usuário não encontrado' });
+            console.error('ID de usuário não encontrado no evento');
+            return res.status(400).json({ error: 'ID de usuário não encontrado' });
           }
           
-          // Calcular nova data de expiração (1 ano a partir de agora)
-          const now = new Date();
-          const expiryDate = new Date(now.setFullYear(now.getFullYear() + 1));
+          // Obter detalhes da assinatura
+          const subscription = await stripe.subscriptions.retrieve(session.subscription);
           
-          // Atualizar perfil do usuário
+          // Calcular data de expiração (1 ano a partir de agora, ou conforme definido na assinatura)
+          const currentDate = new Date();
+          let expiryDate = new Date();
+          expiryDate.setFullYear(currentDate.getFullYear() + 1); // Padrão é 1 ano
+          
+          if (subscription.current_period_end) {
+            expiryDate = new Date(subscription.current_period_end * 1000);
+          }
+          
+          // Atualizar perfil do usuário no Supabase
           const { error: updateError } = await supabase
             .from('user_profiles')
             .update({
               plan_type: 'paid',
-              subscription_id: checkoutSession.subscription,
-              subscription_status: 'active',
-              payment_status: 'paid',
-              last_payment_date: new Date().toISOString(),
+              subscription_id: subscription.id,
+              subscription_status: subscription.status,
               expiry_date: expiryDate.toISOString(),
+              last_payment_date: new Date().toISOString(),
+              updated_at: new Date().toISOString()
             })
             .eq('id', userId);
-            
+          
           if (updateError) {
-            console.error('Erro ao atualizar perfil após pagamento:', updateError);
-            return res.status(500).json({ error: 'Erro ao atualizar perfil' });
+            console.error('Erro ao atualizar perfil do usuário:', updateError);
+            return res.status(500).json({ error: 'Erro ao atualizar usuário' });
           }
           
-          // Registrar transação de pagamento
+          // Registrar a transação no histórico
           const { error: transactionError } = await supabase
             .from('payment_transactions')
             .insert({
               user_id: userId,
-              amount: checkoutSession.amount_total / 100, // Converter de centavos para reais
-              currency: checkoutSession.currency,
-              payment_method: 'stripe',
-              payment_id: checkoutSession.id,
-              status: 'completed',
-              description: 'Assinatura Premium - Anual',
+              transaction_id: session.id,
+              subscription_id: subscription.id,
+              amount: session.amount_total / 100, // Converter de centavos para unidade monetária
+              currency: session.currency,
+              status: 'success',
+              payment_method: session.payment_method_types[0],
+              created_at: new Date().toISOString()
             });
-            
+          
           if (transactionError) {
             console.error('Erro ao registrar transação:', transactionError);
-            // Continuar mesmo com erro no registro da transação
+            // Não retornamos erro aqui para não falhar o webhook, já que o usuário foi atualizado
           }
         }
         break;
       }
       
-      case 'invoice.paid': {
-        // Lidar com renovações de assinatura
+      case 'invoice.payment_succeeded': {
         const invoice = event.data.object;
         const subscriptionId = invoice.subscription;
         
         if (subscriptionId) {
-          // Obter detalhes da assinatura
+          // Buscar a assinatura para obter o ID do cliente
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-          const userId = subscription.metadata?.userId;
+          const customerId = subscription.customer;
+          
+          // Buscar o usuário pelo customer_id no Stripe
+          const { data: userData, error: userError } = await supabase
+            .from('user_profiles')
+            .select('id, subscription_id')
+            .eq('stripe_customer_id', customerId)
+            .maybeSingle();
+          
+          // Se não encontrarmos pelo customer_id, tentamos pelo subscription_id
+          let userId = userData?.id;
+          if (!userId && subscription.id) {
+            const { data: subData, error: subError } = await supabase
+              .from('user_profiles')
+              .select('id')
+              .eq('subscription_id', subscription.id)
+              .maybeSingle();
+              
+            userId = subData?.id;
+          }
           
           if (userId) {
-            // Calcular nova data de expiração (1 ano a partir de agora para renovações)
-            const now = new Date();
-            const expiryDate = new Date(now.setFullYear(now.getFullYear() + 1));
+            // Calcular nova data de expiração
+            const expiryDate = new Date(subscription.current_period_end * 1000);
             
             // Atualizar perfil do usuário
-            await supabase
+            const { error: updateError } = await supabase
               .from('user_profiles')
               .update({
                 plan_type: 'paid',
-                subscription_status: 'active',
-                payment_status: 'paid',
-                last_payment_date: new Date().toISOString(),
+                subscription_status: subscription.status,
                 expiry_date: expiryDate.toISOString(),
+                last_payment_date: new Date().toISOString(),
+                updated_at: new Date().toISOString()
               })
-              .eq('subscription_id', subscriptionId);
+              .eq('id', userId);
+              
+            if (updateError) {
+              console.error('Erro ao atualizar perfil após renovação:', updateError);
+            }
+            
+            // Registrar a transação
+            const { error: transactionError } = await supabase
+              .from('payment_transactions')
+              .insert({
+                user_id: userId,
+                transaction_id: invoice.id,
+                subscription_id: subscriptionId,
+                amount: invoice.amount_paid / 100,
+                currency: invoice.currency,
+                status: 'success',
+                payment_method: invoice.payment_method_type || 'unknown',
+                created_at: new Date().toISOString()
+              });
+              
+            if (transactionError) {
+              console.error('Erro ao registrar transação de renovação:', transactionError);
+            }
+          } else {
+            console.error('Usuário não encontrado para a assinatura:', subscriptionId);
           }
         }
         break;
       }
       
       case 'customer.subscription.deleted': {
-        // Lidar com cancelamentos de assinatura
         const subscription = event.data.object;
         
-        // Atualizar qualquer usuário com este ID de assinatura
-        await supabase
+        // Buscar o usuário pela assinatura
+        const { data: userData, error: userError } = await supabase
           .from('user_profiles')
-          .update({
-            subscription_status: 'canceled',
-            // Não alterar plan_type imediatamente para permitir acesso até o fim do período pago
-          })
-          .eq('subscription_id', subscription.id);
-        
+          .select('id')
+          .eq('subscription_id', subscription.id)
+          .maybeSingle();
+          
+        if (userData?.id) {
+          // Atualizar o status da assinatura para cancelado
+          const { error: updateError } = await supabase
+            .from('user_profiles')
+            .update({
+              subscription_status: 'canceled',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', userData.id);
+            
+          if (updateError) {
+            console.error('Erro ao atualizar status de assinatura cancelada:', updateError);
+          }
+        } else {
+          console.error('Usuário não encontrado para assinatura cancelada:', subscription.id);
+        }
         break;
       }
     }
-    
-    // Responder com sucesso
+
+    // Responder ao Stripe com sucesso
     res.status(200).json({ received: true });
   } catch (error) {
     console.error('Erro ao processar webhook:', error);
-    res.status(500).json({ error: 'Erro ao processar webhook' });
+    res.status(500).json({ error: 'Erro interno ao processar webhook' });
   }
 } 
