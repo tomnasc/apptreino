@@ -1,7 +1,7 @@
 const CACHE_NAME = 'apptreino-v1';
 const urlsToCache = [
   '/',
-  '/index.html',
+  // '/index.html', // Removido - não existe em aplicativos Next.js
   '/dashboard',
   '/manifest.json',
   '/favicon.ico',
