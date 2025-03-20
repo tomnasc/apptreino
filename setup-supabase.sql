@@ -79,6 +79,13 @@ CREATE POLICY "Usuários podem atualizar seu próprio perfil"
   FOR UPDATE
   USING (id = auth.uid());
 
+-- Popular perfis para usuários existentes
+INSERT INTO user_profiles (id, email, plan_type, start_date, expiry_date)
+SELECT id, email, 'free', NOW(), NOW() + INTERVAL '14 days'
+FROM auth.users
+WHERE id NOT IN (SELECT id FROM user_profiles)
+ON CONFLICT (id) DO NOTHING;
+
 -- Adicionar trigger para prevenir alteração do plan_type por usuários comuns
 CREATE OR REPLACE FUNCTION prevent_plan_type_change()
 RETURNS TRIGGER AS $$
@@ -137,6 +144,41 @@ CREATE POLICY "Todos os usuários podem ver configurações"
   ON app_settings
   FOR SELECT
   USING (true);
+
+-- Adicionar um usuário admin inicial (substitua pelo e-mail desejado)
+-- Desabilitar temporariamente os triggers para permitir a atualização
+ALTER TABLE user_profiles DISABLE TRIGGER ALL;
+
+DO $$
+DECLARE
+  admin_id UUID;
+BEGIN
+  -- Procurar um usuário para tornar admin (exemplo com email específico)
+  -- Substitua 'admin@exemplo.com' pelo email desejado
+  SELECT id INTO admin_id FROM auth.users WHERE email = 'admin@exemplo.com' LIMIT 1;
+  
+  -- Se não encontrar, pegar o primeiro usuário registrado
+  IF admin_id IS NULL THEN
+    SELECT id INTO admin_id FROM auth.users ORDER BY created_at LIMIT 1;
+  END IF;
+  
+  -- Se tiver um usuário, defini-lo como admin
+  IF admin_id IS NOT NULL THEN
+    -- Atualizar perfil para admin (sem verificação de triggers)
+    UPDATE user_profiles
+    SET plan_type = 'admin'
+    WHERE id = admin_id;
+    
+    -- Adicionar na tabela admin_users
+    INSERT INTO admin_users (user_id)
+    VALUES (admin_id)
+    ON CONFLICT (user_id) DO NOTHING;
+  END IF;
+END
+$$;
+
+-- Reabilitar os triggers
+ALTER TABLE user_profiles ENABLE TRIGGER ALL;
 
 -- Criar função para verificar se um usuário tem acesso à funcionalidade
 CREATE OR REPLACE FUNCTION check_user_access()
@@ -234,42 +276,6 @@ BEGIN
       AFTER INSERT ON auth.users
       FOR EACH ROW
       EXECUTE FUNCTION create_profile_for_new_user();
-  END IF;
-END
-$$;
-
--- Popular perfis para usuários existentes
-INSERT INTO user_profiles (id, email, plan_type, start_date, expiry_date)
-SELECT id, email, 'free', NOW(), NOW() + INTERVAL '14 days'
-FROM auth.users
-WHERE id NOT IN (SELECT id FROM user_profiles)
-ON CONFLICT (id) DO NOTHING;
-
--- Adicionar um usuário admin inicial (substitua pelo e-mail desejado)
-DO $$
-DECLARE
-  admin_id UUID;
-BEGIN
-  -- Procurar um usuário para tornar admin (exemplo com email específico)
-  -- Substitua 'admin@exemplo.com' pelo email desejado
-  SELECT id INTO admin_id FROM auth.users WHERE email = 'admin@exemplo.com' LIMIT 1;
-  
-  -- Se não encontrar, pegar o primeiro usuário registrado
-  IF admin_id IS NULL THEN
-    SELECT id INTO admin_id FROM auth.users ORDER BY created_at LIMIT 1;
-  END IF;
-  
-  -- Se tiver um usuário, defini-lo como admin
-  IF admin_id IS NOT NULL THEN
-    -- Adicionar na tabela admin_users
-    INSERT INTO admin_users (user_id)
-    VALUES (admin_id)
-    ON CONFLICT (user_id) DO NOTHING;
-    
-    -- Atualizar também na tabela de perfis
-    UPDATE user_profiles
-    SET plan_type = 'admin'
-    WHERE id = admin_id;
   END IF;
 END
 $$; 
