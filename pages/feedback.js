@@ -3,256 +3,269 @@ import { useRouter } from 'next/router';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { toast } from 'react-hot-toast';
 import Layout from '../components/Layout';
+import { FiSend, FiMessageCircle } from 'react-icons/fi';
 
-export default function FeedbackPage() {
+export default function Feedback() {
   const router = useRouter();
   const supabase = useSupabaseClient();
   const user = useUser();
   
-  const [feedbackType, setFeedbackType] = useState('bug');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [deviceInfo, setDeviceInfo] = useState('');
   const [loading, setLoading] = useState(false);
-  const [tableExists, setTableExists] = useState(true);
-  const [configuringTable, setConfiguringTable] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [feedbackHistory, setFeedbackHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [formValues, setFormValues] = useState({
+    subject: '',
+    category: 'sugestão',
+    message: ''
+  });
   
-  // Coletar informações do dispositivo automaticamente
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const info = [
-        `Navegador: ${navigator.userAgent}`,
-        `Tela: ${window.innerWidth}x${window.innerHeight}`,
-        `Sistema: ${navigator.platform}`
-      ].join('\n');
-      setDeviceInfo(info);
+    if (user) {
+      loadFeedbackHistory();
     }
-  }, []);
+  }, [user]);
   
-  // Verificar se a tabela de feedback existe
-  useEffect(() => {
-    const checkTable = async () => {
-      try {
-        const { error } = await supabase.from('user_feedback').select('id').limit(1);
-        if (error) {
-          console.log('Tabela de feedback não encontrada:', error.message);
-          setTableExists(false);
-        } else {
-          setTableExists(true);
-        }
-      } catch (err) {
-        console.error('Erro ao verificar tabela:', err);
-        setTableExists(false);
-      }
-    };
-    
-    checkTable();
-  }, [supabase]);
-  
-  // Função para configurar a tabela de feedback
-  const setupFeedbackTable = async () => {
-    setConfiguringTable(true);
-    
+  const loadFeedbackHistory = async () => {
     try {
-      const response = await fetch('/api/setup-feedback-table', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+      setLoading(true);
       
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.message || 'Erro ao configurar tabela');
-      }
-      
-      toast.success('Tabela configurada com sucesso!');
-      setTableExists(true);
-    } catch (error) {
-      console.error('Erro ao configurar tabela:', error);
-      toast.error('Erro ao configurar tabela. Tente novamente mais tarde.');
-    } finally {
-      setConfiguringTable(false);
-    }
-  };
-  
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!title.trim() || !description.trim()) {
-      toast.error('Por favor, preencha todos os campos obrigatórios');
-      return;
-    }
-    
-    setLoading(true);
-    
-    try {
-      // Criar registro na tabela de feedback
       const { data, error } = await supabase
         .from('user_feedback')
-        .insert([
-          {
-            user_id: user?.id,
-            email: user?.email,
-            feedback_type: feedbackType,
-            title,
-            description,
-            device_info: deviceInfo,
-            status: 'pendente'
-          }
-        ]);
-      
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+        
       if (error) throw error;
       
-      toast.success('Feedback enviado com sucesso!');
-      
-      // Limpar o formulário
-      setTitle('');
-      setDescription('');
-      setFeedbackType('bug');
-      
-      // Redirecionar para o dashboard após 2 segundos
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 2000);
-      
+      setFeedbackHistory(data || []);
     } catch (error) {
-      console.error('Erro ao enviar feedback:', error);
-      toast.error('Erro ao enviar feedback. Tente novamente.');
+      console.error('Erro ao carregar histórico de feedback:', error);
     } finally {
       setLoading(false);
     }
   };
   
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormValues({ ...formValues, [name]: value });
+  };
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formValues.subject.trim() || !formValues.message.trim()) {
+      toast.error('Por favor, preencha todos os campos obrigatórios');
+      return;
+    }
+    
+    try {
+      setSubmitting(true);
+      
+      const { data, error } = await supabase
+        .from('user_feedback')
+        .insert({
+          user_id: user.id,
+          subject: formValues.subject,
+          category: formValues.category,
+          message: formValues.message
+        });
+        
+      if (error) throw error;
+      
+      toast.success('Feedback enviado com sucesso! Obrigado pela sua contribuição.');
+      setFormValues({
+        subject: '',
+        category: 'sugestão',
+        message: ''
+      });
+      
+      // Recarregar o histórico
+      await loadFeedbackHistory();
+      setShowHistory(true);
+    } catch (error) {
+      console.error('Erro ao enviar feedback:', error);
+      toast.error('Erro ao enviar feedback. Por favor, tente novamente.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+  
+  if (!user) {
+    return (
+      <Layout>
+        <div className="flex justify-center items-center h-[70vh]">
+          <div className="text-center">
+            <p className="mb-4 text-lg">Você precisa estar logado para enviar feedback.</p>
+            <button 
+              onClick={() => router.push('/login')}
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+            >
+              Fazer Login
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+  
   return (
-    <Layout title="Feedback">
-      <div className="max-w-xl mx-auto bg-white shadow-md rounded-lg overflow-hidden">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-6">Enviar Feedback</h1>
-          
-          {!tableExists ? (
-            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-              <h3 className="text-lg font-medium text-yellow-800 mb-2">Configuração necessária</h3>
-              <p className="text-sm text-yellow-700 mb-4">
-                A tabela de feedback ainda não foi configurada. Clique no botão abaixo para criar a estrutura necessária.
-              </p>
-              <button
-                onClick={setupFeedbackTable}
-                disabled={configuringTable}
-                className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 disabled:opacity-50"
-              >
-                {configuringTable ? 'Configurando...' : 'Configurar Tabela de Feedback'}
-              </button>
-            </div>
-          ) : (
+    <Layout>
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Envie seu Feedback</h1>
+          <p className="text-gray-600">
+            Compartilhe suas sugestões, dúvidas ou relate problemas. Sua opinião é importante para que possamos melhorar sua experiência.
+          </p>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Formulário de Feedback */}
+          <div className="bg-white rounded-lg shadow-md p-6">
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">
-                  Tipo de Feedback
-                </label>
-                <div className="flex space-x-4">
-                  <label className="inline-flex items-center">
-                    <input
-                      type="radio"
-                      className="form-radio text-blue-500"
-                      name="feedbackType"
-                      value="bug"
-                      checked={feedbackType === 'bug'}
-                      onChange={() => setFeedbackType('bug')}
-                    />
-                    <span className="ml-2">Reportar Erro</span>
-                  </label>
-                  <label className="inline-flex items-center">
-                    <input
-                      type="radio"
-                      className="form-radio text-blue-500"
-                      name="feedbackType"
-                      value="feature"
-                      checked={feedbackType === 'feature'}
-                      onChange={() => setFeedbackType('feature')}
-                    />
-                    <span className="ml-2">Sugestão</span>
-                  </label>
-                  <label className="inline-flex items-center">
-                    <input
-                      type="radio"
-                      className="form-radio text-blue-500"
-                      name="feedbackType"
-                      value="other"
-                      checked={feedbackType === 'other'}
-                      onChange={() => setFeedbackType('other')}
-                    />
-                    <span className="ml-2">Outro</span>
-                  </label>
-                </div>
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">
-                  Título *
+                <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">
+                  Assunto <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder={feedbackType === 'bug' ? "Ex: Erro ao iniciar treino" : "Ex: Adicionar novo recurso"}
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  id="subject"
+                  name="subject"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Título para seu feedback"
+                  value={formValues.subject}
+                  onChange={handleInputChange}
                   required
                 />
               </div>
               
               <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">
-                  Descrição *
+                <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+                  Categoria
                 </label>
-                <textarea
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows="5"
-                  placeholder={feedbackType === 'bug' 
-                    ? "Descreva o erro em detalhes. O que aconteceu? O que você estava fazendo quando ocorreu?" 
-                    : "Descreva sua sugestão em detalhes"
-                  }
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  required
-                />
+                <select
+                  id="category"
+                  name="category"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={formValues.category}
+                  onChange={handleInputChange}
+                >
+                  <option value="sugestão">Sugestão</option>
+                  <option value="dúvida">Dúvida</option>
+                  <option value="problema">Problema</option>
+                  <option value="elogio">Elogio</option>
+                  <option value="outro">Outro</option>
+                </select>
               </div>
               
               <div className="mb-6">
-                <label className="block text-gray-700 text-sm font-bold mb-2">
-                  Informações do Dispositivo (preenchido automaticamente)
+                <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">
+                  Mensagem <span className="text-red-500">*</span>
                 </label>
                 <textarea
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
-                  rows="3"
-                  value={deviceInfo}
-                  onChange={(e) => setDeviceInfo(e.target.value)}
-                  readOnly
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Estas informações nos ajudam a diagnosticar problemas no aplicativo.
-                </p>
+                  id="message"
+                  name="message"
+                  rows="6"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Descreva em detalhes sua sugestão, dúvida ou problema..."
+                  value={formValues.message}
+                  onChange={handleInputChange}
+                  required
+                ></textarea>
               </div>
               
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => router.back()}
-                  className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
-                >
-                  Cancelar
-                </button>
+              <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
-                  disabled={loading}
+                  className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  disabled={submitting}
                 >
-                  {loading ? 'Enviando...' : 'Enviar Feedback'}
+                  {submitting ? (
+                    <span className="inline-block animate-spin h-4 w-4 border-2 border-t-transparent border-white rounded-full mr-2"></span>
+                  ) : (
+                    <FiSend className="mr-2" />
+                  )}
+                  {submitting ? 'Enviando...' : 'Enviar Feedback'}
                 </button>
               </div>
             </form>
-          )}
+          </div>
+          
+          {/* Histórico de Feedback */}
+          <div>
+            <div className="flex items-center mb-4">
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className="flex items-center text-blue-600 hover:text-blue-800 font-medium"
+              >
+                <FiMessageCircle className="mr-2" />
+                {showHistory ? 'Ocultar histórico' : 'Ver meu histórico de feedback'}
+              </button>
+              {loading && (
+                <span className="ml-3 inline-block animate-spin h-4 w-4 border-2 border-t-transparent border-blue-500 rounded-full"></span>
+              )}
+            </div>
+            
+            {showHistory && (
+              <div className="space-y-4">
+                {feedbackHistory.length > 0 ? (
+                  feedbackHistory.map((feedback) => (
+                    <div
+                      key={feedback.id}
+                      className={`bg-white rounded-lg shadow-sm p-4 border-l-4 ${
+                        feedback.response ? 'border-green-500' : 'border-yellow-500'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="font-medium text-gray-800">{feedback.subject}</div>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          feedback.response 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {feedback.response ? 'Respondido' : 'Pendente'}
+                        </span>
+                      </div>
+                      
+                      <div className="text-xs text-gray-500 mb-2">
+                        Enviado em {formatDate(feedback.created_at)}
+                      </div>
+                      
+                      <div className="text-sm text-gray-700 mb-3 whitespace-pre-line">
+                        {feedback.message}
+                      </div>
+                      
+                      {feedback.response && (
+                        <div className="bg-gray-50 p-3 rounded-md mt-3">
+                          <div className="text-xs text-gray-500 mb-1">
+                            Resposta em {feedback.response_date ? formatDate(feedback.response_date) : 'data desconhecida'}
+                          </div>
+                          <div className="text-sm text-gray-700 whitespace-pre-line">
+                            {feedback.response}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="bg-white rounded-lg shadow-sm p-4 text-center text-gray-500">
+                    Você ainda não enviou nenhum feedback.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </Layout>
