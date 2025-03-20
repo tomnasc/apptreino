@@ -16,13 +16,13 @@ export default async function handler(req, res) {
   try {
     console.log('Iniciando configuração de perfis de usuário...');
     
-    // SQL para criar a tabela de perfis e configurar perfis padrão
-    const setupSQL = `
-      -- Criar enum para tipos de plano
-      CREATE TYPE IF NOT EXISTS user_plan_type AS ENUM ('admin', 'paid', 'free');
+    // Lista de comandos SQL para executar sequencialmente
+    const sqlCommands = [
+      // Criar enum para tipos de plano
+      `CREATE TYPE IF NOT EXISTS user_plan_type AS ENUM ('admin', 'paid', 'free');`,
       
-      -- Criar tabela de perfis de usuário
-      CREATE TABLE IF NOT EXISTS user_profiles (
+      // Criar tabela de perfis de usuário
+      `CREATE TABLE IF NOT EXISTS user_profiles (
         id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
         email TEXT,
         full_name TEXT,
@@ -31,38 +31,35 @@ export default async function handler(req, res) {
         expiry_date TIMESTAMP WITH TIME ZONE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
+      );`,
       
-      -- Criar tabela para configurações globais do aplicativo
-      CREATE TABLE IF NOT EXISTS app_settings (
+      // Criar tabela para configurações globais do aplicativo
+      `CREATE TABLE IF NOT EXISTS app_settings (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         setting_key TEXT UNIQUE NOT NULL,
         setting_value TEXT,
         description TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
+      );`,
       
-      -- Inserir configuração padrão para tempo de teste dos usuários gratuitos (em dias)
-      INSERT INTO app_settings (setting_key, setting_value, description)
+      // Inserir configuração padrão
+      `INSERT INTO app_settings (setting_key, setting_value, description)
       VALUES ('free_trial_days', '14', 'Número de dias para período de teste de usuários gratuitos')
-      ON CONFLICT (setting_key) DO NOTHING;
+      ON CONFLICT (setting_key) DO NOTHING;`,
       
-      -- Habilitar RLS para tabela de perfis
-      ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+      // Habilitar RLS para tabela de perfis
+      `ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;`,
       
-      -- Configurar políticas de segurança para perfis
-      
-      -- Usuários podem ver seu próprio perfil
-      DROP POLICY IF EXISTS "Usuários podem ver seu próprio perfil" ON user_profiles;
-      CREATE POLICY "Usuários podem ver seu próprio perfil"
+      // Políticas para user_profiles
+      `DROP POLICY IF EXISTS "Usuários podem ver seu próprio perfil" ON user_profiles;`,
+      `CREATE POLICY "Usuários podem ver seu próprio perfil"
         ON user_profiles
         FOR SELECT
-        USING (id = auth.uid());
-      
-      -- Administradores podem ver todos os perfis
-      DROP POLICY IF EXISTS "Administradores podem ver todos os perfis" ON user_profiles;
-      CREATE POLICY "Administradores podem ver todos os perfis"
+        USING (id = auth.uid());`,
+        
+      `DROP POLICY IF EXISTS "Administradores podem ver todos os perfis" ON user_profiles;`,
+      `CREATE POLICY "Administradores podem ver todos os perfis"
         ON user_profiles
         FOR SELECT
         USING (
@@ -70,19 +67,17 @@ export default async function handler(req, res) {
             SELECT 1 FROM user_profiles
             WHERE id = auth.uid() AND plan_type = 'admin'
           )
-        );
-      
-      -- Usuários podem atualizar seu próprio perfil (exceto plan_type)
-      DROP POLICY IF EXISTS "Usuários podem atualizar seu próprio perfil" ON user_profiles;
-      CREATE POLICY "Usuários podem atualizar seu próprio perfil"
+        );`,
+        
+      `DROP POLICY IF EXISTS "Usuários podem atualizar seu próprio perfil" ON user_profiles;`,
+      `CREATE POLICY "Usuários podem atualizar seu próprio perfil"
         ON user_profiles
         FOR UPDATE
         USING (id = auth.uid())
-        WITH CHECK (id = auth.uid() AND plan_type = OLD.plan_type);
-      
-      -- Administradores podem atualizar todos os perfis
-      DROP POLICY IF EXISTS "Administradores podem atualizar todos os perfis" ON user_profiles;
-      CREATE POLICY "Administradores podem atualizar todos os perfis"
+        WITH CHECK (id = auth.uid() AND plan_type = OLD.plan_type);`,
+        
+      `DROP POLICY IF EXISTS "Administradores podem atualizar todos os perfis" ON user_profiles;`,
+      `CREATE POLICY "Administradores podem atualizar todos os perfis"
         ON user_profiles
         FOR UPDATE
         USING (
@@ -90,14 +85,13 @@ export default async function handler(req, res) {
             SELECT 1 FROM user_profiles
             WHERE id = auth.uid() AND plan_type = 'admin'
           )
-        );
-      
-      -- Configurar políticas para app_settings
-      ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
-      
-      -- Administradores podem ver e modificar configurações
-      DROP POLICY IF EXISTS "Administradores podem gerenciar configurações" ON app_settings;
-      CREATE POLICY "Administradores podem gerenciar configurações"
+        );`,
+        
+      // Configurar políticas para app_settings
+      `ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;`,
+        
+      `DROP POLICY IF EXISTS "Administradores podem gerenciar configurações" ON app_settings;`,
+      `CREATE POLICY "Administradores podem gerenciar configurações"
         ON app_settings
         FOR ALL
         USING (
@@ -105,17 +99,16 @@ export default async function handler(req, res) {
             SELECT 1 FROM user_profiles
             WHERE id = auth.uid() AND plan_type = 'admin'
           )
-        );
-      
-      -- Todos os usuários podem ver configurações
-      DROP POLICY IF EXISTS "Todos os usuários podem ver configurações" ON app_settings;
-      CREATE POLICY "Todos os usuários podem ver configurações"
+        );`,
+        
+      `DROP POLICY IF EXISTS "Todos os usuários podem ver configurações" ON app_settings;`,
+      `CREATE POLICY "Todos os usuários podem ver configurações"
         ON app_settings
         FOR SELECT
-        USING (true);
-      
-      -- Criar função para verificar se um usuário tem acesso à funcionalidade
-      CREATE OR REPLACE FUNCTION check_user_access()
+        USING (true);`,
+        
+      // Criar funções
+      `CREATE OR REPLACE FUNCTION check_user_access()
       RETURNS BOOLEAN AS $$
       DECLARE
         user_plan user_plan_type;
@@ -149,25 +142,23 @@ export default async function handler(req, res) {
         -- Por padrão, negar acesso
         RETURN FALSE;
       END;
-      $$ LANGUAGE plpgsql SECURITY DEFINER;
-      
-      -- Trigger para atualizar a data de atualização de perfis
-      CREATE OR REPLACE FUNCTION update_profile_timestamp()
+      $$ LANGUAGE plpgsql SECURITY DEFINER;`,
+        
+      `CREATE OR REPLACE FUNCTION update_profile_timestamp()
       RETURNS TRIGGER AS $$
       BEGIN
         NEW.updated_at = NOW();
         RETURN NEW;
       END;
-      $$ LANGUAGE plpgsql;
-      
-      DROP TRIGGER IF EXISTS update_profiles_timestamp ON user_profiles;
-      CREATE TRIGGER update_profiles_timestamp
+      $$ LANGUAGE plpgsql;`,
+        
+      `DROP TRIGGER IF EXISTS update_profiles_timestamp ON user_profiles;`,
+      `CREATE TRIGGER update_profiles_timestamp
         BEFORE UPDATE ON user_profiles
         FOR EACH ROW
-        EXECUTE FUNCTION update_profile_timestamp();
-      
-      -- Trigger para criar perfil automaticamente na criação de usuário
-      CREATE OR REPLACE FUNCTION create_profile_for_new_user()
+        EXECUTE FUNCTION update_profile_timestamp();`,
+        
+      `CREATE OR REPLACE FUNCTION create_profile_for_new_user()
       RETURNS TRIGGER AS $$
       DECLARE
         free_days INTEGER;
@@ -186,10 +177,9 @@ export default async function handler(req, res) {
         
         RETURN NEW;
       END;
-      $$ LANGUAGE plpgsql SECURITY DEFINER;
-      
-      -- Verificar se o trigger já existe
-      DO $$
+      $$ LANGUAGE plpgsql SECURITY DEFINER;`,
+        
+      `DO $$
       BEGIN
         IF NOT EXISTS (
           SELECT 1 FROM pg_trigger WHERE tgname = 'create_profile_on_signup'
@@ -200,42 +190,63 @@ export default async function handler(req, res) {
             EXECUTE FUNCTION create_profile_for_new_user();
         END IF;
       END
-      $$;
-    `;
+      $$;`,
+      
+      // Popular perfis para usuários existentes
+      `INSERT INTO user_profiles (id, email, plan_type, start_date, expiry_date)
+      SELECT id, email, 'free', NOW(), NOW() + INTERVAL '14 days'
+      FROM auth.users
+      WHERE id NOT IN (SELECT id FROM user_profiles)
+      ON CONFLICT (id) DO NOTHING;`
+    ];
 
     try {
-      // Executar SQL diretamente
+      // Executar comandos SQL sequencialmente
+      for (const sql of sqlCommands) {
+        try {
+          const { error } = await supabase.rpc('execute_sql', { sql });
+          
+          if (error) {
+            console.warn('Aviso ao executar SQL:', sql, error);
+            // Continuar mesmo com erro em alguns comandos (podem já existir)
+          }
+        } catch (cmdError) {
+          console.warn('Erro ao executar comando:', cmdError);
+          // Continuar mesmo com erro em alguns comandos
+        }
+      }
+      
+      // Verificar se a tabela user_profiles foi criada com sucesso
       const { data, error } = await supabase
-        .from('_exec_sql')
-        .select('*')
-        .rpc('query', { query: setupSQL });
-        
+        .from('user_profiles')
+        .select('id')
+        .limit(1);
+      
       if (error) {
-        console.error('Erro ao executar SQL:', error);
         return res.status(500).json({
-          error: 'Erro ao configurar perfis de usuário',
+          error: 'Tabela user_profiles não foi criada corretamente',
           message: error.message
         });
       }
       
-      // Verificar se existem administradores, se não, criar o primeiro admin
+      // Definir o administrador se fornecido
       if (req.body && req.body.adminEmail) {
-        const { data: user, error: userError } = await supabase
-          .from('auth.users')
-          .select('id')
-          .eq('email', req.body.adminEmail)
-          .single();
+        try {
+          const { data: userData, error: userError } = await supabase.auth.admin
+            .getUserByEmail(req.body.adminEmail);
           
-        if (user && !userError) {
-          // Atualizar usuário para admin
-          const { error: updateError } = await supabase
-            .from('user_profiles')
-            .update({ plan_type: 'admin' })
-            .eq('id', user.id);
-            
-          if (updateError) {
-            console.error('Erro ao definir admin:', updateError);
+          if (userData && !userError) {
+            const { error: updateError } = await supabase
+              .from('user_profiles')
+              .update({ plan_type: 'admin' })
+              .eq('id', userData.id);
+              
+            if (updateError) {
+              console.error('Erro ao definir admin:', updateError);
+            }
           }
+        } catch (adminError) {
+          console.error('Erro ao configurar admin:', adminError);
         }
       }
       
@@ -246,26 +257,29 @@ export default async function handler(req, res) {
     } catch (sqlError) {
       console.error('Erro ao executar SQL:', sqlError);
       
-      // Tentar método alternativo - verificar se as tabelas existem
+      // Verificar se a tabela foi criada mesmo com erros
       try {
-        // Verificar se a tabela de perfis existe
-        const { error: checkError } = await supabase
+        const { data, error } = await supabase
           .from('user_profiles')
           .select('id')
           .limit(1);
-          
-        return res.status(200).json({
-          message: checkError 
-            ? 'Criação de perfis falhou, por favor tente novamente' 
-            : 'Perfis verificados com sucesso',
-          error: checkError ? checkError.message : null
-        });
         
-      } catch (fallbackError) {
+        if (!error) {
+          return res.status(200).json({
+            message: 'Perfis de usuário configurados parcialmente',
+            warning: sqlError.message
+          });
+        } else {
+          return res.status(500).json({
+            error: 'Falha ao configurar perfis de usuário',
+            message: error.message
+          });
+        }
+      } catch (checkError) {
         return res.status(500).json({
-          error: 'Erro em todas as tentativas de configuração',
+          error: 'Erro ao verificar configuração',
           message: sqlError.message,
-          fallbackError: fallbackError.message
+          checkError: checkError.message
         });
       }
     }
