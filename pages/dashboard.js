@@ -14,6 +14,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
   const [isConfiguring, setIsConfiguring] = useState(false);
+  const [stripePriceId, setStripePriceId] = useState('');
   const [userAccessInfo, setUserAccessInfo] = useState({
     hasAccess: true,
     message: '',
@@ -25,8 +26,26 @@ export default function DashboardPage() {
     if (user) {
       fetchData();
       checkAccess();
+      fetchPriceId();
     }
   }, [user]);
+
+  // Buscar o ID do preço do Stripe
+  const fetchPriceId = async () => {
+    try {
+      const response = await fetch('/api/get-price-id');
+      const data = await response.json();
+      
+      if (response.ok && data.priceId) {
+        setStripePriceId(data.priceId);
+        console.log('ID do preço do Stripe carregado:', data.priceId);
+      } else {
+        console.error('Erro ao buscar ID do preço:', data.error || 'Resposta inválida');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar ID do preço:', error);
+    }
+  };
 
   // Verificar acesso do usuário
   const checkAccess = async () => {
@@ -252,9 +271,10 @@ export default function DashboardPage() {
             </div>
             {(!userAccessInfo.hasAccess || userAccessInfo.daysLeft < 3) && userAccessInfo.planType !== 'paid' && (
               <PaymentButton 
-                buttonText="Fazer Upgrade" 
-                variant={!userAccessInfo.hasAccess ? 'danger' : 'primary'} 
-                className="text-xs px-2 py-1"
+                buttonText="Assinar plano Premium" 
+                className="mt-4 w-full sm:w-auto" 
+                variant="primary"
+                priceId={stripePriceId}  
               />
             )}
           </div>
@@ -530,6 +550,7 @@ export default function DashboardPage() {
           <PaymentButton
             buttonText="Fazer Upgrade Agora"
             variant="danger"
+            priceId={stripePriceId}
           />
         </div>
       )}

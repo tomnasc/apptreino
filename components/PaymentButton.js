@@ -1,13 +1,27 @@
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 
-export default function PaymentButton({ className, buttonText = 'Assinar Premium', variant = 'primary', priceId = 'price_1P4U5PLKjRFwjxJpXvD1hMiM' }) {
+export default function PaymentButton({ 
+  className, 
+  buttonText = 'Assinar Premium', 
+  variant = 'primary', 
+  priceId 
+}) {
   const [loading, setLoading] = useState(false);
 
   const handlePaymentClick = async () => {
+    // Validar se o priceId foi fornecido
+    if (!priceId) {
+      console.error('Erro: priceId não foi fornecido ao PaymentButton');
+      toast.error('Configuração incompleta do botão de pagamento', { id: 'checkout' });
+      return;
+    }
+
     try {
       setLoading(true);
       toast.loading('Preparando checkout...', { id: 'checkout' });
+      
+      console.log('Iniciando checkout com priceId:', priceId);
       
       // Usar o endpoint que aceita priceId diretamente
       const response = await fetch('/api/create-checkout-session-direct', {
