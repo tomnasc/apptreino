@@ -244,17 +244,17 @@ export default function Feedback() {
                     <div
                       key={feedback.id}
                       className={`bg-white rounded-lg shadow-sm p-4 border-l-4 ${
-                        feedback.response ? 'border-green-500' : 'border-yellow-500'
+                        feedback.status === 'responded' ? 'border-green-500' : 'border-yellow-500'
                       }`}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <div className="font-medium text-gray-800">{feedback.subject || feedback.title || 'Sem assunto'}</div>
                         <span className={`text-xs px-2 py-1 rounded-full ${
-                          feedback.response 
+                          feedback.status === 'responded' 
                             ? 'bg-green-100 text-green-800' 
                             : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {feedback.response ? 'Respondido' : 'Pendente'}
+                          {feedback.status === 'responded' ? 'Respondido' : 'Pendente'}
                         </span>
                       </div>
                       
@@ -266,13 +266,13 @@ export default function Feedback() {
                         {feedback.message}
                       </div>
                       
-                      {feedback.response && (
+                      {feedback.status === 'responded' && feedback.answer && (
                         <div className="bg-gray-50 p-3 rounded-md mt-3">
                           <div className="text-xs text-gray-500 mb-1">
                             Resposta em {feedback.response_date ? formatDate(feedback.response_date) : 'data desconhecida'}
                           </div>
                           <div className="text-sm text-gray-700 whitespace-pre-line">
-                            {feedback.response}
+                            {feedback.answer}
                           </div>
                         </div>
                       )}

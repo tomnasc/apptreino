@@ -61,9 +61,9 @@ export default function AdminFeedback() {
         .order('created_at', { ascending: false });
         
       if (filter === 'pending') {
-        query = query.is('response', null);
+        query = query.eq('status', 'pending');
       } else if (filter === 'responded') {
-        query = query.not('response', 'is', null);
+        query = query.eq('status', 'responded');
       }
       
       const { data, error } = await query;
@@ -102,7 +102,7 @@ export default function AdminFeedback() {
   
   const handleSelectFeedback = (feedback) => {
     setSelectedFeedback(feedback);
-    setReplyMessage(feedback.response || '');
+    setReplyMessage(feedback.answer || '');
     setShowReplyForm(true);
   };
   
@@ -124,7 +124,7 @@ export default function AdminFeedback() {
       const { error } = await supabase
         .from('user_feedback')
         .update({
-          response: replyMessage,
+          answer: replyMessage,
           response_date: new Date().toISOString(),
           responded_by: user.id,
           status: 'responded'
@@ -241,7 +241,7 @@ export default function AdminFeedback() {
                 <div 
                   key={feedback.id} 
                   className={`bg-white rounded-lg shadow p-4 border-l-4 ${
-                    feedback.response ? 'border-green-500' : 'border-yellow-500'
+                    feedback.status === 'responded' ? 'border-green-500' : 'border-yellow-500'
                   }`}
                 >
                   <div className="flex justify-between items-start mb-2">
@@ -251,11 +251,11 @@ export default function AdminFeedback() {
                     </div>
                     <div>
                       <span className={`text-xs px-2 py-1 rounded-full ${
-                        feedback.response 
+                        feedback.status === 'responded' 
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
-                        {feedback.response ? 'Respondido' : 'Pendente'}
+                        {feedback.status === 'responded' ? 'Respondido' : 'Pendente'}
                       </span>
                     </div>
                   </div>
@@ -265,12 +265,12 @@ export default function AdminFeedback() {
                     <p className="text-gray-700 whitespace-pre-line">{feedback.message}</p>
                   </div>
                   
-                  {feedback.response && (
+                  {feedback.status === 'responded' && feedback.answer && (
                     <div className="bg-gray-50 p-3 rounded-md mb-3">
                       <div className="text-xs text-gray-500 mb-1">
                         Resposta em {feedback.response_date ? formatDate(feedback.response_date) : 'data desconhecida'}
                       </div>
-                      <p className="text-gray-700 whitespace-pre-line">{feedback.response}</p>
+                      <p className="text-gray-700 whitespace-pre-line">{feedback.answer}</p>
                     </div>
                   )}
                   
@@ -278,12 +278,12 @@ export default function AdminFeedback() {
                     <button
                       onClick={() => handleSelectFeedback(feedback)}
                       className={`flex items-center text-sm px-3 py-1 rounded ${
-                        feedback.response 
+                        feedback.status === 'responded' 
                           ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' 
                           : 'bg-blue-500 text-white hover:bg-blue-600'
                       }`}
                     >
-                      {feedback.response ? (
+                      {feedback.status === 'responded' ? (
                         <>
                           <FiMessageCircle className="mr-1" />
                           Ver Resposta
@@ -318,7 +318,7 @@ export default function AdminFeedback() {
             <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-start mb-4">
                 <h3 className="text-lg font-bold">
-                  {selectedFeedback.response ? 'Visualizar Feedback' : 'Responder Feedback'}
+                  {selectedFeedback.status === 'responded' ? 'Visualizar Feedback' : 'Responder Feedback'}
                 </h3>
                 <button 
                   onClick={handleClose}
@@ -367,7 +367,7 @@ export default function AdminFeedback() {
                   ) : (
                     <FiSend className="mr-2" />
                   )}
-                  {selectedFeedback.response ? 'Atualizar Resposta' : 'Enviar Resposta'}
+                  {selectedFeedback.status === 'responded' ? 'Atualizar Resposta' : 'Enviar Resposta'}
                 </button>
               </div>
             </div>
