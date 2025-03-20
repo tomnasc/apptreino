@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     
     // Obter informações do usuário com tratamento de erro aprimorado
-    const { data: userData, error: userError } = await supabase
+    let { data: userData, error: userError } = await supabase
       .from('user_profiles')
       .select('id, stripe_customer_id, first_name, last_name, plan_type')
       .eq('id', session.user.id)
