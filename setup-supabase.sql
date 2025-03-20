@@ -1,8 +1,13 @@
 -- Script para ser executado no editor SQL do Supabase
 -- Este script configura o sistema de tipos de usuário para o App Treino
 
--- Criar enum para tipos de plano
-CREATE TYPE IF NOT EXISTS user_plan_type AS ENUM ('admin', 'paid', 'free');
+-- Criar enum para tipos de plano (verificando primeiro se já existe)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_plan_type') THEN
+        CREATE TYPE user_plan_type AS ENUM ('admin', 'paid', 'free');
+    END IF;
+END$$;
 
 -- Criar tabela de perfis de usuário
 CREATE TABLE IF NOT EXISTS user_profiles (
