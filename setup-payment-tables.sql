@@ -95,9 +95,10 @@ WHERE
    column_name = 'payment_status' OR 
    column_name = 'last_payment_date');
 
+-- Correção dos nomes das colunas na consulta de verificação de políticas
 SELECT 
-  table_name, 
-  policy_name 
+  tablename, 
+  policyname 
 FROM 
   pg_policies 
 WHERE 
