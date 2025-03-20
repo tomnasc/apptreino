@@ -29,6 +29,16 @@ export default async function handler(req, res) {
         details: 'Variável de ambiente STRIPE_SECRET_KEY não está definida' 
       });
     }
+
+    // Verificar se o price_id do Stripe está configurado
+    const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID;
+    if (!STRIPE_PRICE_ID) {
+      console.error('STRIPE_PRICE_ID não está definido');
+      return res.status(500).json({
+        error: 'Configuração incompleta',
+        details: 'ID do preço do Stripe não configurado'
+      });
+    }
     
     console.log('Criando cliente Supabase...');
     
@@ -60,24 +70,14 @@ export default async function handler(req, res) {
       apiVersion: '2023-10-16', // Especificar versão da API
     });
     
-    console.log('Criando sessão de checkout...');
+    console.log('Criando sessão de checkout com o price_id:', STRIPE_PRICE_ID);
     
-    // Tentar criar uma sessão de checkout simples, sem criar cliente ou processar perfil
+    // Criar sessão de checkout usando o price_id pré-configurado
     const checkoutSession = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price_data: {
-            currency: 'brl',
-            product_data: {
-              name: 'Plano Premium Treino na Mão',
-              description: 'Acesso a todos os recursos do Treino na Mão por 1 ano',
-            },
-            unit_amount: 9900, // R$ 99,00 (em centavos)
-            recurring: {
-              interval: 'year',
-            },
-          },
+          price: STRIPE_PRICE_ID, // Usar o price_id pré-configurado
           quantity: 1,
         },
       ],
