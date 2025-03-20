@@ -61,13 +61,36 @@ export default function AdminDashboard() {
   // Carregar estatísticas para o dashboard de administração
   const loadStats = async () => {
     try {
-      // Contar usuários por tipo
-      const { data: userStats, error: userError } = await supabase
+      // Obter contagem total de usuários
+      const { count: totalUsers, error: totalError } = await supabase
         .from('user_profiles')
-        .select('plan_type, count')
-        .group('plan_type');
+        .select('*', { count: 'exact', head: true });
       
-      if (userError) throw userError;
+      if (totalError) throw totalError;
+      
+      // Contar usuários admin
+      const { count: adminUsers, error: adminError } = await supabase
+        .from('user_profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('plan_type', 'admin');
+      
+      if (adminError) throw adminError;
+      
+      // Contar usuários pagos
+      const { count: paidUsers, error: paidError } = await supabase
+        .from('user_profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('plan_type', 'paid');
+      
+      if (paidError) throw paidError;
+      
+      // Contar usuários gratuitos
+      const { count: freeUsers, error: freeError } = await supabase
+        .from('user_profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('plan_type', 'free');
+      
+      if (freeError) throw freeError;
       
       // Contar feedbacks pendentes
       const { count: pendingCount, error: feedbackError } = await supabase
@@ -77,17 +100,12 @@ export default function AdminDashboard() {
       
       if (feedbackError) throw feedbackError;
       
-      // Processar os dados
-      const totalUsers = userStats.reduce((acc, curr) => acc + curr.count, 0);
-      const adminUsers = userStats.find(s => s.plan_type === 'admin')?.count || 0;
-      const paidUsers = userStats.find(s => s.plan_type === 'paid')?.count || 0;
-      const freeUsers = userStats.find(s => s.plan_type === 'free')?.count || 0;
-      
+      // Atualizar estado
       setStats({
-        totalUsers,
-        adminUsers,
-        paidUsers,
-        freeUsers,
+        totalUsers: totalUsers || 0,
+        adminUsers: adminUsers || 0,
+        paidUsers: paidUsers || 0,
+        freeUsers: freeUsers || 0,
         pendingFeedbacks: pendingCount || 0
       });
       
