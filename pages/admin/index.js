@@ -167,7 +167,7 @@ export default function AdminDashboard() {
           </p>
           {stats.pendingFeedbacks > 0 && (
             <Link 
-              href="/admin/feedbacks" 
+              href="/admin/feedback" 
               className="mt-3 inline-block text-sm text-blue-600 hover:text-blue-800"
             >
               Ver todos →
