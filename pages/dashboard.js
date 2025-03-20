@@ -187,6 +187,34 @@ export default function DashboardPage() {
     }
   };
 
+  // Adicionar uma nova função para iniciar o checkout
+  const handleUpgradeClick = async () => {
+    try {
+      toast.loading('Preparando checkout...', { id: 'checkout' });
+      
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.url) {
+        // Redirecionar para a página de checkout do Stripe
+        toast.dismiss('checkout');
+        window.location.href = data.url;
+      } else {
+        console.error('Erro ao criar sessão de checkout:', data.error);
+        toast.error('Não foi possível iniciar o checkout', { id: 'checkout' });
+      }
+    } catch (error) {
+      console.error('Erro ao iniciar checkout:', error);
+      toast.error('Erro ao conectar ao serviço de pagamento', { id: 'checkout' });
+    }
+  };
+
   return (
     <Layout title="Dashboard">
       {/* Banner de plano/período de teste */}
@@ -229,7 +257,7 @@ export default function DashboardPage() {
                     ? 'bg-blue-600 hover:bg-blue-700 text-white'
                     : 'bg-red-600 hover:bg-red-700 text-white'
                 }`}
-                onClick={() => alert('Recurso de upgrade para ser implementado')}
+                onClick={handleUpgradeClick}
               >
                 {userAccessInfo.hasAccess ? 'Upgrade para Premium' : 'Renovar Acesso'}
               </button>
@@ -506,7 +534,7 @@ export default function DashboardPage() {
           </p>
           <button
             className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md"
-            onClick={() => alert('Recurso de upgrade para ser implementado')}
+            onClick={handleUpgradeClick}
           >
             Fazer Upgrade Agora
           </button>
