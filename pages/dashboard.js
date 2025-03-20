@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import { checkUserAccess } from '../utils/checkUserAccess';
+import PaymentButton from '../components/PaymentButton';
 
 export default function DashboardPage() {
   const supabase = useSupabaseClient();
@@ -249,18 +250,12 @@ export default function DashboardPage() {
                 {userAccessInfo.message}
               </p>
             </div>
-            
-            {userAccessInfo.planType === 'free' && (
-              <button
-                className={`px-3 py-1 text-xs font-medium rounded-md ${
-                  userAccessInfo.hasAccess
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : 'bg-red-600 hover:bg-red-700 text-white'
-                }`}
-                onClick={handleUpgradeClick}
-              >
-                {userAccessInfo.hasAccess ? 'Upgrade para Premium' : 'Renovar Acesso'}
-              </button>
+            {(!userAccessInfo.hasAccess || userAccessInfo.daysLeft < 3) && userAccessInfo.planType !== 'paid' && (
+              <PaymentButton 
+                buttonText="Fazer Upgrade" 
+                variant={!userAccessInfo.hasAccess ? 'danger' : 'primary'} 
+                className="text-xs px-2 py-1"
+              />
             )}
           </div>
         </div>
@@ -532,12 +527,10 @@ export default function DashboardPage() {
           <p className="text-sm text-red-600 mb-4">
             Para continuar utilizando todos os recursos do Treino na Mão, faça upgrade para o plano Premium.
           </p>
-          <button
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md"
-            onClick={handleUpgradeClick}
-          >
-            Fazer Upgrade Agora
-          </button>
+          <PaymentButton
+            buttonText="Fazer Upgrade Agora"
+            variant="danger"
+          />
         </div>
       )}
     </Layout>
