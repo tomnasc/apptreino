@@ -70,8 +70,14 @@ export default function Layout({ children, title = 'App Treino', hideNavigation 
 
   const handleSignOut = async () => {
     if (!supabaseClient) return;
-    await supabaseClient.auth.signOut();
-    router.push('/');
+    try {
+      await supabaseClient.auth.signOut();
+      // Usar replace ao invés de push para evitar conflitos de navegação
+      // e garantir um redirecionamento limpo para a página inicial
+      router.replace('/');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
   };
 
   if (!session) {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import Layout from '../components/Layout';
+import { useRouter } from 'next/router';
 
 export default function Profile() {
   const supabase = useSupabaseClient();
@@ -15,6 +16,7 @@ export default function Profile() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  const router = useRouter();
 
   useEffect(() => {
     if (user) {
@@ -104,7 +106,13 @@ export default function Profile() {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+      // Usar replace ao invés de push para evitar conflitos de navegação
+      router.replace('/');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -167,11 +175,11 @@ export default function Profile() {
         
         // Deslogar o usuário
         await supabase.auth.signOut();
-        window.location.href = '/';
+        router.replace('/');
       } else {
         // RPC funcionou, deslogar o usuário e redirecionar
         await supabase.auth.signOut();
-        window.location.href = '/';
+        router.replace('/');
       }
     } catch (error) {
       console.error('Erro ao excluir conta:', error);
