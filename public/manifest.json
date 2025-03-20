@@ -1,6 +1,6 @@
 {
-  "name": "TreinoPro",
-  "short_name": "TreinoPro",
+  "name": "Treino na Mão",
+  "short_name": "Treino na Mão",
   "description": "Aplicativo para gerenciamento de treinos de academia",
   "start_url": "/",
   "display": "standalone",

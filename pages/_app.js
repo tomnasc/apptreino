@@ -27,12 +27,12 @@ function MyApp({ Component, pageProps }) {
   return (
     <>
       <Head>
-        <title>TreinoPro - Seu assistente de treinos</title>
+        <title>Treino na Mão - Seu assistente de treinos</title>
         <meta name="description" content="Aplicativo para acompanhamento e gerenciamento de treinos" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="TreinoPro" />
+        <meta name="apple-mobile-web-app-title" content="Treino na Mão" />
         <link rel="icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />

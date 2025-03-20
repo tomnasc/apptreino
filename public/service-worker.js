@@ -1,4 +1,4 @@
-const CACHE_NAME = 'treinopro-v1';
+const CACHE_NAME = 'treinonamao-v1';
 const urlsToCache = [
   '/',
   // '/index.html', // Removido - não existe em aplicativos Next.js

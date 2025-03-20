@@ -136,10 +136,10 @@ export default function AdminSettings() {
     <Layout title="Configurações do Aplicativo">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">
-          Gerencie as configurações globais do TreinoPro
+          Gerencie as configurações globais do Treino na Mão
         </h1>
         <p className="text-gray-600">
-          Gerencie as configurações globais do TreinoPro
+          Gerencie as configurações globais do Treino na Mão
         </p>
       </div>
       

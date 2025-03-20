@@ -64,7 +64,7 @@ export default function AddToHomeScreen() {
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white p-4 shadow-lg border-t border-gray-200 z-50">
       <div className="flex justify-between items-start mb-2">
-        <h3 className="text-lg font-semibold">Instale o TreinoPro</h3>
+        <h3 className="text-lg font-semibold">Instale o Treino na Mão</h3>
         <button 
           onClick={handleClose} 
           className="text-gray-500"
@@ -76,7 +76,7 @@ export default function AddToHomeScreen() {
       </div>
       
       <p className="text-sm mb-2">
-        Instale o TreinoPro na sua tela inicial para acesso rápido e uma experiência completa.
+        Instale o Treino na Mão na sua tela inicial para acesso rápido e uma experiência completa.
       </p>
       
       {isIOS && (

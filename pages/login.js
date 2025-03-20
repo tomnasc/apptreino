@@ -23,8 +23,8 @@ export default function Login() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4">
       <Head>
-        <title>Login - TreinoPro</title>
-        <meta name="description" content="Faça login para acessar o TreinoPro" />
+        <title>Login - Treino na Mão</title>
+        <meta name="description" content="Faça login para acessar o Treino na Mão" />
       </Head>
 
       <div className="card max-w-md w-full">

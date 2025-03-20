@@ -17,13 +17,13 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4">
       <Head>
-        <title>TreinoPro - Gerencie seus treinos</title>
+        <title>Treino na Mão - Gerencie seus treinos</title>
         <meta name="description" content="Controle seus treinos de academia de forma simples e eficiente" />
       </Head>
 
       <main className="flex flex-col items-center justify-center w-full flex-1 px-4 sm:px-20 text-center">
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-center">
-          Bem-vindo ao <span className="text-blue-500">TreinoPro</span>
+          Bem-vindo ao <span className="text-blue-500">Treino na Mão</span>
         </h1>
         <p className="text-xl mb-8">
           Gerencie seus treinos de academia de forma simples e eficiente.
@@ -44,7 +44,7 @@ export default function Home() {
       </main>
 
       <footer className="py-4 text-center">
-        <p className="text-gray-600">© {new Date().getFullYear()} TreinoPro - Todos os direitos reservados</p>
+        <p className="text-gray-600">© {new Date().getFullYear()} Treino na Mão - Todos os direitos reservados</p>
       </footer>
     </div>
   );

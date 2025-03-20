@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import AddToHomeScreen from './AddToHomeScreen';
 
-export default function Layout({ children, title = 'TreinoPro', hideNavigation = false }) {
+export default function Layout({ children, title = 'Treino na Mão', hideNavigation = false }) {
   const router = useRouter();
   const supabaseClient = useSupabaseClient();
   const [session, setSession] = useState(null);
@@ -87,7 +87,7 @@ export default function Layout({ children, title = 'TreinoPro', hideNavigation =
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Head>
-        <title>{title} - TreinoPro</title>
+        <title>{title} - Treino na Mão</title>
         <meta name="description" content="Gerencie seus treinos de academia" />
       </Head>
 
@@ -97,7 +97,7 @@ export default function Layout({ children, title = 'TreinoPro', hideNavigation =
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
                 <Link href="/dashboard" className="font-bold text-xl text-blue-600">
-                  TreinoPro
+                  Treino na Mão
                 </Link>
               </div>
               <nav className="hidden sm:ml-6 sm:flex sm:space-x-8">
@@ -275,7 +275,7 @@ export default function Layout({ children, title = 'TreinoPro', hideNavigation =
         <footer className="bg-white border-t border-gray-200">
           <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
             <p className="text-center text-gray-600 text-sm mt-2">
-              © {new Date().getFullYear()} TreinoPro - Todos os direitos reservados
+              © {new Date().getFullYear()} Treino na Mão - Todos os direitos reservados
             </p>
           </div>
         </footer>
