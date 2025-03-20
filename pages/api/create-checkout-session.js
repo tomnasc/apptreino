@@ -21,26 +21,47 @@ export default async function handler(req, res) {
     // Inicializar Stripe
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     
-    // Obter informações do usuário
+    // Obter informações do usuário com tratamento de erro aprimorado
     const { data: userData, error: userError } = await supabase
       .from('user_profiles')
-      .select('stripe_customer_id, email, first_name, last_name')
+      .select('id, stripe_customer_id, first_name, last_name, plan_type')
       .eq('id', session.user.id)
-      .single();
+      .maybeSingle();  // Usar maybeSingle para não lançar erro se não encontrar
     
-    if (userError) {
-      console.error('Erro ao obter dados do usuário:', userError);
-      return res.status(500).json({ error: 'Erro ao obter dados do usuário' });
+    // Se não encontrar o perfil ou tiver erro, vamos criar um perfil básico
+    if (userError || !userData) {
+      console.log('Perfil de usuário não encontrado, criando um novo...', userError);
+      
+      // Criar um perfil básico para o usuário
+      const { data: newProfile, error: createError } = await supabase
+        .from('user_profiles')
+        .insert({
+          id: session.user.id,
+          email: session.user.email,
+          plan_type: 'free',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (createError) {
+        console.error('Erro ao criar perfil de usuário:', createError);
+        return res.status(500).json({ error: 'Erro ao criar perfil de usuário' });
+      }
+      
+      // Usar o novo perfil
+      userData = newProfile;
     }
     
     // Obter ou criar cliente no Stripe
-    let customerId = userData.stripe_customer_id;
+    let customerId = userData?.stripe_customer_id;
     
     if (!customerId) {
       // Criar novo cliente no Stripe
       const customer = await stripe.customers.create({
         email: session.user.email,
-        name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || undefined,
+        name: `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim() || session.user.email,
         metadata: {
           userId: session.user.id
         }

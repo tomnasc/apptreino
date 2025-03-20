@@ -20,7 +20,8 @@ export default function Layout({ children, title = 'Treino na Mão', hideNavigat
       setSession(session);
       
       if (!session) {
-        router.push('/login');
+        // Não fazer redirecionamento automático ao inicializar
+        // router.push('/login');
       } else {
         // Verificar se o usuário é administrador
         checkUserRole(session.user.id);
@@ -33,7 +34,8 @@ export default function Layout({ children, title = 'Treino na Mão', hideNavigat
       (_event, session) => {
         setSession(session);
         if (!session) {
-          router.push('/login');
+          // Não fazer o redirecionamento automático aqui, deixar o handleSignOut cuidar disso
+          // router.push('/login');
         } else {
           // Verificar se o usuário é administrador ao mudar de sessão
           checkUserRole(session.user.id);
@@ -72,9 +74,8 @@ export default function Layout({ children, title = 'Treino na Mão', hideNavigat
     if (!supabaseClient) return;
     try {
       await supabaseClient.auth.signOut();
-      // Usar replace ao invés de push para evitar conflitos de navegação
-      // e garantir um redirecionamento limpo para a página inicial
-      router.replace('/');
+      // Substituir o uso do router por uma redireção direta para evitar conflitos
+      window.location.href = '/login';
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
     }
