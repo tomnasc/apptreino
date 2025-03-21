@@ -22,7 +22,10 @@ export default function PaymentButton({
       setLoading(true);
       toast.loading('Preparando checkout...', { id: 'checkout' });
       
-      console.log(`Iniciando checkout com priceId: ${priceId}, modo de teste: ${useTestMode ? 'Sim' : 'Não'}`);
+      // Forçar modo de teste para IDs específicos
+      const mustUseTestMode = useTestMode === true || priceId === 'price_1R4mcCG0twrwKsMTlTaQLjTx';
+      
+      console.log(`Iniciando checkout com priceId: ${priceId}, modo de teste: ${mustUseTestMode ? 'Sim' : 'Não'}`);
       
       // Fazer a requisição para o servidor para criar a sessão de checkout
       const response = await fetch('/api/create-checkout-session-direct', {
@@ -32,7 +35,7 @@ export default function PaymentButton({
         },
         body: JSON.stringify({ 
           priceId,
-          useTestMode: useTestMode === true
+          useTestMode: mustUseTestMode
         }),
       });
       

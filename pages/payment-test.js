@@ -32,8 +32,10 @@ export default function PaymentTest() {
                  window.location.hostname === 'localhost' || 
                  window.location.hostname.includes('vercel.app');
     
+    // Forçar modo de teste em ambiente de desenvolvimento
     if (isDev) {
-      setPaymentMode('test');
+      setPaymentMode('forced-test');
+      console.log('Ambiente de desenvolvimento detectado - modo de teste forçado ativado');
     }
   }, [user]);
 
@@ -43,7 +45,10 @@ export default function PaymentTest() {
       
       const priceId = useTestMode ? priceTest : priceProd;
       
-      console.log(`Iniciando checkout direto. Modo de teste: ${useTestMode ? 'Sim' : 'Não'}, ID de preço: ${priceId}`);
+      // Forçar useTestMode para true se o ID for o de teste específico
+      const mustUseTestMode = useTestMode || priceId === 'price_1R4mcCG0twrwKsMTlTaQLjTx';
+      
+      console.log(`Iniciando checkout direto. Modo de teste: ${mustUseTestMode ? 'Sim' : 'Não'}, ID de preço: ${priceId}`);
       
       const response = await fetch('/api/create-checkout-session-direct', {
         method: 'POST',
@@ -53,7 +58,7 @@ export default function PaymentTest() {
         body: JSON.stringify({
           priceId,
           userId: userId,
-          useTestMode
+          useTestMode: mustUseTestMode
         }),
       });
 
@@ -96,8 +101,17 @@ export default function PaymentTest() {
           </p>
           <p className="dark-text-secondary mb-4">
             <span className="font-medium">ID de preço:</span>{' '}
-            {paymentMode === 'production' ? priceProd : priceTest}
+            <span className={paymentMode !== 'production' ? 'text-green-600 dark:text-green-400 font-mono' : 'font-mono'}>
+              {paymentMode === 'production' ? priceProd : priceTest}
+            </span>
           </p>
+          
+          {/* Aviso se estiver usando o ID de teste específico */}
+          {priceTest === 'price_1R4mcCG0twrwKsMTlTaQLjTx' && (
+            <div className="p-3 mb-4 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded-md text-sm">
+              <strong>Nota:</strong> O ID de preço de teste específico (price_1R4mcCG0twrwKsMTlTaQLjTx) será sempre processado em modo de teste, independentemente da seleção abaixo.
+            </div>
+          )}
           
           <div className="flex flex-wrap gap-2">
             <button

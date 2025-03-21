@@ -34,12 +34,22 @@ export default async function handler(req, res) {
     
     console.log('Verificando variáveis de ambiente...');
     
-    // Verificar qual ambiente do Stripe usar
-    // Se o preço começa com 'price_test_' ou se useTestMode é verdadeiro, ou ambiente for desenvolvimento, usamos a chave de teste
+    // Lista de IDs de preço de teste conhecidos
+    const knownTestPriceIds = [
+      'price_1R4mcCG0twrwKsMTlTaQLjTx', // ID de teste específico para este app
+    ];
+    
+    // Verificar qual ambiente do Stripe usar - identificações mais amplas de IDs de teste
     const isTestPrice = finalPriceId.startsWith('price_test_') || 
                        finalPriceId.includes('_test_') || 
+                       knownTestPriceIds.includes(finalPriceId) ||
                        useTestMode === true ||
                        process.env.NODE_ENV === 'development';
+    
+    // DEBUG: Verificação forçada (temporário)
+    if (finalPriceId === 'price_1R4mcCG0twrwKsMTlTaQLjTx') {
+      console.log('AVISO: ID de preço de teste específico detectado. Forçando modo de teste!');
+    }
     
     // Escolher a chave do Stripe apropriada
     const stripeSecretKey = isTestPrice 
@@ -48,6 +58,9 @@ export default async function handler(req, res) {
 
     console.log(`Usando ambiente Stripe: ${isTestPrice ? 'TESTE' : 'PRODUÇÃO'}`);
     console.log(`PriceID: ${finalPriceId}`);
+    console.log(`useTestMode recebido: ${useTestMode}`);
+    console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`É ID de preço de teste: ${isTestPrice}`);
     
     // Verificar se as variáveis necessárias estão definidas
     if (!stripeSecretKey) {
