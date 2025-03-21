@@ -5,7 +5,8 @@ export default function PaymentButton({
   className, 
   buttonText = 'Assinar Premium', 
   variant = 'primary', 
-  priceId
+  priceId,
+  useTestMode
 }) {
   const [loading, setLoading] = useState(false);
 
@@ -21,7 +22,7 @@ export default function PaymentButton({
       setLoading(true);
       toast.loading('Preparando checkout...', { id: 'checkout' });
       
-      console.log(`Iniciando checkout com priceId: ${priceId}`);
+      console.log(`Iniciando checkout com priceId: ${priceId}, modo de teste: ${useTestMode ? 'Sim' : 'Não'}`);
       
       // Fazer a requisição para o servidor para criar a sessão de checkout
       const response = await fetch('/api/create-checkout-session-direct', {
@@ -29,7 +30,10 @@ export default function PaymentButton({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({ 
+          priceId,
+          useTestMode: useTestMode === true
+        }),
       });
       
       // Obter dados da resposta com tratamento de erro melhorado
@@ -43,14 +47,16 @@ export default function PaymentButton({
         return;
       }
       
-      // Verificar resposta
-      if (response.ok && data?.url) {
+      // Verificar resposta (sessão pode estar em data.url ou data.sessionUrl)
+      const checkoutUrl = data?.sessionUrl || data?.url;
+      
+      if (response.ok && checkoutUrl) {
         // Redirecionar para a página de checkout do Stripe
         toast.dismiss('checkout');
-        console.log('Redirecionando para:', data.url);
+        console.log('Redirecionando para:', checkoutUrl);
         
         // Redirecionar diretamente para a URL
-        window.location.href = data.url;
+        window.location.href = checkoutUrl;
       } else {
         // Exibir erro detalhado
         const errorMessage = data?.details || data?.error || 'Erro desconhecido';

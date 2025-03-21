@@ -21,24 +21,40 @@ export default async function handler(req, res) {
   
   try {
     // Verificar se o price_id foi fornecido na requisição
-    const { priceId } = req.body;
+    const { priceId, useTestMode } = req.body;
+    const finalPriceId = priceId || process.env.NEXT_PUBLIC_STRIPE_PRICE_ID;
     
-    if (!priceId) {
-      console.error('price_id não fornecido na requisição');
+    if (!finalPriceId) {
+      console.error('price_id não fornecido na requisição e não há fallback disponível');
       return res.status(400).json({
         error: 'Parâmetro obrigatório ausente',
-        details: 'O ID do preço (priceId) deve ser fornecido no corpo da requisição'
+        details: 'O ID do preço (priceId) deve ser fornecido no corpo da requisição ou configurado no servidor'
       });
     }
     
     console.log('Verificando variáveis de ambiente...');
     
+    // Verificar qual ambiente do Stripe usar
+    // Se o preço começa com 'price_test_' ou se useTestMode é verdadeiro, ou ambiente for desenvolvimento, usamos a chave de teste
+    const isTestPrice = finalPriceId.startsWith('price_test_') || 
+                       finalPriceId.includes('_test_') || 
+                       useTestMode === true ||
+                       process.env.NODE_ENV === 'development';
+    
+    // Escolher a chave do Stripe apropriada
+    const stripeSecretKey = isTestPrice 
+      ? process.env.STRIPE_SECRET_KEY_TEST 
+      : process.env.STRIPE_SECRET_KEY;
+
+    console.log(`Usando ambiente Stripe: ${isTestPrice ? 'TESTE' : 'PRODUÇÃO'}`);
+    console.log(`PriceID: ${finalPriceId}`);
+    
     // Verificar se as variáveis necessárias estão definidas
-    if (!process.env.STRIPE_SECRET_KEY) {
-      console.error('STRIPE_SECRET_KEY não está definida');
+    if (!stripeSecretKey) {
+      console.error(`${isTestPrice ? 'STRIPE_SECRET_KEY_TEST' : 'STRIPE_SECRET_KEY'} não está definida`);
       return res.status(500).json({ 
         error: 'Configuração incompleta', 
-        details: 'Variável de ambiente STRIPE_SECRET_KEY não está definida' 
+        details: `Variável de ambiente ${isTestPrice ? 'STRIPE_SECRET_KEY_TEST' : 'STRIPE_SECRET_KEY'} não está definida` 
       });
     }
     
@@ -68,18 +84,18 @@ export default async function handler(req, res) {
     console.log('Inicializando Stripe...');
     
     // Inicializar Stripe
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    const stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2023-10-16', // Especificar versão da API
     });
     
-    console.log('Criando sessão de checkout com o price_id fornecido:', priceId);
+    console.log('Criando sessão de checkout com o price_id fornecido:', finalPriceId);
     
     // Criar sessão de checkout usando o price_id fornecido na requisição
     const checkoutSession = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price: priceId, // Usar o price_id fornecido
+          price: finalPriceId, // Usar o price_id fornecido
           quantity: 1,
         },
       ],
@@ -96,7 +112,7 @@ export default async function handler(req, res) {
     console.log('URL de checkout:', checkoutSession.url);
     
     // Retornar URL da sessão de checkout
-    return res.status(200).json({ url: checkoutSession.url });
+    return res.status(200).json({ sessionUrl: checkoutSession.url });
   } catch (error) {
     console.error('ERRO DETALHADO:', error);
     console.error('Nome do erro:', error.name);
