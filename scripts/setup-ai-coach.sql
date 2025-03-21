@@ -50,9 +50,20 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE TRIGGER trigger_set_anonymized_id
-BEFORE INSERT ON user_assessments
-FOR EACH ROW EXECUTE FUNCTION set_anonymized_id();
+-- Verificar se o trigger já existe antes de criar
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger 
+    WHERE tgname = 'trigger_set_anonymized_id' 
+    AND tgrelid = 'user_assessments'::regclass
+  ) THEN
+    CREATE TRIGGER trigger_set_anonymized_id
+    BEFORE INSERT ON user_assessments
+    FOR EACH ROW EXECUTE FUNCTION set_anonymized_id();
+  END IF;
+END
+$$;
 
 -- Políticas RLS (Row Level Security)
 ALTER TABLE user_assessments ENABLE ROW LEVEL SECURITY;
