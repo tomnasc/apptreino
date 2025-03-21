@@ -3,12 +3,63 @@
 @tailwind utilities;
 
 :root {
+  /* Cores para o modo claro (padrão) */
   --primary: #3b82f6;
   --primary-dark: #1d4ed8;
   --secondary: #10b981;
   --secondary-dark: #059669;
   --background: #f9fafb;
   --foreground: #1f2937;
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --input-bg: #ffffff;
+  --input-border: #d1d5db;
+  --header-bg: #ffffff;
+  --header-border: #e5e7eb;
+  --nav-active: #3b82f6;
+  --nav-inactive: #6b7280;
+  --button-primary-bg: #3b82f6;
+  --button-primary-hover: #2563eb;
+  --button-primary-text: #ffffff;
+  --button-secondary-bg: #10b981;
+  --button-secondary-hover: #059669;
+  --button-secondary-text: #ffffff;
+  --button-danger-bg: #ef4444;
+  --button-danger-hover: #dc2626;
+  --button-danger-text: #ffffff;
+  --button-outline-border: #d1d5db;
+  --button-outline-text: #1f2937;
+  --button-outline-hover: #f3f4f6;
+}
+
+[data-theme="dark"] {
+  /* Cores para o modo escuro */
+  --primary: #60a5fa;
+  --primary-dark: #3b82f6;
+  --secondary: #34d399;
+  --secondary-dark: #10b981;
+  --background: #111827;
+  --foreground: #f9fafb;
+  --card-bg: #1f2937;
+  --card-border: #374151;
+  --input-bg: #1f2937;
+  --input-border: #374151;
+  --header-bg: #1f2937;
+  --header-border: #374151;
+  --nav-active: #60a5fa;
+  --nav-inactive: #9ca3af;
+  --button-primary-bg: #3b82f6;
+  --button-primary-hover: #2563eb;
+  --button-primary-text: #ffffff;
+  --button-secondary-bg: #10b981;
+  --button-secondary-hover: #059669;
+  --button-secondary-text: #ffffff;
+  --button-danger-bg: #ef4444;
+  --button-danger-hover: #dc2626;
+  --button-danger-text: #ffffff;
+  --button-outline-border: #374151;
+  --button-outline-text: #f9fafb;
+  --button-outline-hover: #374151;
 }
 
 body {
@@ -16,6 +67,7 @@ body {
   color: var(--foreground);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
     Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 @layer components {
@@ -32,10 +84,13 @@ body {
   }
   
   .card {
-    @apply bg-white rounded-lg shadow-md p-6;
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 transition-colors;
   }
   
   .input {
-    @apply w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    @apply w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 
+      rounded-md py-2 px-3 text-gray-900 dark:text-white
+      focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+      focus:border-transparent transition-colors;
   }
 } 

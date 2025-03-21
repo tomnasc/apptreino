@@ -3,6 +3,7 @@ import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import { SessionContextProvider } from '@supabase/auth-helpers-react';
 import { Toaster } from 'react-hot-toast';
 import Head from 'next/head';
+import { ThemeProvider } from '../context/ThemeContext';
 import '../styles/globals.css';
 
 function MyApp({ Component, pageProps }) {
@@ -25,7 +26,7 @@ function MyApp({ Component, pageProps }) {
   }, []);
 
   return (
-    <>
+    <ThemeProvider>
       <Head>
         <title>Treino na Mão - Seu assistente de treinos</title>
         <meta name="description" content="Aplicativo para acompanhamento e gerenciamento de treinos" />
@@ -46,7 +47,7 @@ function MyApp({ Component, pageProps }) {
         <Component {...pageProps} />
         <Toaster position="bottom-center" />
       </SessionContextProvider>
-    </>
+    </ThemeProvider>
   );
 }
 
