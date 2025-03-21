@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import { checkUserAccess } from '../utils/checkUserAccess';
 import PaymentButton from '../components/PaymentButton';
+import { useRouter } from 'next/router';
 
 export default function DashboardPage() {
   const supabase = useSupabaseClient();
@@ -287,7 +288,7 @@ export default function DashboardPage() {
             Bem-vindo ao seu dashboard de treinos
           </h1>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="dark-card bg-blue-50/60 dark:bg-blue-900/20 rounded-lg p-6 border border-blue-100 dark:border-blue-800/50">
               <h2 className="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-4">
                 Resumo
@@ -352,6 +353,31 @@ export default function DashboardPage() {
                   .
                 </p>
               )}
+            </div>
+
+            {/* Card de IA Coach */}
+            <div className="dark-card rounded-lg shadow-md p-6">
+              <div className="flex items-center mb-4">
+                <div className="bg-gradient-to-r from-purple-500 to-blue-500 p-3 rounded-lg mr-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold dark-text-primary">Treino Personalizado com IA</h3>
+                  <p className="text-sm dark-text-tertiary">Obtenha sugestões personalizadas</p>
+                </div>
+              </div>
+              
+              <p className="dark-text-secondary mb-4">
+                Faça uma avaliação física rápida e nossa IA vai sugerir treinos específicos para seus objetivos.
+              </p>
+              
+              <Link href="/assessment">
+                <a className="inline-flex items-center justify-center px-4 py-2 bg-purple-600 hover:bg-purple-700 dark:bg-purple-700 dark:hover:bg-purple-800 text-white rounded-md text-sm font-medium w-full">
+                  Iniciar Avaliação Física
+                </a>
+              </Link>
             </div>
           </div>
         </div>
