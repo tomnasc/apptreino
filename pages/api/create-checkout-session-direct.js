@@ -13,15 +13,13 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
-  // Longs detalhados para diagnóstico
-  console.log('=== DIAGNÓSTICO DE CHECKOUT DIRETO ===');
+  // Logs para diagnóstico
+  console.log('=== CHECKOUT DIRETO - AMBIENTE DE PRODUÇÃO ===');
   console.log('Requisição recebida em:', new Date().toISOString());
-  console.log('Headers:', JSON.stringify(req.headers, null, 2));
-  console.log('Body:', JSON.stringify(req.body, null, 2));
   
   try {
     // Verificar se o price_id foi fornecido na requisição
-    const { priceId, useTestMode } = req.body;
+    const { priceId } = req.body;
     const finalPriceId = priceId || process.env.NEXT_PUBLIC_STRIPE_PRICE_ID;
     
     if (!finalPriceId) {
@@ -32,42 +30,14 @@ export default async function handler(req, res) {
       });
     }
     
-    console.log('Verificando variáveis de ambiente...');
+    console.log('Verificando a chave do Stripe...');
     
-    // Lista de IDs de preço de teste conhecidos
-    const knownTestPriceIds = [
-      'price_1R4mcCG0twrwKsMTlTaQLjTx', // ID de teste específico para este app
-    ];
-    
-    // Verificar qual ambiente do Stripe usar - identificações mais amplas de IDs de teste
-    const isTestPrice = finalPriceId.startsWith('price_test_') || 
-                       finalPriceId.includes('_test_') || 
-                       knownTestPriceIds.includes(finalPriceId) ||
-                       useTestMode === true ||
-                       process.env.NODE_ENV === 'development';
-    
-    // DEBUG: Verificação forçada (temporário)
-    if (finalPriceId === 'price_1R4mcCG0twrwKsMTlTaQLjTx') {
-      console.log('AVISO: ID de preço de teste específico detectado. Forçando modo de teste!');
-    }
-    
-    // Escolher a chave do Stripe apropriada
-    const stripeSecretKey = isTestPrice 
-      ? process.env.STRIPE_SECRET_KEY_TEST 
-      : process.env.STRIPE_SECRET_KEY;
-
-    console.log(`Usando ambiente Stripe: ${isTestPrice ? 'TESTE' : 'PRODUÇÃO'}`);
-    console.log(`PriceID: ${finalPriceId}`);
-    console.log(`useTestMode recebido: ${useTestMode}`);
-    console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`É ID de preço de teste: ${isTestPrice}`);
-    
-    // Verificar se as variáveis necessárias estão definidas
-    if (!stripeSecretKey) {
-      console.error(`${isTestPrice ? 'STRIPE_SECRET_KEY_TEST' : 'STRIPE_SECRET_KEY'} não está definida`);
+    // Verificar se a chave do Stripe está definida
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.error('STRIPE_SECRET_KEY não está definida');
       return res.status(500).json({ 
         error: 'Configuração incompleta', 
-        details: `Variável de ambiente ${isTestPrice ? 'STRIPE_SECRET_KEY_TEST' : 'STRIPE_SECRET_KEY'} não está definida` 
+        details: 'Variável de ambiente STRIPE_SECRET_KEY não está definida' 
       });
     }
     
@@ -96,19 +66,19 @@ export default async function handler(req, res) {
     
     console.log('Inicializando Stripe...');
     
-    // Inicializar Stripe
-    const stripe = new Stripe(stripeSecretKey, {
+    // Inicializar Stripe com a chave de produção
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
       apiVersion: '2023-10-16', // Especificar versão da API
     });
     
-    console.log('Criando sessão de checkout com o price_id fornecido:', finalPriceId);
+    console.log('Criando sessão de checkout com o price_id:', finalPriceId);
     
-    // Criar sessão de checkout usando o price_id fornecido na requisição
+    // Criar sessão de checkout 
     const checkoutSession = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price: finalPriceId, // Usar o price_id fornecido
+          price: finalPriceId,
           quantity: 1,
         },
       ],

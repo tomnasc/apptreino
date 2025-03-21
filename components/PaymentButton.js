@@ -5,8 +5,7 @@ export default function PaymentButton({
   className, 
   buttonText = 'Assinar Premium', 
   variant = 'primary', 
-  priceId,
-  useTestMode
+  priceId
 }) {
   const [loading, setLoading] = useState(false);
 
@@ -22,10 +21,7 @@ export default function PaymentButton({
       setLoading(true);
       toast.loading('Preparando checkout...', { id: 'checkout' });
       
-      // Forçar modo de teste para IDs específicos
-      const mustUseTestMode = useTestMode === true || priceId === 'price_1R4mcCG0twrwKsMTlTaQLjTx';
-      
-      console.log(`Iniciando checkout com priceId: ${priceId}, modo de teste: ${mustUseTestMode ? 'Sim' : 'Não'}`);
+      console.log(`Iniciando checkout com priceId: ${priceId}`);
       
       // Fazer a requisição para o servidor para criar a sessão de checkout
       const response = await fetch('/api/create-checkout-session-direct', {
@@ -33,10 +29,7 @@ export default function PaymentButton({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          priceId,
-          useTestMode: mustUseTestMode
-        }),
+        body: JSON.stringify({ priceId }),
       });
       
       // Obter dados da resposta com tratamento de erro melhorado
