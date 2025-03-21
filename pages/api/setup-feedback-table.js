@@ -27,7 +27,7 @@ export default async function handler(req, res) {
         title TEXT NOT NULL,
         description TEXT NOT NULL,
         device_info TEXT,
-        status TEXT DEFAULT 'pendente',
+        status TEXT DEFAULT 'pending',
         admin_notes TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

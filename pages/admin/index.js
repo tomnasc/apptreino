@@ -104,7 +104,7 @@ export default function AdminDashboard() {
       const { count: pendingCount, error: feedbackError } = await supabase
         .from('user_feedback')
         .select('id', { count: 'exact', head: true })
-        .eq('status', 'pendente');
+        .eq('status', 'pending');
       
       if (feedbackError) throw feedbackError;
       
@@ -172,7 +172,7 @@ export default function AdminDashboard() {
         .from('user_feedback')
         .update({
           response: responseText,
-          status: 'respondido',
+          status: 'responded',
           response_date: new Date().toISOString()
         })
         .eq('id', selectedFeedback.id);
