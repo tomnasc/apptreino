@@ -70,7 +70,7 @@ export default function WorkoutSuggestionsPage() {
     fetchData();
   }, [assessmentId, user, supabase, router]);
   
-  // Função para gerar treinos usando a função do Supabase Edge
+  // Função para gerar treinos usando a API route do Next.js
   const generateWorkouts = async () => {
     if (!assessmentId || !user) return;
     
@@ -78,12 +78,30 @@ export default function WorkoutSuggestionsPage() {
       setGeneratingWorkouts(true);
       toast.loading('Gerando sugestões de treino...', { id: 'generating' });
       
-      // Chamar função Edge do Supabase
-      const { data, error } = await supabase.functions.invoke('generate-workout-suggestions', {
-        body: { assessmentId }
+      // Obter o token de autenticação
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token;
+      
+      if (!authToken) {
+        throw new Error('Falha ao obter token de autenticação');
+      }
+      
+      // Chamar a API route local em vez da função Edge
+      const response = await fetch('/api/ai-workout-suggestions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ assessmentId })
       });
       
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Falha ao gerar sugestões de treino');
+      }
+      
+      const data = await response.json();
       
       toast.success('Sugestões de treino geradas!', { id: 'generating' });
       
