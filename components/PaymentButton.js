@@ -5,7 +5,8 @@ export default function PaymentButton({
   className, 
   buttonText = 'Assinar Premium', 
   variant = 'primary', 
-  priceId 
+  priceId,
+  showToast = true
 }) {
   const [loading, setLoading] = useState(false);
 
@@ -13,18 +14,25 @@ export default function PaymentButton({
     // Validar se o priceId foi fornecido
     if (!priceId) {
       console.error('Erro: priceId não foi fornecido ao PaymentButton');
-      toast.error('Configuração incompleta do botão de pagamento', { id: 'checkout' });
+      
+      if (showToast) {
+        toast.error('Configuração incompleta do botão de pagamento');
+      }
+      
       return;
     }
 
     try {
       setLoading(true);
-      toast.loading('Preparando checkout...', { id: 'checkout' });
+      
+      if (showToast) {
+        toast.loading('Preparando checkout...', { id: 'checkout' });
+      }
       
       console.log('Iniciando checkout com priceId:', priceId);
       
-      // Usar o endpoint que aceita priceId diretamente
-      const response = await fetch('/api/create-checkout-session-direct', {
+      // Usar o endpoint básico que funciona corretamente
+      const response = await fetch('/api/create-checkout-session-basic', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -38,7 +46,11 @@ export default function PaymentButton({
         data = await response.json();
       } catch (jsonError) {
         console.error('Erro ao processar resposta JSON:', jsonError);
-        toast.error('Erro ao processar resposta do servidor', { id: 'checkout' });
+        
+        if (showToast) {
+          toast.error('Erro ao processar resposta do servidor', { id: 'checkout' });
+        }
+        
         setLoading(false);
         return;
       }
@@ -46,19 +58,30 @@ export default function PaymentButton({
       // Verificar resposta
       if (response.ok && data?.url) {
         // Redirecionar para a página de checkout do Stripe
-        toast.dismiss('checkout');
+        if (showToast) {
+          toast.dismiss('checkout');
+        }
+        
         console.log('Redirecionando para:', data.url);
         window.location.href = data.url;
       } else {
         // Exibir erro detalhado
         const errorMessage = data?.details || data?.error || 'Erro desconhecido';
         console.error('Erro ao criar sessão de checkout:', errorMessage, data);
-        toast.error(`Erro no checkout: ${errorMessage}`, { id: 'checkout' });
+        
+        if (showToast) {
+          toast.error(`Erro no checkout: ${errorMessage}`, { id: 'checkout' });
+        }
+        
         setLoading(false);
       }
     } catch (error) {
       console.error('Exceção ao iniciar checkout:', error);
-      toast.error('Erro ao conectar ao serviço de pagamento', { id: 'checkout' });
+      
+      if (showToast) {
+        toast.error('Erro ao conectar ao serviço de pagamento', { id: 'checkout' });
+      }
+      
       setLoading(false);
     }
   };
