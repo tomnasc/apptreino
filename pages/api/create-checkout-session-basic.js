@@ -9,7 +9,6 @@ export default async function handler(req, res) {
 
   console.log('=== DIAGNÓSTICO CHECKOUT BÁSICO ===');
   console.log('Requisição recebida em:', new Date().toISOString());
-  console.log('Body:', req.body);
   
   try {
     // Verificar variáveis de ambiente
@@ -20,24 +19,6 @@ export default async function handler(req, res) {
         error: 'Configuração incompleta', 
         details: 'Chave secreta do Stripe não está definida' 
       });
-    }
-
-    // Obter o priceId do corpo da requisição ou do ambiente
-    let priceId = req.body?.priceId;
-    if (!priceId) {
-      // Tentar usar o priceId do ambiente como fallback
-      priceId = process.env.STRIPE_PRICE_ID;
-      console.log('Usando priceId do ambiente:', priceId);
-      
-      if (!priceId) {
-        console.error('Price ID não fornecido e não configurado no ambiente');
-        return res.status(400).json({
-          error: 'Parâmetro obrigatório',
-          details: 'ID do preço não fornecido'
-        });
-      }
-    } else {
-      console.log('Usando priceId fornecido na requisição:', priceId);
     }
 
     // Verificar se é ambiente de teste
@@ -64,32 +45,32 @@ export default async function handler(req, res) {
     const userId = session.user.id;
     console.log('Usuário autenticado:', userId);
 
-    // Verificar produto (para diagnóstico, não interrompe o fluxo)
-    try {
-      const price = await stripe.prices.retrieve(priceId);
-      console.log('Price verificado:', price.id);
-      console.log('Produto:', price.product);
-      console.log('Valor:', price.unit_amount / 100, price.currency.toUpperCase());
-    } catch (priceError) {
-      console.warn('Aviso: Não foi possível verificar o preço:', priceError.message);
-      // Continuamos mesmo com erro, o Stripe verificará o priceId de qualquer forma
-    }
-
-    // Criar sessão de checkout
+    // Criar sessão de checkout básica
     const checkoutSession = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price: priceId,
+          price_data: {
+            currency: 'brl',
+            product_data: {
+              name: 'Teste de Checkout - Plano Básico',
+              description: 'Produto de teste para diagnóstico do Stripe',
+            },
+            unit_amount: 500, // R$ 5,00
+            recurring: {
+              interval: 'month',
+            },
+          },
           quantity: 1,
         },
       ],
       mode: 'subscription',
       success_url: `${req.headers.origin || 'https://www.treinonamao.app'}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.origin || 'https://www.treinonamao.app'}/dashboard`,
+      cancel_url: `${req.headers.origin || 'https://www.treinonamao.app'}/stripe-debug`,
       client_reference_id: userId,
       metadata: {
-        userId: userId
+        userId: userId,
+        testMode: 'true',
       }
     });
 

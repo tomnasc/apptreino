@@ -274,7 +274,7 @@ export default function DashboardPage() {
                 buttonText="Assinar plano Premium" 
                 className="mt-4 w-full sm:w-auto" 
                 variant="primary"
-                priceId={stripePriceId}  
+                priceId={stripePriceId} 
               />
             )}
           </div>

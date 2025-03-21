@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import Layout from '../components/Layout';
+import PaymentButton from '../components/PaymentButton';
 
 export default function StripeDebugPage() {
   const [stripeKey, setStripeKey] = useState('');
@@ -56,38 +57,6 @@ export default function StripeDebugPage() {
     }
   };
 
-  const handleDirectCheckout = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Criar uma sessão básica através da API
-      const response = await fetch('/api/create-checkout-session-basic', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || data.details || 'Erro desconhecido ao criar sessão');
-      }
-      
-      // Redirecionar para a URL do Stripe diretamente
-      window.location.href = data.url;
-      
-    } catch (error) {
-      console.error('Erro no checkout direto:', error);
-      setError({
-        type: 'checkout',
-        message: `Erro no checkout: ${error.message}`
-      });
-      setLoading(false);
-    }
-  };
-
   return (
     <Layout title="Diagnóstico do Stripe">
       <div className="max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-md">
@@ -135,13 +104,12 @@ export default function StripeDebugPage() {
             {loading ? 'Testando...' : 'Testar conexão com Stripe.js'}
           </button>
           
-          <button
-            onClick={handleDirectCheckout}
-            disabled={loading}
-            className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium disabled:bg-gray-300 disabled:text-gray-500"
-          >
-            {loading ? 'Processando...' : 'Checkout direto (sem Stripe.js)'}
-          </button>
+          <PaymentButton
+            buttonText="Checkout direto (método confiável)"
+            variant="success"
+            className="w-full py-3 px-4 rounded-md font-medium"
+            useBasicCheckout={true}
+          />
         </div>
         
         <div className="mt-8 text-sm text-gray-500">

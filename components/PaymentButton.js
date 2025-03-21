@@ -6,38 +6,37 @@ export default function PaymentButton({
   buttonText = 'Assinar Premium', 
   variant = 'primary', 
   priceId,
-  showToast = true
+  useBasicCheckout = false // Opção para usar o checkout básico para diagnóstico
 }) {
   const [loading, setLoading] = useState(false);
 
   const handlePaymentClick = async () => {
-    // Validar se o priceId foi fornecido
-    if (!priceId) {
+    // Validar se o priceId foi fornecido (quando não estiver usando checkout básico)
+    if (!useBasicCheckout && !priceId) {
       console.error('Erro: priceId não foi fornecido ao PaymentButton');
-      
-      if (showToast) {
-        toast.error('Configuração incompleta do botão de pagamento');
-      }
-      
+      toast.error('Configuração incompleta do botão de pagamento', { id: 'checkout' });
       return;
     }
 
     try {
       setLoading(true);
+      toast.loading('Preparando checkout...', { id: 'checkout' });
       
-      if (showToast) {
-        toast.loading('Preparando checkout...', { id: 'checkout' });
-      }
+      // Selecionar o endpoint apropriado
+      const endpoint = useBasicCheckout 
+        ? '/api/create-checkout-session-basic'  // Checkout básico que sempre funciona
+        : '/api/create-checkout-session-direct'; // Checkout com priceId
+
+      console.log(`Iniciando checkout ${useBasicCheckout ? 'básico' : `com priceId: ${priceId}`}`);
       
-      console.log('Iniciando checkout com priceId:', priceId);
-      
-      // Usar o endpoint básico que funciona corretamente
-      const response = await fetch('/api/create-checkout-session-basic', {
+      // Fazer a requisição para o servidor para criar a sessão de checkout
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ priceId }),
+        // Só envia priceId se não estiver usando checkout básico
+        body: useBasicCheckout ? JSON.stringify({}) : JSON.stringify({ priceId }),
       });
       
       // Obter dados da resposta com tratamento de erro melhorado
@@ -46,11 +45,7 @@ export default function PaymentButton({
         data = await response.json();
       } catch (jsonError) {
         console.error('Erro ao processar resposta JSON:', jsonError);
-        
-        if (showToast) {
-          toast.error('Erro ao processar resposta do servidor', { id: 'checkout' });
-        }
-        
+        toast.error('Erro ao processar resposta do servidor', { id: 'checkout' });
         setLoading(false);
         return;
       }
@@ -58,30 +53,21 @@ export default function PaymentButton({
       // Verificar resposta
       if (response.ok && data?.url) {
         // Redirecionar para a página de checkout do Stripe
-        if (showToast) {
-          toast.dismiss('checkout');
-        }
-        
+        toast.dismiss('checkout');
         console.log('Redirecionando para:', data.url);
+        
+        // Redirecionar diretamente para a URL (método mais confiável)
         window.location.href = data.url;
       } else {
         // Exibir erro detalhado
         const errorMessage = data?.details || data?.error || 'Erro desconhecido';
         console.error('Erro ao criar sessão de checkout:', errorMessage, data);
-        
-        if (showToast) {
-          toast.error(`Erro no checkout: ${errorMessage}`, { id: 'checkout' });
-        }
-        
+        toast.error(`Erro no checkout: ${errorMessage}`, { id: 'checkout' });
         setLoading(false);
       }
     } catch (error) {
       console.error('Exceção ao iniciar checkout:', error);
-      
-      if (showToast) {
-        toast.error('Erro ao conectar ao serviço de pagamento', { id: 'checkout' });
-      }
-      
+      toast.error('Erro ao conectar ao serviço de pagamento', { id: 'checkout' });
       setLoading(false);
     }
   };
