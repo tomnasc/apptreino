@@ -6,7 +6,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Configuração do Hugging Face
 const HF_API_TOKEN = process.env.HF_API_TOKEN;
-const HF_MODEL = process.env.HF_MODEL || 'mistralai/Mistral-7B-Instruct-v0.2';
+const HF_MODEL = process.env.HF_MODEL || 'mistralai/Mixtral-8x7B-Instruct-v0.1';
 
 // Helper para verificar se todas as variáveis de ambiente necessárias estão configuradas
 const checkEnvironmentVariables = () => {
@@ -135,6 +135,8 @@ export default async function handler(req, res) {
        - Músculos trabalhados
        - Descrição da execução
     
+    IMPORTANTE: Sua resposta deve ser TOTALMENTE em português brasileiro, incluindo todos os nomes de exercícios, descrições e demais textos.
+    
     Formate sua resposta como um objeto JSON com a seguinte estrutura:
     {
       "workouts": [
@@ -155,14 +157,23 @@ export default async function handler(req, res) {
         }
       ]
     }
+    
+    Exemplos de termos em português para usar:
+    - Use "Agachamento" em vez de "Squat"
+    - Use "Supino" em vez de "Bench Press"
+    - Use "Levantamento Terra" em vez de "Deadlift"
+    - Use "Rosca Direta" em vez de "Bicep Curl"
+    - Use "Puxada Alta" em vez de "Lat Pulldown"
+    - Níveis de dificuldade: "Iniciante", "Intermediário", "Avançado"
+    - Nomes de músculos em português: "Peito", "Costas", "Pernas", "Ombros", "Bíceps", "Tríceps", "Abdômen", "Glúteos", "Quadríceps", "Isquiotibiais"
     `;
     
     // Configuração para o modelo instruído
     const payload = {
       inputs: `<s>[INST] ${prompt} [/INST]`,
       parameters: {
-        max_new_tokens: 2048,
-        temperature: 0.7,
+        max_new_tokens: 3000,
+        temperature: 0.8,
         top_p: 0.95,
         return_full_text: false
       }
