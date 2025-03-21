@@ -5,12 +5,31 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 // Configurações da função
 Deno.serve(async (req) => {
+  // Lidar com solicitações OPTIONS (preflight) para CORS
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+        'Access-Control-Max-Age': '86400'
+      }
+    });
+  }
+  
   try {
     // Verificar método
     if (req.method !== 'POST') {
       return new Response(
         JSON.stringify({ error: 'Método não permitido' }),
-        { status: 405, headers: { 'Content-Type': 'application/json' } }
+        { 
+          status: 405, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
+        }
       )
     }
     
@@ -22,7 +41,13 @@ Deno.serve(async (req) => {
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Token de autenticação ausente' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
+        { 
+          status: 401, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
+        }
       )
     }
     
@@ -41,7 +66,13 @@ Deno.serve(async (req) => {
     if (userError || !user) {
       return new Response(
         JSON.stringify({ error: 'Usuário não autenticado' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
+        { 
+          status: 401, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
+        }
       )
     }
     
@@ -50,7 +81,13 @@ Deno.serve(async (req) => {
     if (!assessmentId) {
       return new Response(
         JSON.stringify({ error: 'ID da avaliação não fornecido' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { 
+          status: 400, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
+        }
       )
     }
     
@@ -64,14 +101,26 @@ Deno.serve(async (req) => {
     if (assessmentError) {
       return new Response(
         JSON.stringify({ error: 'Erro ao buscar avaliação', details: assessmentError }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+        { 
+          status: 500, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
+        }
       )
     }
     
     if (!assessment) {
       return new Response(
         JSON.stringify({ error: 'Avaliação não encontrada' }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
+        { 
+          status: 404, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
+        }
       )
     }
     
@@ -253,20 +302,38 @@ Deno.serve(async (req) => {
     if (insertError) {
       return new Response(
         JSON.stringify({ error: 'Erro ao salvar sugestões', details: insertError }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+        { 
+          status: 500, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
+        }
       )
     }
     
     return new Response(
       JSON.stringify({ success: true, workouts: insertedWorkouts }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
+      { 
+        status: 200, 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        } 
+      }
     )
     
   } catch (error) {
     console.error("Erro interno:", error);
     return new Response(
       JSON.stringify({ error: 'Erro interno', details: error.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { 
+        status: 500, 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        } 
+      }
     )
   }
 }) 
