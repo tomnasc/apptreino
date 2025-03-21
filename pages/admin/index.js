@@ -132,13 +132,13 @@ export default function AdminDashboard() {
         .from('user_feedback')
         .select(`
           id, 
-          subject, 
-          message, 
-          category, 
+          title as subject, 
+          description as message, 
+          feedback_type as category, 
           status, 
-          response, 
+          admin_notes as response, 
           created_at,
-          response_date,
+          updated_at as response_date,
           user_id
         `)
         .order('created_at', { ascending: false });
@@ -203,9 +203,9 @@ export default function AdminDashboard() {
       const { data, error } = await supabase
         .from('user_feedback')
         .update({
-          response: responseText,
+          admin_notes: responseText,
           status: 'responded',
-          response_date: new Date().toISOString()
+          updated_at: new Date().toISOString()
         })
         .eq('id', selectedFeedback.id);
       
