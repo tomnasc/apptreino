@@ -131,14 +131,14 @@ export default function AdminDashboard() {
       const { data, error } = await supabase
         .from('user_feedback')
         .select(`
-          id, 
-          title as subject, 
-          description as message, 
-          feedback_type as category, 
-          status, 
-          admin_notes as response, 
+          id,
+          title,
+          description,
+          feedback_type,
+          status,
+          admin_notes,
           created_at,
-          updated_at as response_date,
+          updated_at,
           user_id
         `)
         .order('created_at', { ascending: false });
@@ -164,6 +164,14 @@ export default function AdminDashboard() {
             
             // Adicionar informações de usuário aos feedbacks
             data.forEach(feedback => {
+              // Mapear campos para manter compatibilidade com o resto do código
+              feedback.subject = feedback.title;
+              feedback.message = feedback.description;
+              feedback.category = feedback.feedback_type;
+              feedback.response = feedback.admin_notes;
+              feedback.response_date = feedback.updated_at;
+              
+              // Adicionar informações do usuário
               if (feedback.user_id && userMap[feedback.user_id]) {
                 feedback.users = {
                   id: feedback.user_id,
