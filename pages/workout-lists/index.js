@@ -76,7 +76,7 @@ export default function WorkoutLists() {
     <Layout title="Listas de Treinos">
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Suas Listas de Treinos</h1>
+          <h1 className="text-2xl font-bold dark-text-primary">Suas Listas de Treinos</h1>
           <Link
             href="/workout-lists/new"
             className="btn-primary"
@@ -87,18 +87,18 @@ export default function WorkoutLists() {
 
         {loading ? (
           <div className="text-center py-10">
-            <p>Carregando...</p>
+            <p className="dark-text-secondary">Carregando...</p>
           </div>
         ) : workoutLists.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {workoutLists.map((list) => (
-              <div key={list.id} className="card hover:shadow-lg transition-shadow">
+              <div key={list.id} className="dark-card rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
                 <div className="flex justify-between items-start">
-                  <h2 className="text-xl font-semibold text-gray-900">{list.name}</h2>
+                  <h2 className="text-xl font-semibold dark-text-primary">{list.name}</h2>
                   <div className="flex space-x-2">
                     <Link
                       href={`/workout-lists/${list.id}`}
-                      className="text-blue-600 hover:text-blue-800"
+                      className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -111,7 +111,7 @@ export default function WorkoutLists() {
                     </Link>
                     <button
                       onClick={() => handleDelete(list.id)}
-                      className="text-red-600 hover:text-red-800"
+                      className="text-red-600 hover:text-red-500 dark:text-red-400 dark:hover:text-red-300"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -128,12 +128,12 @@ export default function WorkoutLists() {
                     </button>
                   </div>
                 </div>
-                <p className="text-gray-600 mt-2">{list.description || 'Sem descrição'}</p>
+                <p className="dark-text-secondary mt-2">{list.description || 'Sem descrição'}</p>
                 <div className="mt-4 flex justify-between items-center">
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm dark-text-tertiary">
                     Criada em {formatDate(list.created_at)}
                   </span>
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                  <span className="px-2 py-1 dark-highlight text-xs rounded-full">
                     {list.exercises?.[0]?.count || 0} exercícios
                   </span>
                 </div>
@@ -156,7 +156,7 @@ export default function WorkoutLists() {
           </div>
         ) : (
           <div className="text-center py-10">
-            <p className="text-gray-600 mb-4">
+            <p className="dark-text-secondary mb-4">
               Você ainda não tem nenhuma lista de treinos.
             </p>
             <Link href="/workout-lists/new" className="btn-primary">

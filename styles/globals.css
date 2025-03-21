@@ -33,21 +33,21 @@
 }
 
 [data-theme="dark"] {
-  /* Cores para o modo escuro */
+  /* Cores para o modo escuro - melhorado para contraste */
   --primary: #60a5fa;
   --primary-dark: #3b82f6;
   --secondary: #34d399;
   --secondary-dark: #10b981;
-  --background: #111827;
-  --foreground: #f9fafb;
-  --card-bg: #1f2937;
-  --card-border: #374151;
-  --input-bg: #1f2937;
-  --input-border: #374151;
-  --header-bg: #1f2937;
-  --header-border: #374151;
+  --background: #0f172a; /* Fundo mais escuro para maior contraste */
+  --foreground: #f3f4f6; /* Texto principal mais claro */
+  --card-bg: #1e293b; /* Fundo do card mais claro para maior contraste */
+  --card-border: #334155;
+  --input-bg: #1e293b;
+  --input-border: #475569;
+  --header-bg: #1e293b; /* Header mais claro que o fundo */
+  --header-border: #334155;
   --nav-active: #60a5fa;
-  --nav-inactive: #9ca3af;
+  --nav-inactive: #cbd5e1; /* Texto inativo mais visível */
   --button-primary-bg: #3b82f6;
   --button-primary-hover: #2563eb;
   --button-primary-text: #ffffff;
@@ -57,8 +57,8 @@
   --button-danger-bg: #ef4444;
   --button-danger-hover: #dc2626;
   --button-danger-text: #ffffff;
-  --button-outline-border: #374151;
-  --button-outline-text: #f9fafb;
+  --button-outline-border: #475569;
+  --button-outline-text: #f3f4f6;
   --button-outline-hover: #374151;
 }
 
@@ -92,5 +92,26 @@ body {
       rounded-md py-2 px-3 text-gray-900 dark:text-white
       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
       focus:border-transparent transition-colors;
+  }
+
+  /* Classes específicas para melhorar contraste no modo escuro */
+  .dark-text-primary {
+    @apply text-gray-900 dark:text-gray-100;
+  }
+
+  .dark-text-secondary {
+    @apply text-gray-600 dark:text-gray-300;
+  }
+
+  .dark-text-tertiary {
+    @apply text-gray-500 dark:text-gray-400;
+  }
+  
+  .dark-card {
+    @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700;
+  }
+  
+  .dark-highlight {
+    @apply bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200;
   }
 } 

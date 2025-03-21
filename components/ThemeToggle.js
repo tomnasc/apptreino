@@ -8,7 +8,7 @@ export default function ThemeToggle({ className = '' }) {
       onClick={toggleTheme}
       className={`p-2 rounded-md ${
         theme === 'dark' 
-          ? 'bg-gray-700 text-yellow-300 hover:bg-gray-600' 
+          ? 'bg-gray-800 text-yellow-300 hover:bg-gray-700 ring-1 ring-gray-600' 
           : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
       } transition-colors ${className}`}
       aria-label={`Mudar para modo ${theme === 'light' ? 'escuro' : 'claro'}`}
