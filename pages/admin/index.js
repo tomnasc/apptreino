@@ -139,14 +139,46 @@ export default function AdminDashboard() {
           response, 
           created_at,
           response_date,
-          users (
-            id,
-            email
-          )
+          user_id
         `)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
+      
+      // Buscar dados dos usuários separadamente
+      if (data && data.length > 0) {
+        const userIds = [...new Set(data.map(item => item.user_id))].filter(Boolean);
+        
+        if (userIds.length > 0) {
+          const { data: profiles, error: profilesError } = await supabase
+            .from('user_profiles')
+            .select('id, email')
+            .in('id', userIds);
+            
+          if (!profilesError && profiles) {
+            // Mapear emails de usuários para os feedbacks
+            const userMap = {};
+            profiles.forEach(profile => {
+              userMap[profile.id] = profile;
+            });
+            
+            // Adicionar informações de usuário aos feedbacks
+            data.forEach(feedback => {
+              if (feedback.user_id && userMap[feedback.user_id]) {
+                feedback.users = {
+                  id: feedback.user_id,
+                  email: userMap[feedback.user_id].email
+                };
+              } else {
+                feedback.users = {
+                  id: feedback.user_id,
+                  email: 'Usuário desconhecido'
+                };
+              }
+            });
+          }
+        }
+      }
       
       setFeedbackItems(data || []);
     } catch (error) {
