@@ -74,21 +74,21 @@ export default function PaymentHistoryPage() {
   };
 
   const getStatusClass = (status) => {
-    if (!status) return 'bg-gray-100 text-gray-800';
+    if (!status) return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300';
     
     switch (status.toLowerCase()) {
       case 'success':
       case 'paid':
       case 'completed':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300';
       case 'pending':
       case 'processing':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300';
       case 'failed':
       case 'canceled':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300';
     }
   };
 
@@ -121,22 +121,22 @@ export default function PaymentHistoryPage() {
   return (
     <Layout title="Histórico de Pagamentos">
       <div className="max-w-6xl mx-auto px-4">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">
+        <h1 className="text-2xl font-bold dark-text-primary mb-6">
           Histórico de Pagamentos
         </h1>
         
         {/* Resumo da assinatura */}
-        <div className="bg-white rounded-lg shadow mb-6 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Sua Assinatura</h2>
+        <div className="dark-card rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-lg font-semibold dark-text-primary mb-4">Sua Assinatura</h2>
           
           {loading ? (
-            <p className="text-gray-500">Carregando detalhes...</p>
+            <p className="dark-text-tertiary">Carregando detalhes...</p>
           ) : subscription ? (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
-                  <p className="text-sm text-gray-500">Plano</p>
-                  <p className="font-medium">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Plano</p>
+                  <p className="font-medium dark-text-secondary">
                     {subscription.plan_type === 'paid' ? 'Premium' : 
                      subscription.plan_type === 'free' ? 'Gratuito' : 
                      subscription.plan_type === 'admin' ? 'Administrador' : 
@@ -145,100 +145,107 @@ export default function PaymentHistoryPage() {
                 </div>
                 
                 <div>
-                  <p className="text-sm text-gray-500">Status</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Status</p>
                   <p className="font-medium">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(subscription.subscription_status)}`}>
-                      {subscription.subscription_status === 'active' ? 'Ativa' :
-                       subscription.subscription_status === 'canceled' ? 'Cancelada' :
-                       subscription.subscription_status === 'past_due' ? 'Pagamento Pendente' :
-                       subscription.subscription_status || 'N/A'}
+                      {subscription.subscription_status ? 
+                        subscription.subscription_status.charAt(0).toUpperCase() + 
+                        subscription.subscription_status.slice(1) 
+                        : 'N/A'}
                     </span>
                   </p>
                 </div>
                 
                 <div>
-                  <p className="text-sm text-gray-500">Validade</p>
-                  <p className="font-medium">{formatDate(subscription.expiry_date)}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Expira em</p>
+                  <p className="font-medium dark-text-secondary">
+                    {subscription.expiry_date ? formatDate(subscription.expiry_date) : 'N/A'}
+                  </p>
                 </div>
               </div>
               
-              {subscription.plan_type === 'paid' && new Date(subscription.expiry_date) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && (
-                <div className="pt-4 border-t border-gray-200">
+              {subscription.subscription_status === 'active' && (
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-sm dark-text-tertiary mb-4">
+                    Seu plano será renovado automaticamente na data de expiração. Se quiser cancelar a renovação automática, acesse sua conta no provedor de pagamento.
+                  </p>
+                </div>
+              )}
+              
+              {subscription.subscription_status !== 'active' && subscription.plan_type !== 'admin' && (
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-sm dark-text-tertiary mb-4">
+                    {subscription.plan_type === 'paid' 
+                      ? 'Sua assinatura está inativa ou foi cancelada. Para continuar aproveitando os benefícios do plano Premium, renove sua assinatura.'
+                      : 'Assine o plano Premium para ter acesso a todos os recursos do aplicativo.'}
+                  </p>
                   <button
                     onClick={handleRenewSubscription}
-                    className="btn-primary text-sm"
+                    className="btn-primary"
                   >
-                    Renovar Assinatura
+                    {subscription.plan_type === 'paid' ? 'Renovar Assinatura' : 'Assinar Plano Premium'}
                   </button>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Sua assinatura {new Date(subscription.expiry_date) < new Date() ? 'expirou' : 'expirará em breve'}. 
-                    Renove para continuar aproveitando todos os recursos premium.
-                  </p>
                 </div>
               )}
             </div>
           ) : (
-            <p className="text-gray-500">Nenhuma informação de assinatura encontrada.</p>
+            <p className="dark-text-tertiary">Nenhuma informação de assinatura disponível</p>
           )}
         </div>
         
         {/* Histórico de transações */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Transações</h2>
+        <div className="dark-card rounded-lg shadow-md p-6">
+          <h2 className="text-lg font-semibold dark-text-primary mb-4">Histórico de Transações</h2>
           
           {loading ? (
-            <p className="text-gray-500">Carregando histórico...</p>
+            <p className="dark-text-tertiary">Carregando transações...</p>
           ) : transactions.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-800/60">
                   <tr>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Data
                     </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Descrição
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Valor
                     </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Método
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Status
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      ID da Transação
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-800/30 divide-y divide-gray-200 dark:divide-gray-700">
                   {transactions.map((transaction) => (
                     <tr key={transaction.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm dark-text-tertiary">
                         {formatDate(transaction.created_at)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {formatCurrency(transaction.amount, transaction.currency)}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm dark-text-secondary">
+                        {transaction.description || 'Assinatura Premium'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {transaction.payment_method === 'card' ? 'Cartão' : 
-                         transaction.payment_method === 'boleto' ? 'Boleto' : 
-                         transaction.payment_method || 'N/A'}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm dark-text-secondary">
+                        {formatCurrency(transaction.amount, transaction.currency)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(transaction.status)}`}>
-                          {transaction.status === 'success' ? 'Concluído' :
-                           transaction.status === 'pending' ? 'Pendente' :
-                           transaction.status === 'failed' ? 'Falhou' :
-                           transaction.status || 'N/A'}
+                          {transaction.status ? 
+                            transaction.status.charAt(0).toUpperCase() + 
+                            transaction.status.slice(1) 
+                            : 'N/A'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <span className="font-mono">
+                          {transaction.transaction_id ? 
+                            `${transaction.transaction_id.slice(0, 6)}...${transaction.transaction_id.slice(-4)}` 
+                            : 'N/A'}
                         </span>
                       </td>
                     </tr>
@@ -247,7 +254,7 @@ export default function PaymentHistoryPage() {
               </table>
             </div>
           ) : (
-            <p className="text-gray-500">Você ainda não realizou nenhuma transação.</p>
+            <p className="dark-text-tertiary">Nenhuma transação encontrada</p>
           )}
         </div>
       </div>

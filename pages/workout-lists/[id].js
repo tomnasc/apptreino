@@ -375,437 +375,335 @@ export default function EditWorkoutList() {
   }
 
   return (
-    <Layout title={`Editar: ${workoutList?.name || ''}`}>
-      <div className="space-y-8">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Editar Lista de Treinos</h1>
-          <div className="flex space-x-2">
+    <Layout title={workoutList ? `Editar: ${workoutList.name}` : 'Editar Lista de Treinos'}>
+      <div className="py-6 px-4">
+        <div className="mb-6">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold dark-text-primary">
+              {workoutList ? workoutList.name : 'Editar Lista de Treinos'}
+            </h1>
             <Link
-              href="/workout-lists"
-              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-            >
-              Voltar
-            </Link>
-            <Link
-              href={`/workout-mode/${id}`}
-              className="btn-secondary"
+              href="/workout-mode/[id]"
+              as={`/workout-mode/${id}`}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white rounded-md text-sm font-medium"
             >
               Iniciar Treino
             </Link>
           </div>
+          <p className="dark-text-secondary mt-2">
+            Edite os detalhes e adicione exercícios à sua lista de treinos
+          </p>
         </div>
 
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg
-                  className="h-5 w-5 text-red-500"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            </div>
+        {loading ? (
+          <div className="flex justify-center items-center h-40">
+            <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 dark:border-gray-700 h-12 w-12"></div>
           </div>
-        )}
-
-        {/* Formulário de edição da lista */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Informações da Lista</h2>
-          <form onSubmit={handleUpdateList}>
-            <div className="grid grid-cols-1 gap-6">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome da lista *
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  className="input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                  Descrição (opcional)
-                </label>
-                <textarea
-                  id="description"
-                  className="input min-h-[100px]"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </div>
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={saving}
-                >
-                  {saving ? 'Salvando...' : 'Salvar Alterações'}
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-
-        {/* Lista de exercícios */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">Exercícios</h2>
+        ) : error ? (
+          <div className="dark-card rounded-lg shadow-md p-4 text-center">
+            <p className="text-red-600 dark:text-red-400">{error}</p>
             <button
-              onClick={() => setShowExerciseForm(!showExerciseForm)}
-              className="btn-primary"
+              onClick={() => router.push('/workout-lists')}
+              className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-md text-sm font-medium"
             >
-              {showExerciseForm ? 'Cancelar' : 'Adicionar Exercício'}
+              Voltar para Listas de Treinos
             </button>
           </div>
-
-          {/* Formulário de exercício */}
-          {showExerciseForm && (
-            <div className="bg-gray-50 p-4 rounded-lg mb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                {editingExerciseId ? 'Editar Exercício' : 'Novo Exercício'}
-              </h3>
-              <form onSubmit={handleAddExercise}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <label htmlFor="exerciseName" className="block text-sm font-medium text-gray-700 mb-1">
-                      Nome do exercício *
+        ) : (
+          <div className="space-y-6">
+            {/* Formulário de informações da lista */}
+            <div className="dark-card rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-semibold dark-text-primary mb-4">Informações da Lista</h2>
+              <form onSubmit={handleUpdateList}>
+                <div className="grid grid-cols-1 gap-6">
+                  <div>
+                    <label htmlFor="name" className="block text-sm font-medium dark-text-tertiary mb-1">
+                      Nome da lista *
                     </label>
                     <input
                       type="text"
-                      id="exerciseName"
-                      className="input"
-                      value={exerciseName}
-                      onChange={(e) => setExerciseName(e.target.value)}
-                      placeholder="Ex: Supino reto"
+                      id="name"
+                      className="dark-input mt-1 block w-full rounded-md"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
                       required
                     />
                   </div>
                   <div>
-                    <label htmlFor="weight" className="block text-sm font-medium text-gray-700 mb-1">
-                      Carga (kg)
+                    <label htmlFor="description" className="block text-sm font-medium dark-text-tertiary mb-1">
+                      Descrição (opcional)
                     </label>
-                    <input
-                      type="number"
-                      id="weight"
-                      className="input"
-                      value={weight}
-                      onChange={(e) => setWeight(e.target.value)}
-                      placeholder="Ex: 20"
-                      min="0"
-                      step="0.5"
+                    <textarea
+                      id="description"
+                      className="dark-input mt-1 block w-full rounded-md min-h-[100px]"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
                     />
                   </div>
-                  <div>
-                    <label htmlFor="sets" className="block text-sm font-medium text-gray-700 mb-1">
-                      Número de séries *
-                    </label>
-                    <input
-                      type="number"
-                      id="sets"
-                      className="input"
-                      value={sets}
-                      onChange={(e) => setSets(e.target.value)}
-                      placeholder="Ex: 3"
-                      min="1"
-                      required
-                    />
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-md text-sm font-medium focus:outline-none disabled:opacity-50"
+                      disabled={saving}
+                    >
+                      {saving ? 'Salvando...' : 'Salvar Alterações'}
+                    </button>
                   </div>
-                  <div>
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="checkbox"
-                        id="isTimeBased"
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        checked={isTimeBasedExercise}
-                        onChange={(e) => setIsTimeBasedExercise(e.target.checked)}
-                      />
-                      <label htmlFor="isTimeBased" className="ml-2 block text-sm font-medium text-gray-700">
-                        Exercício baseado em tempo
-                      </label>
-                    </div>
-                    {isTimeBasedExercise ? (
-                      <>
-                        <label htmlFor="time" className="block text-sm font-medium text-gray-700 mb-1">
-                          Tempo (segundos) *
-                        </label>
-                        <input
-                          type="number"
-                          id="time"
-                          className="input"
-                          value={time}
-                          onChange={(e) => setTime(e.target.value)}
-                          placeholder="Ex: 30"
-                          min="1"
-                          required={isTimeBasedExercise}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <label htmlFor="reps" className="block text-sm font-medium text-gray-700 mb-1">
-                          Repetições por série *
-                        </label>
-                        <input
-                          type="number"
-                          id="reps"
-                          className="input"
-                          value={reps}
-                          onChange={(e) => setReps(e.target.value)}
-                          placeholder="Ex: 12"
-                          min="1"
-                          required={!isTimeBasedExercise}
-                        />
-                      </>
-                    )}
-                  </div>
-                  <div>
-                    <label htmlFor="restTime" className="block text-sm font-medium text-gray-700 mb-1">
-                      Tempo de descanso (segundos) *
-                    </label>
-                    <input
-                      type="number"
-                      id="restTime"
-                      className="input"
-                      value={restTime}
-                      onChange={(e) => setRestTime(e.target.value)}
-                      placeholder="Ex: 60"
-                      min="0"
-                      required
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label htmlFor="videoUrl" className="block text-sm font-medium text-gray-700 mb-1">
-                      Link do vídeo (YouTube)
-                    </label>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="url"
-                        id="videoUrl"
-                        className="input flex-grow"
-                        value={videoUrl}
-                        onChange={(e) => setVideoUrl(e.target.value)}
-                        placeholder="Ex: https://www.youtube.com/watch?v=..."
-                      />
-                      <button
-                        type="button"
-                        onClick={() => searchYoutubeVideo(exerciseName)}
-                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md shadow-sm flex items-center"
-                        disabled={!exerciseName.trim()}
-                      >
-                        <svg 
-                          xmlns="http://www.w3.org/2000/svg" 
-                          className="h-5 w-5 mr-1" 
-                          viewBox="0 0 24 24" 
-                          fill="currentColor"
-                        >
-                          <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
-                        </svg>
-                        Buscar vídeo
-                      </button>
-                    </div>
-                    {videoUrl && getYoutubeVideoId(videoUrl) && (
-                      <div className="mt-2 p-1 bg-gray-50 rounded border border-gray-200">
-                        <div className="flex items-center">
-                          <img 
-                            src={`https://img.youtube.com/vi/${getYoutubeVideoId(videoUrl)}/default.jpg`}
-                            alt="Thumbnail do vídeo"
-                            className="w-20 h-auto rounded"
-                          />
-                          <span className="ml-2 text-xs text-gray-500 truncate">
-                            Vídeo selecionado
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-4 flex justify-end space-x-2">
-                  <button
-                    type="button"
-                    onClick={resetExerciseForm}
-                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn-primary"
-                    disabled={saving}
-                  >
-                    {saving ? 'Salvando...' : (editingExerciseId ? 'Atualizar' : 'Adicionar')}
-                  </button>
                 </div>
               </form>
             </div>
-          )}
 
-          {exercises.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">
-                Nenhum exercício adicionado ainda. Clique em "Adicionar Exercício" para começar.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {exercises.map((exercise, index) => (
-                <div key={exercise.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900">{exercise.name}</h3>
-                      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        {exercise.weight && (
-                          <div>
-                            <span className="font-medium text-gray-500">Carga:</span>{' '}
-                            <span>{exercise.weight} kg</span>
-                          </div>
-                        )}
-                        <div>
-                          <span className="font-medium text-gray-500">Séries:</span>{' '}
-                          <span>{exercise.sets}</span>
+            {/* Lista de exercícios */}
+            <div className="dark-card rounded-lg shadow-md p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold dark-text-primary">Exercícios</h2>
+                <button
+                  onClick={() => {
+                    setShowExerciseForm(!showExerciseForm);
+                    if (editingExerciseId) {
+                      resetExerciseForm();
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-md text-sm font-medium focus:outline-none"
+                >
+                  {showExerciseForm ? 'Cancelar' : 'Adicionar Exercício'}
+                </button>
+              </div>
+
+              {/* Formulário de exercício */}
+              {showExerciseForm && (
+                <div className="dark-card bg-gray-50/60 dark:bg-gray-800/30 p-4 rounded-lg mb-6">
+                  <h3 className="text-lg font-medium dark-text-primary mb-4">
+                    {editingExerciseId ? 'Editar Exercício' : 'Novo Exercício'}
+                  </h3>
+                  <form onSubmit={handleAddExercise}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label htmlFor="exerciseName" className="block text-sm font-medium dark-text-tertiary mb-1">
+                          Nome do exercício *
+                        </label>
+                        <input
+                          type="text"
+                          id="exerciseName"
+                          className="dark-input mt-1 block w-full rounded-md"
+                          value={exerciseName}
+                          onChange={(e) => setExerciseName(e.target.value)}
+                          placeholder="Ex: Supino reto"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="weight" className="block text-sm font-medium dark-text-tertiary mb-1">
+                          Carga (kg)
+                        </label>
+                        <input
+                          type="number"
+                          id="weight"
+                          className="dark-input mt-1 block w-full rounded-md"
+                          value={weight}
+                          onChange={(e) => setWeight(e.target.value)}
+                          placeholder="Ex: 20"
+                          min="0"
+                          step="0.5"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="sets" className="block text-sm font-medium dark-text-tertiary mb-1">
+                          Número de séries *
+                        </label>
+                        <input
+                          type="number"
+                          id="sets"
+                          className="dark-input mt-1 block w-full rounded-md"
+                          value={sets}
+                          onChange={(e) => setSets(e.target.value)}
+                          placeholder="Ex: 3"
+                          min="1"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center mb-2">
+                          <label className="flex items-center text-sm dark-text-tertiary">
+                            <input
+                              type="checkbox"
+                              className="form-checkbox h-4 w-4 text-blue-600 dark:text-blue-400 rounded"
+                              checked={isTimeBasedExercise}
+                              onChange={() => setIsTimeBasedExercise(!isTimeBasedExercise)}
+                            />
+                            <span className="ml-2">Exercício baseado em tempo</span>
+                          </label>
                         </div>
-                        {exercise.reps && (
-                          <div>
-                            <span className="font-medium text-gray-500">Repetições:</span>{' '}
-                            <span>{exercise.reps}</span>
-                          </div>
+                        {isTimeBasedExercise ? (
+                          <>
+                            <label htmlFor="time" className="block text-sm font-medium dark-text-tertiary mb-1">
+                              Tempo por série (segundos) *
+                            </label>
+                            <input
+                              type="number"
+                              id="time"
+                              className="dark-input mt-1 block w-full rounded-md"
+                              value={time}
+                              onChange={(e) => setTime(e.target.value)}
+                              placeholder="Ex: 30"
+                              min="1"
+                              required={isTimeBasedExercise}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <label htmlFor="reps" className="block text-sm font-medium dark-text-tertiary mb-1">
+                              Repetições por série *
+                            </label>
+                            <input
+                              type="number"
+                              id="reps"
+                              className="dark-input mt-1 block w-full rounded-md"
+                              value={reps}
+                              onChange={(e) => setReps(e.target.value)}
+                              placeholder="Ex: 12"
+                              min="1"
+                              required={!isTimeBasedExercise}
+                            />
+                          </>
                         )}
-                        {exercise.time && (
-                          <div>
-                            <span className="font-medium text-gray-500">Tempo:</span>{' '}
-                            <span>{exercise.time} segundos</span>
-                          </div>
-                        )}
-                        <div>
-                          <span className="font-medium text-gray-500">Descanso:</span>{' '}
-                          <span>{exercise.rest_time || 60} segundos</span>
+                      </div>
+                      <div>
+                        <label htmlFor="restTime" className="block text-sm font-medium dark-text-tertiary mb-1">
+                          Tempo de descanso (segundos) *
+                        </label>
+                        <input
+                          type="number"
+                          id="restTime"
+                          className="dark-input mt-1 block w-full rounded-md"
+                          value={restTime}
+                          onChange={(e) => setRestTime(e.target.value)}
+                          placeholder="Ex: 60"
+                          min="0"
+                          required
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label htmlFor="videoUrl" className="block text-sm font-medium dark-text-tertiary mb-1">
+                          URL do vídeo (opcional)
+                        </label>
+                        <input
+                          type="url"
+                          id="videoUrl"
+                          className="dark-input mt-1 block w-full rounded-md"
+                          value={videoUrl}
+                          onChange={(e) => setVideoUrl(e.target.value)}
+                          placeholder="Ex: https://youtube.com/watch?v=..."
+                        />
+                      </div>
+                    </div>
+                    
+                    {error && (
+                      <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-md">
+                        {error}
+                      </div>
+                    )}
+                    
+                    <div className="mt-6 flex justify-end">
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-md text-sm font-medium focus:outline-none disabled:opacity-50"
+                        disabled={saving}
+                      >
+                        {saving ? 'Salvando...' : editingExerciseId ? 'Atualizar Exercício' : 'Adicionar Exercício'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Lista de exercícios */}
+              <div className="space-y-4">
+                {exercises.length > 0 ? (
+                  exercises.map((exercise, index) => (
+                    <div key={exercise.id} className="dark-card border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between">
+                        <h3 className="font-medium dark-text-primary text-lg">{exercise.name}</h3>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEditExercise(exercise)}
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteExercise(exercise.id)}
+                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
+                      
+                      <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div>
+                          <p className="text-xs dark-text-tertiary">Séries</p>
+                          <p className="font-medium dark-text-secondary">{exercise.sets}</p>
+                        </div>
+                        <div>
+                          {exercise.reps ? (
+                            <>
+                              <p className="text-xs dark-text-tertiary">Repetições</p>
+                              <p className="font-medium dark-text-secondary">{exercise.reps}</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-xs dark-text-tertiary">Tempo</p>
+                              <p className="font-medium dark-text-secondary">{exercise.time}s</p>
+                            </>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs dark-text-tertiary">Carga</p>
+                          <p className="font-medium dark-text-secondary">{exercise.weight ? `${exercise.weight}kg` : '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs dark-text-tertiary">Descanso</p>
+                          <p className="font-medium dark-text-secondary">{exercise.rest_time}s</p>
+                        </div>
+                      </div>
+                      
                       {exercise.video_url && (
-                        <div className="mt-3">
-                          <a
-                            href={exercise.video_url}
-                            target="_blank"
+                        <div className="mt-2">
+                          <a 
+                            href={exercise.video_url} 
+                            target="_blank" 
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center"
                           >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-5 w-5 mr-1"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
-                            >
-                              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                              <path
-                                fillRule="evenodd"
-                                d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-                                clipRule="evenodd"
-                              />
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
                             </svg>
-                            Ver demonstração
+                            Ver vídeo
                           </a>
                         </div>
                       )}
                     </div>
-                    <div className="flex space-x-1">
-                      <button
-                        onClick={() => handleMoveExercise(exercise.id, 'up')}
-                        disabled={index === 0}
-                        className={`p-1 rounded ${
-                          index === 0
-                            ? 'text-gray-400 cursor-not-allowed'
-                            : 'text-gray-600 hover:bg-gray-200'
-                        }`}
-                        title="Mover para cima"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleMoveExercise(exercise.id, 'down')}
-                        disabled={index === exercises.length - 1}
-                        className={`p-1 rounded ${
-                          index === exercises.length - 1
-                            ? 'text-gray-400 cursor-not-allowed'
-                            : 'text-gray-600 hover:bg-gray-200'
-                        }`}
-                        title="Mover para baixo"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleEditExercise(exercise)}
-                        className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                        title="Editar"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteExercise(exercise.id)}
-                        className="p-1 text-red-600 hover:bg-red-100 rounded"
-                        title="Excluir"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </button>
-                    </div>
+                  ))
+                ) : (
+                  <div className="text-center p-8 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                    <p className="dark-text-tertiary mb-4">Ainda não há exercícios nesta lista</p>
+                    <button
+                      onClick={() => setShowExerciseForm(true)}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-md text-sm font-medium"
+                    >
+                      Adicionar Primeiro Exercício
+                    </button>
                   </div>
-                </div>
-              ))}
+                )}
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

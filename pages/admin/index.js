@@ -4,6 +4,7 @@ import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
+import { FiCheckCircle, FiAlertCircle, FiUser, FiUsers, FiList, FiBell } from 'react-icons/fi';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -13,11 +14,18 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalUsers: 0,
-    adminUsers: 0,
-    paidUsers: 0,
-    freeUsers: 0,
-    pendingFeedbacks: 0
+    totalWorkoutLists: 0,
+    totalFeedback: 0,
+    pendingFeedback: 0,
+    recentUsers: [],
+    recentFeedback: []
   });
+  
+  const [selectedTab, setSelectedTab] = useState('dashboard');
+  const [feedbackItems, setFeedbackItems] = useState([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [selectedFeedback, setSelectedFeedback] = useState(null);
+  const [responseText, setResponseText] = useState('');
   
   // Verificar se o usuário é administrador
   useEffect(() => {
@@ -103,10 +111,11 @@ export default function AdminDashboard() {
       // Atualizar estado
       setStats({
         totalUsers: totalUsers || 0,
-        adminUsers: adminUsers || 0,
-        paidUsers: paidUsers || 0,
-        freeUsers: freeUsers || 0,
-        pendingFeedbacks: pendingCount || 0
+        totalWorkoutLists: 0,
+        totalFeedback: 0,
+        pendingFeedback: pendingCount || 0,
+        recentUsers: [],
+        recentFeedback: []
       });
       
     } catch (error) {
@@ -115,11 +124,89 @@ export default function AdminDashboard() {
     }
   };
   
+  const fetchFeedbackList = async () => {
+    try {
+      setFeedbackLoading(true);
+      
+      const { data, error } = await supabase
+        .from('user_feedback')
+        .select(`
+          id, 
+          subject, 
+          message, 
+          category, 
+          status, 
+          response, 
+          created_at,
+          response_date,
+          users (
+            id,
+            email
+          )
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      setFeedbackItems(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar feedbacks:', error);
+      toast.error('Erro ao carregar feedbacks');
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+  
+  const handleSelectFeedback = (feedback) => {
+    setSelectedFeedback(feedback);
+    setResponseText(feedback.response || '');
+  };
+  
+  const handleResponseSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!selectedFeedback) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_feedback')
+        .update({
+          response: responseText,
+          status: 'respondido',
+          response_date: new Date().toISOString()
+        })
+        .eq('id', selectedFeedback.id);
+      
+      if (error) throw error;
+      
+      toast.success('Resposta enviada com sucesso!');
+      
+      // Atualizar a lista de feedbacks
+      fetchFeedbackList();
+      
+      // Limpar a seleção
+      setSelectedFeedback(null);
+      setResponseText('');
+    } catch (error) {
+      console.error('Erro ao enviar resposta:', error);
+      toast.error('Erro ao enviar resposta. Tente novamente.');
+    }
+  };
+  
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).format(date);
+  };
+  
   if (loading) {
     return (
       <Layout title="Painel de Administração">
         <div className="flex justify-center items-center h-64">
-          <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div>
+          <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 dark:border-gray-700 h-12 w-12"></div>
         </div>
       </Layout>
     );
@@ -131,112 +218,329 @@ export default function AdminDashboard() {
   
   return (
     <Layout title="Painel de Administração">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Painel de Administração</h1>
-        <p className="text-gray-600">
-          Gerencie usuários, configurações e feedback do aplicativo
-        </p>
-      </div>
-      
-      {/* Cards com estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-lg font-medium text-gray-800 mb-2">Usuários</h3>
-          <p className="text-3xl font-bold text-blue-600">{stats.totalUsers}</p>
-          <div className="mt-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Administradores:</span>
-              <span className="font-medium">{stats.adminUsers}</span>
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold dark-text-primary mb-6">Painel Administrativo</h1>
+        
+        {/* Abas de navegação */}
+        <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setSelectedTab('dashboard')}
+              className={`${
+                selectedTab === 'dashboard'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent dark-text-tertiary hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => {
+                setSelectedTab('feedback');
+                fetchFeedbackList();
+              }}
+              className={`${
+                selectedTab === 'feedback'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent dark-text-tertiary hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
+            >
+              Feedbacks
+            </button>
+          </nav>
+        </div>
+        
+        {/* Conteúdo das abas */}
+        {selectedTab === 'dashboard' && (
+          <div>
+            {/* Cards de estatísticas */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <div className="dark-card rounded-lg shadow-md p-6">
+                <div className="flex items-center">
+                  <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mr-4">
+                    <FiUser className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium dark-text-tertiary">Usuários</p>
+                    <p className="text-2xl font-semibold dark-text-primary">{stats.totalUsers}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="dark-card rounded-lg shadow-md p-6">
+                <div className="flex items-center">
+                  <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 mr-4">
+                    <FiList className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium dark-text-tertiary">Listas de Treino</p>
+                    <p className="text-2xl font-semibold dark-text-primary">{stats.totalWorkoutLists}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="dark-card rounded-lg shadow-md p-6">
+                <div className="flex items-center">
+                  <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 mr-4">
+                    <FiBell className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium dark-text-tertiary">Total de Feedbacks</p>
+                    <p className="text-2xl font-semibold dark-text-primary">{stats.totalFeedback}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="dark-card rounded-lg shadow-md p-6">
+                <div className="flex items-center">
+                  <div className="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 mr-4">
+                    <FiBell className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium dark-text-tertiary">Feedbacks Pendentes</p>
+                    <p className="text-2xl font-semibold dark-text-primary">{stats.pendingFeedback}</p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Usuários pagos:</span>
-              <span className="font-medium">{stats.paidUsers}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Usuários gratuitos:</span>
-              <span className="font-medium">{stats.freeUsers}</span>
+            
+            {/* Seções de dados recentes */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Usuários recentes */}
+              <div className="dark-card rounded-lg shadow-md overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                  <h2 className="text-lg font-medium dark-text-primary">Usuários Recentes</h2>
+                </div>
+                <div className="p-6">
+                  {stats.recentUsers.length > 0 ? (
+                    <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {stats.recentUsers.map((user) => (
+                        <div key={user.id} className="py-3 flex justify-between items-center">
+                          <div>
+                            <p className="font-medium dark-text-primary">{user.email}</p>
+                            <p className="text-sm dark-text-tertiary">ID: {user.id.substring(0, 8)}...</p>
+                          </div>
+                          <p className="text-sm dark-text-tertiary">{formatDate(user.created_at)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="dark-text-tertiary text-center py-4">Nenhum usuário recente encontrado</p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Feedbacks recentes */}
+              <div className="dark-card rounded-lg shadow-md overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                  <h2 className="text-lg font-medium dark-text-primary">Feedbacks Recentes</h2>
+                </div>
+                <div className="p-6">
+                  {stats.recentFeedback.length > 0 ? (
+                    <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {stats.recentFeedback.map((feedback) => (
+                        <div key={feedback.id} className="py-3">
+                          <div className="flex justify-between items-start">
+                            <p className="font-medium dark-text-primary">{feedback.subject}</p>
+                            <div className={`text-xs px-2 py-0.5 rounded-full 
+                              ${feedback.status === 'respondido' 
+                                ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300' 
+                                : feedback.status === 'em análise'
+                                ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300' 
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'}`}
+                            >
+                              {feedback.status === 'respondido' ? 'Respondido' : 
+                               feedback.status === 'em análise' ? 'Em análise' : 
+                               'Pendente'}
+                            </div>
+                          </div>
+                          <div className="flex mt-1 justify-between">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 mr-2">
+                              {feedback.category ? 
+                                feedback.category.charAt(0).toUpperCase() + feedback.category.slice(1) : 
+                                'Sem categoria'}
+                            </span>
+                            <p className="text-sm dark-text-tertiary">{formatDate(feedback.created_at)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="dark-text-tertiary text-center py-4">Nenhum feedback recente encontrado</p>
+                  )}
+                  
+                  <div className="mt-4 text-center">
+                    <button
+                      onClick={() => {
+                        setSelectedTab('feedback');
+                        fetchFeedbackList();
+                      }}
+                      className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                    >
+                      Ver todos os feedbacks
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
         
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-lg font-medium text-gray-800 mb-2">Feedbacks</h3>
-          <p className="text-3xl font-bold text-orange-500">{stats.pendingFeedbacks}</p>
-          <p className="text-sm text-gray-600 mt-2">
-            Feedbacks pendentes de resposta
-          </p>
-          {stats.pendingFeedbacks > 0 && (
-            <Link 
-              href="/admin/feedback" 
-              className="mt-3 inline-block text-sm text-blue-600 hover:text-blue-800"
-            >
-              Ver todos →
-            </Link>
-          )}
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-lg font-medium text-gray-800 mb-2">Configurações</h3>
-          <div className="flex flex-col space-y-2 mt-4">
-            <Link
-              href="/admin/settings"
-              className="text-blue-600 hover:text-blue-800 flex items-center"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-              </svg>
-              Configurações do Aplicativo
-            </Link>
+        {selectedTab === 'feedback' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Lista de feedbacks */}
+            <div className="lg:col-span-1 dark-card rounded-lg shadow-md overflow-hidden max-h-[80vh]">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-medium dark-text-primary">Lista de Feedbacks</h2>
+              </div>
+              
+              <div className="overflow-y-auto max-h-[calc(80vh-56px)]"> {/* 56px é a altura do cabeçalho */}
+                {feedbackLoading ? (
+                  <div className="flex justify-center items-center h-40">
+                    <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 dark:border-gray-700 h-8 w-8"></div>
+                  </div>
+                ) : feedbackItems.length > 0 ? (
+                  <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {feedbackItems.map((feedback) => (
+                      <div 
+                        key={feedback.id} 
+                        onClick={() => handleSelectFeedback(feedback)}
+                        className={`p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150 ${
+                          selectedFeedback?.id === feedback.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <p className="font-medium dark-text-primary line-clamp-1">{feedback.subject}</p>
+                          <div className={`text-xs px-2 py-0.5 rounded-full shrink-0 ml-2 
+                            ${feedback.status === 'respondido' 
+                              ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300' 
+                              : feedback.status === 'em análise'
+                              ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300' 
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'}`}
+                          >
+                            {feedback.status === 'respondido' ? 'Respondido' : 
+                             feedback.status === 'em análise' ? 'Em análise' : 
+                             'Pendente'}
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-between mt-2">
+                          <div className="flex items-center">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 mr-2">
+                              {feedback.category ? 
+                                feedback.category.charAt(0).toUpperCase() + feedback.category.slice(1) : 
+                                'Sem categoria'}
+                            </span>
+                            <p className="text-xs dark-text-tertiary truncate">
+                              {feedback.users?.email || 'Usuário desconhecido'}
+                            </p>
+                          </div>
+                          <p className="text-xs dark-text-tertiary">{formatDate(feedback.created_at)}</p>
+                        </div>
+                        
+                        <p className="text-sm dark-text-secondary mt-2 line-clamp-2">
+                          {feedback.message}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="dark-text-tertiary text-center py-8">Nenhum feedback encontrado</p>
+                )}
+              </div>
+            </div>
+            
+            {/* Detalhes do feedback */}
+            <div className="lg:col-span-2">
+              {selectedFeedback ? (
+                <div className="dark-card rounded-lg shadow-md p-6">
+                  <div className="mb-6">
+                    <div className="flex justify-between items-start">
+                      <h2 className="text-xl font-semibold dark-text-primary">{selectedFeedback.subject}</h2>
+                      <div className={`text-xs px-2 py-0.5 rounded-full 
+                        ${selectedFeedback.status === 'respondido' 
+                          ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300' 
+                          : selectedFeedback.status === 'em análise'
+                          ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300' 
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'}`}
+                      >
+                        {selectedFeedback.status === 'respondido' ? 'Respondido' : 
+                         selectedFeedback.status === 'em análise' ? 'Em análise' : 
+                         'Pendente'}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center mt-2">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 mr-2">
+                        {selectedFeedback.category ? 
+                          selectedFeedback.category.charAt(0).toUpperCase() + selectedFeedback.category.slice(1) : 
+                          'Sem categoria'}
+                      </span>
+                      <p className="text-sm dark-text-tertiary">
+                        Enviado por: {selectedFeedback.users?.email || 'Usuário desconhecido'}
+                      </p>
+                      <span className="mx-2 text-gray-300 dark:text-gray-600">•</span>
+                      <p className="text-sm dark-text-tertiary">
+                        {formatDate(selectedFeedback.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-8">
+                    <h3 className="text-md font-medium dark-text-primary mb-2">Mensagem:</h3>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-800/30 rounded-lg">
+                      <p className="dark-text-secondary whitespace-pre-wrap">{selectedFeedback.message}</p>
+                    </div>
+                  </div>
+                  
+                  {selectedFeedback.response ? (
+                    <div>
+                      <h3 className="text-md font-medium dark-text-primary mb-2">Resposta:</h3>
+                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <p className="dark-text-secondary whitespace-pre-wrap">{selectedFeedback.response}</p>
+                        
+                        {selectedFeedback.response_date && (
+                          <p className="text-xs dark-text-tertiary mt-2">
+                            Respondido em {formatDate(selectedFeedback.response_date)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <h3 className="text-md font-medium dark-text-primary mb-2">Responder:</h3>
+                      <form onSubmit={handleResponseSubmit}>
+                        <textarea
+                          value={responseText}
+                          onChange={(e) => setResponseText(e.target.value)}
+                          className="w-full rounded-md dark-input min-h-[120px]"
+                          placeholder="Digite sua resposta para o usuário..."
+                          required
+                        ></textarea>
+                        
+                        <div className="mt-4 flex justify-end">
+                          <button
+                            type="submit"
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-md text-sm font-medium"
+                          >
+                            Enviar Resposta
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="dark-card rounded-lg shadow-md flex items-center justify-center h-[400px]">
+                  <div className="text-center">
+                    <FiBell className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+                    <p className="dark-text-secondary">Selecione um feedback para visualizar os detalhes</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
-      
-      {/* Menu de navegação administrativa */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-lg font-medium text-gray-800 mb-4">Gerenciamento de Usuários</h3>
-          <ul className="space-y-2">
-            <li>
-              <Link 
-                href="/admin/users" 
-                className="text-blue-600 hover:text-blue-800 flex items-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-                </svg>
-                Gerenciar Usuários
-              </Link>
-            </li>
-            <li>
-              <Link 
-                href="/admin/settings" 
-                className="text-blue-600 hover:text-blue-800 flex items-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                </svg>
-                Gerenciar Períodos de Teste
-              </Link>
-            </li>
-          </ul>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-lg font-medium text-gray-800 mb-4">Comunicação e Feedback</h3>
-          <ul className="space-y-2">
-            <li>
-              <Link 
-                href="/admin/feedback" 
-                className="text-blue-600 hover:text-blue-800 flex items-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2zM7 8H5v2h2V8zm2 0h2v2H9V8zm6 0h-2v2h2V8z" clipRule="evenodd" />
-                </svg>
-                Gerenciar Feedbacks
-              </Link>
-            </li>
-          </ul>
-        </div>
+        )}
       </div>
     </Layout>
   );

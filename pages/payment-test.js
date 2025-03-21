@@ -2,12 +2,25 @@ import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { loadStripe } from '@stripe/stripe-js';
 import PaymentButton from '../components/PaymentButton';
+import { useUser } from '@supabase/auth-helpers-react';
+import { toast } from 'react-hot-toast';
 
-export default function PaymentTestPage() {
+export default function PaymentTest() {
   const [stripeKey, setStripeKey] = useState('');
   const [priceId, setPriceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('direct');
+  const user = useUser();
+
+  // Cards de teste para Stripe
+  const testCards = [
+    { brand: 'Visa', number: '4242 4242 4242 4242', cvc: 'Qualquer 3 dígitos', date: 'Qualquer data futura' },
+    { brand: 'Visa (falha)', number: '4000 0000 0000 0002', cvc: 'Qualquer 3 dígitos', date: 'Qualquer data futura' },
+    { brand: 'Mastercard', number: '5555 5555 5555 4444', cvc: 'Qualquer 3 dígitos', date: 'Qualquer data futura' },
+    { brand: 'Mastercard (autenticação)', number: '5200 8282 8282 8210', cvc: 'Qualquer 3 dígitos', date: 'Qualquer data futura' },
+  ];
 
   useEffect(() => {
     // Verificar se a chave pública do Stripe está definida
@@ -34,6 +47,12 @@ export default function PaymentTestPage() {
     
     fetchPriceId();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      setUserId(user.id);
+    }
+  }, [user]);
 
   const handleTestClick = async () => {
     try {
@@ -71,10 +90,42 @@ export default function PaymentTestPage() {
     }
   };
 
+  const handleDirectCheckout = async () => {
+    try {
+      setLoading(true);
+      
+      const response = await fetch('/api/create-checkout-session-direct', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          priceId: 'price_1OQAEDDRd1DJtpnqCUfUlWrQ', // ID do preço no Stripe
+          userId: userId,
+        }),
+      });
+
+      const { sessionUrl, error } = await response.json();
+
+      if (error) {
+        toast.error(`Erro: ${error}`);
+        return;
+      }
+
+      // Redirecionar para a página de checkout do Stripe
+      window.location.href = sessionUrl;
+    } catch (error) {
+      console.error('Erro ao processar pagamento:', error);
+      toast.error('Erro ao processar pagamento. Tente novamente mais tarde.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Layout title="Teste de Pagamento">
-      <div className="bg-white shadow-md rounded-lg p-6 max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Página de Teste de Pagamento</h1>
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold dark-text-primary mb-6">Página de Teste de Pagamento</h1>
         
         {error && (
           <div className="bg-red-50 text-red-700 p-4 rounded-md mb-6 border border-red-200">
@@ -83,64 +134,73 @@ export default function PaymentTestPage() {
           </div>
         )}
         
-        <div className="bg-blue-50 p-4 rounded-md mb-6 border border-blue-200">
-          <h2 className="text-lg font-semibold text-blue-800 mb-2">Configuração do Stripe</h2>
-          <p><strong>Chave pública:</strong> {stripeKey.startsWith('pk_') ? `${stripeKey.substring(0, 7)}...` : stripeKey}</p>
-          <p><strong>Ambiente:</strong> {stripeKey.includes('_live_') ? 'Produção ⚠️' : 'Teste ✅'}</p>
-          <p><strong>ID do preço:</strong> {loading ? 'Carregando...' : priceId || 'Não disponível'}</p>
-        </div>
-        
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-2">Cartões de Teste</h2>
-          <p className="mb-4 text-gray-600">Use estes cartões de teste para simular diferentes cenários de pagamento:</p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="border rounded-md p-3 bg-green-50">
-              <h3 className="font-medium text-green-800">Pagamento Bem-sucedido</h3>
-              <p className="font-mono mt-2">4242 4242 4242 4242</p>
-              <p className="text-sm text-gray-600 mt-1">Data: qualquer futura | CVV: qualquer</p>
+        <div className="grid md:grid-cols-2 gap-8">
+          <div className="dark-card rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-semibold dark-text-primary mb-4">Testar Pagamento</h2>
+            
+            <div className="mb-6">
+              <h3 className="font-medium dark-text-primary mb-2">Opções de pagamento:</h3>
+              <div className="space-y-2">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    checked={paymentMethod === 'direct'}
+                    onChange={() => setPaymentMethod('direct')}
+                    className="form-radio text-blue-600"
+                  />
+                  <span className="dark-text-primary">Checkout Direto (recomendado)</span>
+                </label>
+              </div>
             </div>
             
-            <div className="border rounded-md p-3 bg-yellow-50">
-              <h3 className="font-medium text-yellow-800">Autenticação 3D Secure</h3>
-              <p className="font-mono mt-2">4000 0000 0000 3220</p>
-              <p className="text-sm text-gray-600 mt-1">Data: qualquer futura | CVV: qualquer</p>
-            </div>
-            
-            <div className="border rounded-md p-3 bg-red-50">
-              <h3 className="font-medium text-red-800">Pagamento Recusado</h3>
-              <p className="font-mono mt-2">4000 0000 0000 0002</p>
-              <p className="text-sm text-gray-600 mt-1">Data: qualquer futura | CVV: qualquer</p>
-            </div>
-            
-            <div className="border rounded-md p-3 bg-red-50">
-              <h3 className="font-medium text-red-800">Fundos Insuficientes</h3>
-              <p className="font-mono mt-2">4000 0000 0000 9995</p>
-              <p className="text-sm text-gray-600 mt-1">Data: qualquer futura | CVV: qualquer</p>
+            <div className="mt-4">
+              <button
+                onClick={handleDirectCheckout}
+                disabled={loading || !userId}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-md text-sm font-medium focus:outline-none disabled:opacity-50 w-full"
+              >
+                {loading ? 'Processando...' : 'Iniciar Checkout de Teste'}
+              </button>
+              
+              {!userId && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                  Você precisa estar logado para testar o pagamento
+                </p>
+              )}
             </div>
           </div>
-        </div>
-        
-        <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
-          <PaymentButton 
-            buttonText="Checkout via API (Recomendado)" 
-            priceId={priceId}
-            variant="primary"
-            className="w-full sm:w-auto"
-          />
           
-          <button
-            onClick={handleTestClick}
-            disabled={loading || !priceId}
-            className="px-4 py-2 rounded-md font-medium bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300 disabled:text-gray-600 w-full sm:w-auto"
-          >
-            Checkout via Stripe.js
-          </button>
-        </div>
-        
-        <div className="mt-8 text-sm text-gray-500">
-          <p>Esta página é apenas para testes. Em ambiente de produção, use cartões reais.</p>
-          <p>Para mais informações, consulte a <a href="https://stripe.com/docs/testing" className="text-blue-600 hover:text-blue-800" target="_blank" rel="noopener noreferrer">documentação de testes do Stripe</a>.</p>
+          <div className="dark-card rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-semibold dark-text-primary mb-4">Cartões de Teste do Stripe</h2>
+            <p className="text-sm dark-text-secondary mb-4">
+              Use estes cartões para testar diferentes cenários de pagamento. 
+              Nenhuma cobrança real será feita.
+            </p>
+            
+            <div className="space-y-4">
+              {testCards.map((card, index) => (
+                <div key={index} className="p-3 border border-gray-200 dark:border-gray-700 rounded-md">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium dark-text-primary">{card.brand}</span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="dark-text-tertiary">Número:</span>{' '}
+                      <span className="dark-text-secondary font-mono">{card.number}</span>
+                    </div>
+                    <div>
+                      <span className="dark-text-tertiary">CVC:</span>{' '}
+                      <span className="dark-text-secondary">{card.cvc}</span>
+                    </div>
+                    <div>
+                      <span className="dark-text-tertiary">Data:</span>{' '}
+                      <span className="dark-text-secondary">{card.date}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </Layout>

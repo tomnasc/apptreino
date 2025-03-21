@@ -184,7 +184,7 @@ export default function AdminFeedback() {
     return (
       <Layout>
         <div className="flex justify-center items-center h-[70vh]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-400"></div>
         </div>
       </Layout>
     );
@@ -196,17 +196,17 @@ export default function AdminFeedback() {
     <Layout>
       <div className="container mx-auto px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Comunicação e Feedback</h1>
-          <p className="text-gray-600">Gerencie feedback e comunicação com seus usuários.</p>
+          <h1 className="text-2xl font-bold dark-text-primary mb-2">Comunicação e Feedback</h1>
+          <p className="dark-text-secondary">Gerencie feedback e comunicação com seus usuários.</p>
         </div>
         
         {/* Filters */}
         <div className="mb-6">
-          <div className="flex bg-white p-1 rounded-lg shadow-sm overflow-x-auto space-x-1">
+          <div className="flex dark-card p-1 rounded-lg shadow-sm overflow-x-auto space-x-1">
             <button
               onClick={() => handleFilterChange('all')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                filter === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                filter === 'all' ? 'bg-blue-500 dark:bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 dark-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               Todos
@@ -214,7 +214,7 @@ export default function AdminFeedback() {
             <button
               onClick={() => handleFilterChange('pending')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                filter === 'pending' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                filter === 'pending' ? 'bg-blue-500 dark:bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 dark-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               Pendentes
@@ -222,7 +222,7 @@ export default function AdminFeedback() {
             <button
               onClick={() => handleFilterChange('responded')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                filter === 'responded' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                filter === 'responded' ? 'bg-blue-500 dark:bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 dark-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               Respondidos
@@ -232,7 +232,7 @@ export default function AdminFeedback() {
         
         {loading ? (
           <div className="flex justify-center items-center h-40">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 dark:border-blue-400"></div>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
@@ -240,140 +240,155 @@ export default function AdminFeedback() {
               feedbackList.map(feedback => (
                 <div 
                   key={feedback.id} 
-                  className={`bg-white rounded-lg shadow p-4 border-l-4 ${
-                    feedback.status === 'responded' ? 'border-green-500' : 'border-yellow-500'
+                  className={`dark-card rounded-lg shadow p-4 border-l-4 ${
+                    feedback.status === 'responded' ? 'border-green-500 dark:border-green-600' : 'border-yellow-500 dark:border-yellow-600'
                   }`}
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <div className="font-medium">{getUserName(feedback.user_id)}</div>
-                      <div className="text-xs text-gray-500">{formatDate(feedback.created_at)}</div>
+                      <div className="font-medium dark-text-primary">{getUserName(feedback.user_id)}</div>
+                      <div className="text-xs dark-text-tertiary">{formatDate(feedback.created_at)}</div>
                     </div>
-                    <div>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        feedback.status === 'responded' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-yellow-100 text-yellow-800'
+                    <div className="flex items-center">
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        feedback.status === 'responded'
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                          : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
                       }`}>
-                        {feedback.status === 'responded' ? 'Respondido' : 'Pendente'}
+                        {feedback.status === 'responded' ? (
+                          <>
+                            <FiCheckCircle className="mr-1" />
+                            Respondido
+                          </>
+                        ) : (
+                          <>
+                            <FiMessageCircle className="mr-1" />
+                            Pendente
+                          </>
+                        )}
                       </span>
                     </div>
                   </div>
                   
                   <div className="mb-3">
-                    <div className="font-medium text-gray-800">{feedback.subject || feedback.title || 'Sem assunto'}</div>
-                    <p className="text-gray-700 whitespace-pre-line">{feedback.message}</p>
+                    <div className="dark-text-primary whitespace-pre-line">
+                      {feedback.message}
+                    </div>
                   </div>
                   
-                  {feedback.status === 'responded' && feedback.answer && (
-                    <div className="bg-gray-50 p-3 rounded-md mb-3">
-                      <div className="text-xs text-gray-500 mb-1">
-                        Resposta em {feedback.response_date ? formatDate(feedback.response_date) : 'data desconhecida'}
+                  {feedback.status === 'responded' ? (
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                        Resposta:
                       </div>
-                      <p className="text-gray-700 whitespace-pre-line">{feedback.answer}</p>
+                      <div className="dark-text-secondary whitespace-pre-line">
+                        {feedback.answer}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => handleSelectFeedback(feedback)}
+                        className="inline-flex items-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                      >
+                        <FiSend className="mr-1" />
+                        Responder
+                      </button>
                     </div>
                   )}
-                  
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => handleSelectFeedback(feedback)}
-                      className={`flex items-center text-sm px-3 py-1 rounded ${
-                        feedback.status === 'responded' 
-                          ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' 
-                          : 'bg-blue-500 text-white hover:bg-blue-600'
-                      }`}
-                    >
-                      {feedback.status === 'responded' ? (
-                        <>
-                          <FiMessageCircle className="mr-1" />
-                          Ver Resposta
-                        </>
-                      ) : (
-                        <>
-                          <FiSend className="mr-1" />
-                          Responder
-                        </>
-                      )}
-                    </button>
-                  </div>
                 </div>
               ))
             ) : (
-              <div className="bg-white rounded-lg shadow p-8 text-center">
-                <div className="text-gray-500 mb-2">
-                  {filter === 'pending' 
-                    ? 'Não há feedback pendente' 
-                    : filter === 'responded' 
-                      ? 'Nenhum feedback foi respondido ainda' 
-                      : 'Nenhum feedback recebido'}
+              <div className="dark-card rounded-lg shadow p-8 text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30">
+                  <FiMessageCircle className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
+                <h3 className="mt-2 text-sm font-medium dark-text-primary">Nenhum feedback encontrado</h3>
+                <p className="mt-1 text-sm dark-text-tertiary">
+                  {filter === 'pending' 
+                    ? 'Não há feedbacks pendentes no momento.'
+                    : filter === 'responded'
+                    ? 'Não há feedbacks respondidos para exibir.'
+                    : 'Não encontramos nenhum feedback.'}
+                </p>
               </div>
             )}
           </div>
         )}
-        
-        {/* Reply Modal */}
-        {showReplyForm && selectedFeedback && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-lg font-bold">
-                  {selectedFeedback.status === 'responded' ? 'Visualizar Feedback' : 'Responder Feedback'}
-                </h3>
-                <button 
-                  onClick={handleClose}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <FiXCircle className="h-5 w-5" />
-                </button>
-              </div>
-              
-              <div className="mb-4 p-4 bg-gray-50 rounded-md">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="font-medium">{getUserName(selectedFeedback.user_id)}</div>
-                  <div className="text-xs text-gray-500">{formatDate(selectedFeedback.created_at)}</div>
-                </div>
-                <div className="font-medium text-gray-800 mb-2">{selectedFeedback.subject || selectedFeedback.title || 'Sem assunto'}</div>
-                <p className="text-gray-700 whitespace-pre-line">{selectedFeedback.message}</p>
-              </div>
-              
+      </div>
+      
+      {/* Modal para responder feedback */}
+      {selectedFeedback && showReplyForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 z-50 flex items-center justify-center p-4">
+          <div className="dark-card rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+              <h3 className="text-lg font-medium dark-text-primary">
+                Responder Feedback
+              </h3>
+              <button
+                onClick={handleClose}
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none"
+              >
+                <FiXCircle className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-4">
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Sua resposta
+                <label className="block text-sm font-medium dark-text-tertiary mb-1">
+                  De:
+                </label>
+                <div className="dark-text-primary">
+                  {getUserName(selectedFeedback.user_id)}
+                </div>
+              </div>
+              
+              <div className="mb-6">
+                <label className="block text-sm font-medium dark-text-tertiary mb-1">
+                  Mensagem:
+                </label>
+                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                  <div className="dark-text-primary whitespace-pre-line">
+                    {selectedFeedback.message}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mb-6">
+                <label htmlFor="reply" className="block text-sm font-medium dark-text-tertiary mb-1">
+                  Sua resposta:
                 </label>
                 <textarea
-                  rows="5"
-                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Digite sua resposta para o usuário..."
+                  id="reply"
+                  rows={5}
+                  className="dark-input mt-1 block w-full rounded-md"
+                  placeholder="Digite sua resposta..."
                   value={replyMessage}
                   onChange={(e) => setReplyMessage(e.target.value)}
-                ></textarea>
+                />
               </div>
               
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end space-x-2">
                 <button
+                  type="button"
                   onClick={handleClose}
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium dark-text-primary hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none"
                 >
                   Cancelar
                 </button>
                 <button
+                  type="button"
                   onClick={handleSendReply}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
                   disabled={loading}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-md shadow-sm text-sm font-medium focus:outline-none disabled:opacity-50"
                 >
-                  {loading ? (
-                    <span className="inline-block animate-spin h-4 w-4 border-2 border-t-transparent border-white rounded-full mr-2"></span>
-                  ) : (
-                    <FiSend className="mr-2" />
-                  )}
-                  {selectedFeedback.status === 'responded' ? 'Atualizar Resposta' : 'Enviar Resposta'}
+                  {loading ? 'Enviando...' : 'Enviar Resposta'}
                 </button>
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </Layout>
   );
 } 

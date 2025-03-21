@@ -46,85 +46,84 @@ export default function NewWorkoutList() {
     }
   };
 
+  if (!user) {
+    return (
+      <Layout title="Nova Lista de Treinos">
+        <div className="flex justify-center items-center h-64">
+          <p className="dark-text-secondary text-center">
+            Você precisa estar logado para criar uma nova lista de treinos.
+          </p>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout title="Nova Lista de Treinos">
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white shadow-md rounded-lg p-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">
-            Criar nova lista de treinos
-          </h1>
+      <div className="py-6 px-4">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold dark-text-primary mb-2">Nova Lista de Treinos</h1>
+          <p className="dark-text-secondary">
+            Crie uma lista para organizar os seus exercícios e acompanhar seus treinos
+          </p>
+        </div>
 
-          {error && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg
-                    className="h-5 w-5 text-red-500"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+        <div className="max-w-2xl mx-auto">
+          <div className="dark-card rounded-lg shadow-md p-6">
+            <form onSubmit={handleSubmit}>
+              {error && (
+                <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-md">
+                  {error}
                 </div>
-                <div className="ml-3">
-                  <p className="text-sm text-red-700">{error}</p>
-                </div>
+              )}
+              
+              <div className="mb-6">
+                <label htmlFor="name" className="block text-sm font-medium dark-text-tertiary mb-1">
+                  Nome da Lista *
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  className="dark-input mt-1 block w-full rounded-md"
+                  placeholder="Ex: Treino A - Superior"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
               </div>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                Nome da lista *
-              </label>
-              <input
-                type="text"
-                id="name"
-                className="input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: Treino A - Peito e Tríceps"
-                required
-              />
-            </div>
-
-            <div className="mb-6">
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                Descrição (opcional)
-              </label>
-              <textarea
-                id="description"
-                className="input min-h-[100px]"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Descreva o objetivo deste treino"
-              />
-            </div>
-
-            <div className="flex items-center justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => router.back()}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={loading}
-              >
-                {loading ? 'Criando...' : 'Criar e adicionar exercícios'}
-              </button>
-            </div>
-          </form>
+              
+              <div className="mb-6">
+                <label htmlFor="description" className="block text-sm font-medium dark-text-tertiary mb-1">
+                  Descrição (opcional)
+                </label>
+                <textarea
+                  id="description"
+                  rows="3"
+                  className="dark-input mt-1 block w-full rounded-md"
+                  placeholder="Descreva o objetivo desta lista de treinos"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                ></textarea>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <button
+                  type="button"
+                  onClick={() => router.push('/workout-lists')}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md dark-text-primary hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white text-sm font-medium rounded-md focus:outline-none disabled:opacity-50"
+                >
+                  {loading ? 'Criando...' : 'Criar Lista de Treinos'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     </Layout>
