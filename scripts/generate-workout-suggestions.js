@@ -10,7 +10,7 @@ Deno.serve(async (req) => {
     return new Response(null, {
       status: 204,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': 'https://www.treinonamao.app',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Authorization, Content-Type',
         'Access-Control-Max-Age': '86400'
@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
           status: 405, 
           headers: { 
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Origin': 'https://www.treinonamao.app'
           } 
         }
       )
@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
           status: 401, 
           headers: { 
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Origin': 'https://www.treinonamao.app'
           } 
         }
       )
@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
           status: 401, 
           headers: { 
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Origin': 'https://www.treinonamao.app'
           } 
         }
       )
@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
           status: 400, 
           headers: { 
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Origin': 'https://www.treinonamao.app'
           } 
         }
       )
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
           status: 500, 
           headers: { 
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Origin': 'https://www.treinonamao.app'
           } 
         }
       )
@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
           status: 404, 
           headers: { 
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Origin': 'https://www.treinonamao.app'
           } 
         }
       )
@@ -306,7 +306,7 @@ Deno.serve(async (req) => {
           status: 500, 
           headers: { 
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Origin': 'https://www.treinonamao.app'
           } 
         }
       )
@@ -318,7 +318,7 @@ Deno.serve(async (req) => {
         status: 200, 
         headers: { 
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
+          'Access-Control-Allow-Origin': 'https://www.treinonamao.app'
         } 
       }
     )
@@ -331,7 +331,7 @@ Deno.serve(async (req) => {
         status: 500, 
         headers: { 
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
+          'Access-Control-Allow-Origin': 'https://www.treinonamao.app'
         } 
       }
     )
