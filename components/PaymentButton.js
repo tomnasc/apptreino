@@ -5,14 +5,13 @@ export default function PaymentButton({
   className, 
   buttonText = 'Assinar Premium', 
   variant = 'primary', 
-  priceId,
-  useBasicCheckout = false // Opção para usar o checkout básico para diagnóstico
+  priceId
 }) {
   const [loading, setLoading] = useState(false);
 
   const handlePaymentClick = async () => {
-    // Validar se o priceId foi fornecido (quando não estiver usando checkout básico)
-    if (!useBasicCheckout && !priceId) {
+    // Validar se o priceId foi fornecido
+    if (!priceId) {
       console.error('Erro: priceId não foi fornecido ao PaymentButton');
       toast.error('Configuração incompleta do botão de pagamento', { id: 'checkout' });
       return;
@@ -22,21 +21,15 @@ export default function PaymentButton({
       setLoading(true);
       toast.loading('Preparando checkout...', { id: 'checkout' });
       
-      // Selecionar o endpoint apropriado
-      const endpoint = useBasicCheckout 
-        ? '/api/create-checkout-session-basic'  // Checkout básico que sempre funciona
-        : '/api/create-checkout-session-direct'; // Checkout com priceId
-
-      console.log(`Iniciando checkout ${useBasicCheckout ? 'básico' : `com priceId: ${priceId}`}`);
+      console.log(`Iniciando checkout com priceId: ${priceId}`);
       
       // Fazer a requisição para o servidor para criar a sessão de checkout
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/create-checkout-session-direct', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        // Só envia priceId se não estiver usando checkout básico
-        body: useBasicCheckout ? JSON.stringify({}) : JSON.stringify({ priceId }),
+        body: JSON.stringify({ priceId }),
       });
       
       // Obter dados da resposta com tratamento de erro melhorado
@@ -56,7 +49,7 @@ export default function PaymentButton({
         toast.dismiss('checkout');
         console.log('Redirecionando para:', data.url);
         
-        // Redirecionar diretamente para a URL (método mais confiável)
+        // Redirecionar diretamente para a URL
         window.location.href = data.url;
       } else {
         // Exibir erro detalhado

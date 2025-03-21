@@ -8,6 +8,7 @@ export default function StripeDebugPage() {
   const [isTest, setIsTest] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [stripePriceId, setStripePriceId] = useState('');
 
   useEffect(() => {
     // Verificar a chave pública do Stripe que está sendo usada
@@ -15,7 +16,35 @@ export default function StripeDebugPage() {
     setStripeKey(publishableKey || 'Não definida');
     setIsTest(publishableKey?.includes('_test_') || false);
     setLoading(false);
+    
+    // Buscar o ID do preço padrão do Stripe
+    fetchPriceId();
   }, []);
+  
+  // Buscar o ID do preço do Stripe
+  const fetchPriceId = async () => {
+    try {
+      const response = await fetch('/api/get-price-id');
+      const data = await response.json();
+      
+      if (response.ok && data.priceId) {
+        setStripePriceId(data.priceId);
+        console.log('ID do preço do Stripe carregado:', data.priceId);
+      } else {
+        console.error('Erro ao buscar ID do preço:', data.error || 'Resposta inválida');
+        setError({
+          type: 'price',
+          message: `Erro ao carregar ID do preço: ${data.error || 'Resposta inválida'}`
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao buscar ID do preço:', error);
+      setError({
+        type: 'price',
+        message: `Erro ao carregar ID do preço: ${error.message}`
+      });
+    }
+  };
 
   const handleTestStripe = async () => {
     try {
@@ -72,6 +101,10 @@ export default function StripeDebugPage() {
             <span className="text-green-600">Teste ✓</span> : 
             <span className="text-red-600">Produção ⚠️</span>}
           </p>
+          <p><strong>ID do preço:</strong> {stripePriceId ? 
+            <span className="text-green-600">{stripePriceId.substring(0, 5)}...{stripePriceId.substring(stripePriceId.length - 4)}</span> : 
+            <span className="text-red-600">Não carregado</span>}
+          </p>
           <p className="text-sm text-gray-500 mt-2">
             {isTest ? 
               'Você está usando o ambiente de teste do Stripe, perfeito para desenvolvimento.' : 
@@ -104,12 +137,14 @@ export default function StripeDebugPage() {
             {loading ? 'Testando...' : 'Testar conexão com Stripe.js'}
           </button>
           
-          <PaymentButton
-            buttonText="Checkout direto (método confiável)"
-            variant="success"
-            className="w-full py-3 px-4 rounded-md font-medium"
-            useBasicCheckout={true}
-          />
+          {stripePriceId && (
+            <PaymentButton
+              buttonText="Checkout Padrão"
+              variant="success"
+              className="w-full py-3 px-4 rounded-md font-medium"
+              priceId={stripePriceId}
+            />
+          )}
         </div>
         
         <div className="mt-8 text-sm text-gray-500">
