@@ -13,7 +13,12 @@
     }
   ],
   "env": {
-    "NEXT_PUBLIC_VERCEL_URL": "${VERCEL_URL}"
+    "NEXT_PUBLIC_VERCEL_URL": "${VERCEL_URL}",
+    "NEXT_PUBLIC_SUPABASE_URL": "@next_public_supabase_url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@next_public_supabase_anon_key",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase_service_role_key",
+    "HF_API_TOKEN": "@hf_api_token",
+    "HF_MODEL": "@hf_model"
   },
   "github": {
     "enabled": true,

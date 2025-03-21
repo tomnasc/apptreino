@@ -96,22 +96,53 @@ export default function WorkoutSuggestionsPage() {
         body: JSON.stringify({ assessmentId })
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Falha ao gerar sugestões de treino');
-      }
+      // Obter o corpo da resposta para análise
+      const responseData = await response.json();
       
-      const data = await response.json();
+      if (!response.ok) {
+        // Extrair mensagem de erro mais detalhada
+        const errorMessage = 
+          responseData.details || 
+          responseData.error || 
+          'Falha ao gerar sugestões de treino';
+          
+        console.error('Erro detalhado:', responseData);
+        
+        throw new Error(errorMessage);
+      }
       
       toast.success('Sugestões de treino geradas!', { id: 'generating' });
       
-      if (data?.workouts) {
-        setSuggestedWorkouts(data.workouts);
+      if (responseData?.workouts) {
+        setSuggestedWorkouts(responseData.workouts);
       }
       
     } catch (error) {
       console.error('Erro ao gerar treinos:', error);
-      toast.error('Erro ao gerar sugestões de treino', { id: 'generating' });
+      
+      // Mensagem de erro mais amigável para o usuário
+      let errorMessage = 'Erro ao gerar sugestões de treino';
+      
+      // Verificar se é um erro de ambiente ou configuração
+      if (error.message.includes('Configuração incompleta') || 
+          error.message.includes('Variáveis de ambiente')) {
+        errorMessage = 'Erro de configuração do servidor. Por favor, contate o suporte.';
+      } 
+      // Verificar se é um erro do Hugging Face
+      else if (error.message.includes('Hugging Face')) {
+        errorMessage = 'Erro no serviço de IA. Por favor, tente novamente mais tarde.';
+      }
+      // Verificar se é um erro de autenticação
+      else if (error.message.includes('autenticação') || error.message.includes('token')) {
+        errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
+      }
+      
+      toast.error(errorMessage, { id: 'generating' });
+      
+      // Reconectar Supabase se for erro de autenticação
+      if (error.message.includes('autenticação') || error.message.includes('token')) {
+        supabase.auth.refreshSession();
+      }
     } finally {
       setGeneratingWorkouts(false);
     }

@@ -8,11 +8,51 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const HF_API_TOKEN = process.env.HF_API_TOKEN;
 const HF_MODEL = process.env.HF_MODEL || 'mistralai/Mistral-7B-Instruct-v0.2';
 
+// Helper para verificar se todas as variáveis de ambiente necessárias estão configuradas
+const checkEnvironmentVariables = () => {
+  const requiredVariables = [
+    { name: 'NEXT_PUBLIC_SUPABASE_URL', value: process.env.NEXT_PUBLIC_SUPABASE_URL },
+    { name: 'SUPABASE_SERVICE_ROLE_KEY', value: process.env.SUPABASE_SERVICE_ROLE_KEY },
+    { name: 'HF_API_TOKEN', value: process.env.HF_API_TOKEN },
+    { name: 'HF_MODEL', value: process.env.HF_MODEL }
+  ];
+
+  const missingVariables = requiredVariables
+    .filter(v => !v.value)
+    .map(v => v.name);
+
+  if (missingVariables.length > 0) {
+    return {
+      success: false,
+      missingVariables
+    };
+  }
+
+  return { success: true };
+};
+
 export default async function handler(req, res) {
+  // Verificar variáveis de ambiente primeiro
+  const envCheck = checkEnvironmentVariables();
+  if (!envCheck.success) {
+    console.error(`Variáveis de ambiente faltando: ${envCheck.missingVariables.join(', ')}`);
+    return res.status(500).json({ 
+      error: 'Configuração incompleta do servidor', 
+      details: `Variáveis de ambiente faltando: ${envCheck.missingVariables.join(', ')}` 
+    });
+  }
+
   // Verificar método
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método não permitido' });
   }
+
+  console.log('API recebeu requisição POST: ', JSON.stringify({
+    body: req.body,
+    headers: {
+      authorization: req.headers.authorization ? 'Presente (valor omitido por segurança)' : 'Ausente'
+    }
+  }));
 
   // Extrair corpo da requisição
   const { assessmentId } = req.body;
@@ -27,18 +67,29 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log('Inicializando cliente Supabase...');
     // Inicializar cliente Supabase admin para operações do servidor
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
     // Extrair token JWT do cabeçalho Authorization (formato: "Bearer TOKEN")
     const token = authHeader.split(' ')[1];
     
+    console.log('Verificando autenticação do usuário...');
     // Verificar autenticação diretamente com o token
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
     
-    if (userError || !user) {
+    if (userError) {
+      console.error('Erro na verificação do usuário:', userError);
       return res.status(401).json({ error: 'Usuário não autenticado', details: userError?.message });
     }
+    
+    if (!user) {
+      console.error('Usuário não encontrado com o token fornecido');
+      return res.status(401).json({ error: 'Usuário não encontrado' });
+    }
+    
+    console.log(`Usuário autenticado: ${user.id}`);
+    console.log(`Buscando avaliação física com ID: ${assessmentId}`);
     
     // Buscar avaliação física
     const { data: assessment, error: assessmentError } = await supabaseAdmin
@@ -49,12 +100,16 @@ export default async function handler(req, res) {
       .single();
     
     if (assessmentError) {
+      console.error('Erro ao buscar avaliação:', assessmentError);
       return res.status(500).json({ error: 'Erro ao buscar avaliação', details: assessmentError });
     }
     
     if (!assessment) {
+      console.error(`Avaliação não encontrada para ID: ${assessmentId}`);
       return res.status(404).json({ error: 'Avaliação não encontrada' });
     }
+    
+    console.log('Avaliação encontrada, criando prompt para o modelo...');
     
     // Criar prompt para o modelo
     const prompt = `
@@ -113,20 +168,64 @@ export default async function handler(req, res) {
       }
     };
     
-    // Chamar a API do Hugging Face
-    const response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${HF_API_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
+    console.log(`Chamando API do Hugging Face com modelo: ${HF_MODEL}`);
+    
+    // Tentar chamar a API do Hugging Face com timeout e retry
+    let response;
+    let retries = 0;
+    const maxRetries = 2;
+    
+    while (retries <= maxRetries) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos de timeout
+        
+        response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${HF_API_TOKEN}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          break;
+        } else if (response.status === 503 && retries < maxRetries) {
+          // Modelo ainda carregando, tentar novamente
+          const waitTime = Math.pow(2, retries) * 1000; // Exponential backoff: 1s, 2s, 4s
+          console.log(`Modelo ainda carregando, aguardando ${waitTime}ms antes de tentar novamente...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          retries++;
+        } else {
+          // Outro tipo de erro
+          const errorText = await response.text();
+          throw new Error(`Erro na API do Hugging Face: ${response.status} - ${errorText}`);
+        }
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          console.error('Timeout ao chamar a API do Hugging Face');
+          if (retries < maxRetries) {
+            retries++;
+            console.log(`Tentativa ${retries} de ${maxRetries}...`);
+          } else {
+            throw new Error('Timeout ao chamar a API do Hugging Face após várias tentativas');
+          }
+        } else {
+          throw error;
+        }
+      }
+    }
     
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Erro na API do Hugging Face: ${response.status} - ${errorText}`);
     }
+    
+    console.log('Resposta recebida da API do Hugging Face, processando...');
     
     // Processar resposta do Hugging Face
     const hfResponse = await response.json();
@@ -149,6 +248,8 @@ export default async function handler(req, res) {
       // Alguns modelos podem fornecer texto antes ou depois do JSON
       const cleanedJsonString = jsonString.replace(/^[\s\S]*?({[\s\S]*})[\s\S]*$/, '$1');
       
+      console.log("String JSON para parse:", cleanedJsonString);
+      
       suggestedWorkouts = JSON.parse(cleanedJsonString);
       
       // Se o JSON não tiver a propriedade workouts, adicionar
@@ -166,6 +267,8 @@ export default async function handler(req, res) {
           ] 
         };
       }
+      
+      console.log("Workouts estruturados:", JSON.stringify(suggestedWorkouts));
     } catch (parseError) {
       console.error("Erro ao processar resposta da IA:", parseError, "Resposta:", responseContent);
       
@@ -209,6 +312,8 @@ export default async function handler(req, res) {
       };
     }
     
+    console.log('Salvando sugestões no banco de dados...');
+    
     // Salvar sugestões no banco
     const workoutsToInsert = suggestedWorkouts.workouts.map(workout => ({
       assessment_id: assessmentId,
@@ -227,13 +332,16 @@ export default async function handler(req, res) {
       .select();
     
     if (insertError) {
+      console.error('Erro ao salvar sugestões:', insertError);
       return res.status(500).json({ error: 'Erro ao salvar sugestões', details: insertError });
     }
+    
+    console.log(`${insertedWorkouts?.length || 0} treinos salvos com sucesso`);
     
     return res.status(200).json({ success: true, workouts: insertedWorkouts });
     
   } catch (error) {
     console.error("Erro interno:", error);
-    return res.status(500).json({ error: 'Erro interno', details: error.message });
+    return res.status(500).json({ error: 'Erro interno', details: error.message, stack: error.stack });
   }
 } 
