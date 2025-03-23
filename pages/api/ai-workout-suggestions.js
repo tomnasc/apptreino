@@ -128,8 +128,9 @@ export default async function handler(req, res) {
     
     console.log('Avaliação encontrada, criando prompt para o modelo...');
     
-    // Criar prompt para o modelo
+    // Criar prompt para o modelo - Usando um prompt mais técnico e específico para PT-BR
     const prompt = `
+    Você é um profesor de educação física e especialista em treinamento de força e condicionamento físico.
     Por favor, crie 3 rotinas de treino diferentes para uma pessoa com as seguintes características:
     - Altura: ${assessment.height} cm
     - Peso: ${assessment.weight} kg
@@ -152,7 +153,7 @@ export default async function handler(req, res) {
        - Músculos trabalhados
        - Descrição da execução
     
-    IMPORTANTE: Sua resposta deve ser TOTALMENTE em português brasileiro, incluindo todos os nomes de exercícios, descrições e demais textos.
+    IMPORTANTE: Sua resposta deve ser TOTALMENTE em PT-BR, incluindo todos os nomes de exercícios, descrições e demais textos.
     
     Formate sua resposta como um objeto JSON com a seguinte estrutura:
     {
