@@ -19,12 +19,7 @@ jobs:
           
       # Importante: Configure o segredo VERCEL_TOKEN nas configurações do repositório no GitHub
       # Vá para Settings > Secrets > Actions > New repository secret
-      
-      # Configure também um arquivo vercel.json na raiz do projeto com:
-      # {
-      #   "projectId": "seu-project-id",
-      #   "orgId": "seu-org-id"
-      # }
+      # Use aspas em seu terminal quando executar comandos localmente: vercel pull --token="seu-token"
           
       - name: Install dependencies
         run: npm ci
@@ -33,10 +28,13 @@ jobs:
         run: npm install --global vercel@latest
         
       - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
         
       - name: Build Project Artifacts
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
         
       - name: Deploy Project Artifacts to Vercel
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} 
+        run: |
+          vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}" 
