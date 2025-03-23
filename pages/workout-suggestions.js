@@ -397,10 +397,23 @@ export default function WorkoutSuggestionsPage() {
   // Função para renderizar exercícios, aplicando tradução quando necessário
   const renderExercises = (exercises, workoutId) => {
     return exercises.map((exercise, index) => {
-      // Verificar se exercise.muscles existe antes de tentar fazer o map
-      const translatedMuscles = exercise.muscles ? 
-        exercise.muscles.map(translateMuscle) : 
-        ['Não especificado'];
+      // Verificar se exercise.muscles existe E é um array antes de tentar fazer o map
+      let translatedMuscles = ['Não especificado'];
+      
+      if (exercise.muscles) {
+        // Verificar se muscles é um array
+        if (Array.isArray(exercise.muscles)) {
+          translatedMuscles = exercise.muscles.map(translateMuscle);
+        } 
+        // Se for uma string, considerar como um único músculo
+        else if (typeof exercise.muscles === 'string') {
+          translatedMuscles = [translateMuscle(exercise.muscles)];
+        }
+        // Se for outro tipo (objeto, etc.), usar um valor padrão
+        else {
+          translatedMuscles = ['Não especificado'];
+        }
+      }
       
       // Aplicar tradução para dificuldade caso esteja em inglês e exista
       const translatedDifficulty = exercise.difficulty ? 
