@@ -1174,6 +1174,39 @@ export default function WorkoutMode() {
     console.log("Notificações sonoras desativadas");
   };
 
+  // Adicionar função para pular para um exercício específico
+  const skipToExercise = (targetIndex) => {
+    // Confirmar com o usuário
+    if (!confirm(`Deseja pular para o exercício "${exercises[targetIndex].name}"?`)) {
+      return;
+    }
+
+    // Copiar a lista de exercícios
+    const updatedExercises = [...exercises];
+    
+    // Remover o exercício selecionado da posição atual
+    const targetExercise = updatedExercises.splice(targetIndex, 1)[0];
+    
+    // Inserir o exercício selecionado na posição atual
+    updatedExercises.splice(currentExerciseIndex, 0, targetExercise);
+    
+    // Atualizar o estado com a nova lista de exercícios
+    setExercises(updatedExercises);
+    
+    // Resetar contadores relacionados ao exercício
+    setCurrentSetIndex(0);
+    setRepsCompleted(0);
+    
+    // Verificar se o exercício de destino é baseado em tempo
+    if (targetExercise.time) {
+      setTimeRemaining(targetExercise.time);
+      setTimerActive(false);
+    }
+
+    // Atualizar o tempo inicial da série
+    setCurrentSetStartTime(new Date());
+  };
+
   if (loading) {
     return (
       <Layout title="Carregando...">
@@ -1695,26 +1728,29 @@ export default function WorkoutMode() {
                 
                 <div className="p-4">
                   <div className="space-y-3">
-                    {exercises.slice(currentExerciseIndex + 1, currentExerciseIndex + 3).map((exercise, index) => (
-                      <div key={exercise.id} className="flex items-center p-3 bg-gray-50 rounded-lg">
+                    {exercises.slice(currentExerciseIndex + 1).map((exercise, index) => (
+                      <div 
+                        key={exercise.id} 
+                        className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                        onClick={() => skipToExercise(currentExerciseIndex + index + 1)}
+                      >
                         <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold mr-3">
                           {currentExerciseIndex + index + 2}
                         </div>
-                        <div>
+                        <div className="flex-1">
                           <h3 className="font-medium text-gray-800">{exercise.name}</h3>
                           <p className="text-sm text-gray-500">
                             {exercise.sets} séries{exercise.reps ? `, ${exercise.reps} repetições` : ''}
                             {exercise.time ? `, ${exercise.time} segundos` : ''}
                           </p>
                         </div>
+                        <div className="ml-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                          </svg>
+                        </div>
                       </div>
                     ))}
-                    
-                    {exercises.length > currentExerciseIndex + 3 && (
-                      <div className="text-center text-sm text-gray-500 pt-2">
-                        +{exercises.length - (currentExerciseIndex + 3)} exercícios restantes
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
