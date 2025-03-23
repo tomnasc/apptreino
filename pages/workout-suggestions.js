@@ -247,10 +247,10 @@ export default function WorkoutSuggestionsPage() {
             sets: parseInt(exercise.sets) || 3,
             reps: exercise.reps,
             rest_time: parseInt(exercise.rest?.replace('s', '')) || 60,
-            notes: exercise.execution || '',
-            order_position: index + 1,
-            muscles: exercise.muscles || [],
-            difficulty: exercise.difficulty || 'normal'
+            notes: exercise.execution ? 
+              `${exercise.execution}${exercise.muscles ? ` | Músculos: ${exercise.muscles.join(', ')}` : ''}` :
+              exercise.muscles ? `Músculos trabalhados: ${exercise.muscles.join(', ')}` : '',
+            order_position: index + 1
           }));
           
           // Inserir os exercícios na lista
