@@ -289,14 +289,13 @@ export default function WorkoutSuggestionsPage() {
                 }
               }
               
-              // Construir objeto de exercício
+              // Construir objeto de exercício - removendo a coluna notes que não existe no banco
               return {
                 workout_list_id: workoutListId,
                 name: exercise.name,
                 sets: parseInt(exercise.sets) || 3,
                 reps: reps,
                 rest_time: restTime,
-                notes: notes,
                 order_position: index + 1
               };
             });
