@@ -228,10 +228,8 @@ export default function WorkoutSuggestionsPage() {
           .insert([
             { 
               name: selectedWorkoutData.workout_name, 
-              description: selectedWorkoutData.workout_description,
-              user_id: user.id,
-              is_from_ai: true,
-              ai_source_id: workoutId
+              description: `${selectedWorkoutData.workout_description} (Gerado pela IA)`,
+              user_id: user.id
             }
           ])
           .select();
