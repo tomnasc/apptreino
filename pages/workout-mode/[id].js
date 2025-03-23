@@ -52,6 +52,9 @@ export default function WorkoutMode() {
   const backgroundAudioRef = useRef(null);
   const audioContextRef = useRef(null);
 
+  // Adicionar timerRef para controlar o timer
+  const timerRef = useRef(null);
+
   // Detectar se é um dispositivo iOS
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -485,6 +488,65 @@ export default function WorkoutMode() {
     }
   }, [sessionUrlParam, exercises, isWorkoutActive]);
 
+  // Adicionar efeito para carregar estado do treino do localStorage
+  useEffect(() => {
+    // Verificar se há um treino ativo
+    const storedWorkoutActive = localStorage.getItem(`treinoPro_isWorkoutActive_${id}`);
+    if (storedWorkoutActive === 'true') {
+      // Carregar estado do treino do localStorage
+      try {
+        const storedExerciseIndex = localStorage.getItem(`treinoPro_currentExerciseIndex_${id}`);
+        const storedSetIndex = localStorage.getItem(`treinoPro_currentSetIndex_${id}`);
+        const storedCompletedSets = localStorage.getItem(`treinoPro_completedSets_${id}`);
+        const storedRepsHistory = localStorage.getItem(`treinoPro_setRepsHistory_${id}`);
+        const storedSessionId = localStorage.getItem(`treinoPro_sessionId_${id}`);
+        const storedStartTime = localStorage.getItem(`treinoPro_workoutStartTime_${id}`);
+        
+        if (storedExerciseIndex) setCurrentExerciseIndex(parseInt(storedExerciseIndex));
+        if (storedSetIndex) setCurrentSetIndex(parseInt(storedSetIndex));
+        if (storedCompletedSets) setCompletedSets(JSON.parse(storedCompletedSets));
+        if (storedRepsHistory) setSetRepsHistory(JSON.parse(storedRepsHistory));
+        if (storedSessionId) setSessionId(storedSessionId);
+        if (storedStartTime) setWorkoutStartTime(new Date(storedStartTime));
+        
+        setIsWorkoutActive(true);
+      } catch (error) {
+        console.error('Erro ao restaurar estado do treino:', error);
+      }
+    }
+  }, [id]);
+
+  // Salvar estado do treino no localStorage quando houver mudanças relevantes
+  useEffect(() => {
+    if (isWorkoutActive) {
+      try {
+        localStorage.setItem(`treinoPro_isWorkoutActive_${id}`, 'true');
+        localStorage.setItem(`treinoPro_currentExerciseIndex_${id}`, currentExerciseIndex.toString());
+        localStorage.setItem(`treinoPro_currentSetIndex_${id}`, currentSetIndex.toString());
+        localStorage.setItem(`treinoPro_completedSets_${id}`, JSON.stringify(completedSets));
+        localStorage.setItem(`treinoPro_sessionId_${id}`, sessionId || '');
+        if (workoutStartTime) {
+          localStorage.setItem(`treinoPro_workoutStartTime_${id}`, workoutStartTime.toISOString());
+        }
+      } catch (error) {
+        console.error('Erro ao salvar estado do treino:', error);
+      }
+    } else {
+      // Limpar localStorage quando o treino não estiver ativo
+      try {
+        localStorage.removeItem(`treinoPro_isWorkoutActive_${id}`);
+        localStorage.removeItem(`treinoPro_currentExerciseIndex_${id}`);
+        localStorage.removeItem(`treinoPro_currentSetIndex_${id}`);
+        localStorage.removeItem(`treinoPro_completedSets_${id}`);
+        localStorage.removeItem(`treinoPro_setRepsHistory_${id}`);
+        localStorage.removeItem(`treinoPro_sessionId_${id}`);
+        localStorage.removeItem(`treinoPro_workoutStartTime_${id}`);
+      } catch (error) {
+        console.error('Erro ao limpar estado do treino:', error);
+      }
+    }
+  }, [isWorkoutActive, currentExerciseIndex, currentSetIndex, completedSets, sessionId, workoutStartTime, id]);
+
   const fetchWorkoutList = async () => {
     try {
       setLoading(true);
@@ -647,6 +709,13 @@ export default function WorkoutMode() {
     }
     updatedSetRepsHistory[exerciseKey][currentSetIndex] = repsCompleted;
     setSetRepsHistory(updatedSetRepsHistory);
+    
+    // Salvar histórico no localStorage para persistir após recarregar a página
+    try {
+      localStorage.setItem(`treinoPro_setRepsHistory_${id}`, JSON.stringify(updatedSetRepsHistory));
+    } catch (error) {
+      console.error("Erro ao salvar histórico de séries:", error);
+    }
     
     // Verificar se deve mostrar o alerta de aumentar carga
     // Somente se:
@@ -821,7 +890,7 @@ export default function WorkoutMode() {
   // Função para pular o exercício atual e movê-lo para o final da ficha
   const skipExercise = () => {
     // Confirmar com o usuário 
-    if (!confirm('Deseja realmente pular este exercício? Ele será movido para o final da ficha.')) {
+    if (!confirm('Deseja realmente pular este exercício? Ele será movido para a próxima posição na lista.')) {
       return;
     }
 
@@ -837,20 +906,20 @@ export default function WorkoutMode() {
     // Remover o exercício atual
     const skippedExercise = updatedExercises.splice(currentExerciseIndex, 1)[0];
     
-    // Adicionar o exercício ao final da lista
-    updatedExercises.push(skippedExercise);
+    // Adicionar o exercício na próxima posição, não no final
+    updatedExercises.splice(currentExerciseIndex + 1, 0, skippedExercise);
     
     // Atualizar o estado com a nova lista de exercícios
     setExercises(updatedExercises);
     
-    // Não precisamos incrementar o índice porque ao remover o exercício atual,
-    // o próximo exercício já passa para a posição atual automaticamente
+    // Passamos para o próximo exercício (que agora é o que estava após o atual)
+    setCurrentExerciseIndex(currentExerciseIndex + 1);
     
     // Resetar contadores relacionados ao exercício
     setCurrentSetIndex(0);
     setRepsCompleted(0);
-    if (updatedExercises[currentExerciseIndex].time) {
-      setTimeRemaining(updatedExercises[currentExerciseIndex].time);
+    if (updatedExercises[currentExerciseIndex + 1].time) {
+      setTimeRemaining(updatedExercises[currentExerciseIndex + 1].time);
       setTimerActive(false);
     }
 
@@ -1020,22 +1089,15 @@ export default function WorkoutMode() {
   // Função para enviar notificação
   const sendRestFinishedNotification = () => {
     if (!notificationPermission) {
-      console.log('Notificações não permitidas. Tentando reproduzir som como alternativa.');
-      try {
-        const audio = new Audio('/sounds/notification.mp3');
-        audio.volume = 1.0;
-        audio.play().catch(e => console.log('Erro ao tocar som:', e));
-        
-        if ('vibrate' in navigator) {
-          navigator.vibrate([200, 100, 200, 100, 200]);
-        }
-        
-        // Mostrar alerta visual para iOS mesmo sem permissão
-        if (isIOS) {
-          showIOSAlert();
-        }
-      } catch (audioError) {
-        console.error('Erro ao inicializar áudio:', audioError);
+      console.log('Notificações não permitidas.');
+      
+      if ('vibrate' in navigator) {
+        navigator.vibrate([200, 100, 200, 100, 200]);
+      }
+      
+      // Mostrar alerta visual para iOS mesmo sem permissão
+      if (isIOS) {
+        showIOSAlert();
       }
       return;
     }
@@ -1056,59 +1118,6 @@ export default function WorkoutMode() {
         if ('vibrate' in navigator) {
           navigator.vibrate([300, 100, 300, 100, 300]);
         }
-        
-        // Tocar um som mais alto em iOS
-        try {
-          // Criar e configurar áudio com volume alto
-          const audio = new Audio('/sounds/notification.mp3');
-          audio.volume = 1.0; // Volume máximo
-          
-          // Função para tentar reproduzir o som com repetição
-          const playSound = () => {
-            console.log('Tentando reproduzir som no iOS');
-            
-            // Tentar reproduzir múltiplas vezes (iOS pode limitar a reprodução automática)
-            const playAttempt = () => {
-              audio.play().catch(e => {
-                console.log('Erro ao tentar reproduzir som no iOS:', e);
-                
-                // Se falhar, tentar novamente quando o usuário interagir com a página
-                document.addEventListener('touchstart', function playOnTouch() {
-                  audio.play().catch(err => console.log('Erro após interação:', err));
-                  document.removeEventListener('touchstart', playOnTouch);
-                }, { once: true });
-              });
-            };
-            
-            // Tentar reproduzir agora
-            playAttempt();
-            
-            // E tentar novamente em 1 segundo para aumentar as chances
-            setTimeout(playAttempt, 1000);
-          };
-          
-          // Reproduzir som agora
-          playSound();
-          
-          // Força a tela a ficar ligada (quando possível)
-          if ('wakeLock' in navigator) {
-            try {
-              navigator.wakeLock.request('screen').then(wakeLock => {
-                console.log('WakeLock ativado para manter a tela ligada');
-                
-                // Liberar após 10 segundos
-                setTimeout(() => {
-                  wakeLock.release();
-                  console.log('WakeLock liberado');
-                }, 10000);
-              }).catch(e => console.log('Erro ao tentar WakeLock:', e));
-            } catch (wlError) {
-              console.log('WakeLock não suportado:', wlError);
-            }
-          }
-        } catch (audioError) {
-          console.log('Erro ao inicializar áudio no iOS:', audioError);
-        }
       } else {
         // Abordagem padrão para outros navegadores
         try {
@@ -1128,26 +1137,12 @@ export default function WorkoutMode() {
             notification.close();
           };
           
-          // Tocar um som de alerta com tratamento de erros aprimorado
-          const audio = new Audio('/sounds/notification.mp3');
-          audio.volume = 0.8;
-          audio.play().catch(e => console.log('Erro ao reproduzir som:', e));
-          
           // Vibrar dispositivo
           if ('vibrate' in navigator) {
             navigator.vibrate([200, 100, 200]);
           }
         } catch (notificationError) {
           console.error('Erro ao criar notificação:', notificationError);
-          
-          // Fallback para som se a notificação falhar
-          try {
-            const audio = new Audio('/sounds/notification.mp3');
-            audio.volume = 1.0;
-            audio.play().catch(e => console.log('Erro no fallback de som:', e));
-          } catch (audioError) {
-            console.error('Fallback de áudio também falhou:', audioError);
-          }
         }
       }
     } catch (error) {
@@ -1336,6 +1331,12 @@ export default function WorkoutMode() {
       };
     }
   }, [isIOS]);
+
+  // Remover referências a notificações sonoras
+  const playBackgroundNotificationSound = () => {
+    // Função vazia para não executar sons
+    console.log("Notificações sonoras desativadas");
+  };
 
   if (loading) {
     return (
@@ -1648,7 +1649,7 @@ export default function WorkoutMode() {
                             ? 'bg-green-500 hover:bg-green-600 text-white'
                             : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
                       >
-                        Concluir
+                        {repsCompleted === 0 ? 'Iniciar Série' : 'Concluir Série'}
                       </button>
                     </div>
                     
@@ -1678,6 +1679,20 @@ export default function WorkoutMode() {
                           onClick={() => {
                             console.log('Iniciando cronômetro de exercício');
                             setTimerActive(true);
+                            // Iniciar o cronômetro imediatamente
+                            const timer = setInterval(() => {
+                              setTimeRemaining(prev => {
+                                if (prev <= 1) {
+                                  clearInterval(timer);
+                                  setTimerActive(false);
+                                  handleSetCompleted();
+                                  return 0;
+                                }
+                                return prev - 1;
+                              });
+                            }, 1000);
+                            // Armazenar o timer para limpeza posterior
+                            timerRef.current = timer;
                           }}
                           className="px-6 py-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-bold shadow transition-all"
                         >
@@ -1688,6 +1703,11 @@ export default function WorkoutMode() {
                           onClick={() => {
                             console.log('Parando cronômetro de exercício');
                             setTimerActive(false);
+                            // Limpar o interval quando o cronômetro for parado
+                            if (timerRef.current) {
+                              clearInterval(timerRef.current);
+                              timerRef.current = null;
+                            }
                           }}
                           className="px-6 py-3 rounded-full bg-red-500 hover:bg-red-600 text-white font-bold shadow transition-all"
                         >
