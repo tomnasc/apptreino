@@ -274,7 +274,7 @@ export default function WorkoutSuggestionsPage() {
   };
 
   // Função para renderizar exercícios, aplicando tradução quando necessário
-  const renderExercises = (exercises) => {
+  const renderExercises = (exercises, workoutId) => {
     return exercises.map((exercise, index) => {
       // Verificar se exercise.muscles existe antes de tentar fazer o map
       const translatedMuscles = exercise.muscles ? 
@@ -286,13 +286,13 @@ export default function WorkoutSuggestionsPage() {
         translateDifficulty(exercise.difficulty) : 
         'Normal';
       
+      const exerciseId = `${workoutId}-${index}`;
+      
       return (
         <li key={index} className="text-sm">
           <div
             onClick={() => setExpandedExercise(
-              expandedExercise === `${workout.id}-${index}` 
-                ? null 
-                : `${workout.id}-${index}`
+              expandedExercise === exerciseId ? null : exerciseId
             )}
             className="flex justify-between items-center cursor-pointer py-2 px-3 dark-card rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50"
           >
@@ -300,7 +300,7 @@ export default function WorkoutSuggestionsPage() {
             <span className="text-xs dark-text-tertiary">{exercise.sets}×{exercise.reps}</span>
           </div>
           
-          {expandedExercise === `${workout.id}-${index}` && (
+          {expandedExercise === exerciseId && (
             <div className="mt-2 px-3 py-2 bg-gray-50 dark:bg-gray-800/50 rounded-md text-xs space-y-1">
               <p><span className="font-medium">Séries:</span> {exercise.sets}</p>
               <p><span className="font-medium">Repetições:</span> {exercise.reps}</p>
@@ -416,7 +416,7 @@ export default function WorkoutSuggestionsPage() {
                   <div className="mb-4">
                     <h4 className="text-sm font-medium dark-text-tertiary mb-2">Exercícios:</h4>
                     <ul className="space-y-2">
-                      {renderExercises(workout.exercises)}
+                      {renderExercises(workout.exercises, workout.id)}
                     </ul>
                   </div>
                   
