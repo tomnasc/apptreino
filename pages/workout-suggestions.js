@@ -88,7 +88,7 @@ export default function WorkoutSuggestionsPage() {
       
       // Chamar a API route local com timeout maior
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutos de timeout
+      const timeoutId = setTimeout(() => controller.abort(), 240000); // 4 minutos de timeout
       
       try {
         // Primeiro tenta a API online
@@ -140,59 +140,18 @@ export default function WorkoutSuggestionsPage() {
       } catch (error) {
         console.error('Erro ao gerar treinos online:', error);
         
-        // Tentar o método offline como fallback
-        try {
-          toast.dismiss('generating');
-          toast.loading('Gerando sugestões offline...', { id: 'generating-offline' });
-          
-          console.log('Tentando gerar treinos usando método offline');
-          
-          // Chamar a API offline
-          const offlineResponse = await fetch('/api/offline-workout-suggestions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({ 
-              assessmentId,
-              level: assessment?.experience_level,
-              goals: assessment?.fitness_goals
-            })
-          });
-          
-          if (!offlineResponse.ok) {
-            throw new Error('Falha na geração offline');
-          }
-          
-          const offlineData = await offlineResponse.json();
-          
-          if (offlineData.success && offlineData.workouts) {
-            // Atualizar UI com os treinos offline
-            setSuggestedWorkouts(offlineData.workouts);
-            toast.dismiss('generating-offline');
-            toast.success('Treinos offline gerados com sucesso');
-            
-            return; // Sair da função após sucesso offline
-          } else {
-            throw new Error('Dados de treino offline inválidos');
-          }
-        } catch (offlineError) {
-          console.error('Erro ao gerar treinos offline:', offlineError);
-          
-          // Mensagem de erro mais amigável para o usuário
-          let errorMessage = 'Erro ao gerar sugestões de treino';
-          
-          // Verificar se é um erro de timeout
-          if (error.message.includes('demorando muito') || error.message.includes('timeout')) {
-            errorMessage = 'Tempo esgotado ao gerar treinos. O servidor está ocupado, tente novamente mais tarde.';
-          }
-          
-          toast.dismiss('generating-offline');
-          toast.error(errorMessage);
+        // Mensagem de erro mais amigável para o usuário
+        let errorMessage = 'Erro ao gerar sugestões de treino';
+        
+        // Verificar se é um erro de timeout ou outro erro comum
+        if (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('timeout')) {
+          errorMessage = 'O tempo limite foi excedido. A IA está ocupada no momento, por favor tente novamente mais tarde.';
+        } else if (error.message.includes('inválida')) {
+          errorMessage = 'Resposta inválida do servidor. A IA pode estar sobrecarregada, tente novamente mais tarde.';
         }
-      } finally {
-        setGeneratingWorkouts(false);
+        
+        toast.dismiss('generating');
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error('Erro geral ao gerar treinos:', error);
