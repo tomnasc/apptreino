@@ -222,52 +222,107 @@ export default function WorkoutSuggestionsPage() {
       const selectedWorkoutData = suggestedWorkouts.find(workout => workout.id === workoutId);
       
       if (selectedWorkoutData) {
-        // Criar uma nova lista de treino a partir do treino sugerido selecionado
-        const { data: newWorkoutList, error: createListError } = await supabase
-          .from('workout_lists')
-          .insert([
-            { 
+        try {
+          // 1. Criar uma nova lista de treino a partir do treino sugerido selecionado
+          const { data: newWorkoutList, error: createListError } = await supabase
+            .from('workout_lists')
+            .insert([{ 
               name: selectedWorkoutData.workout_name, 
               description: `${selectedWorkoutData.workout_description} (Gerado pela IA)`,
               user_id: user.id
-            }
-          ])
-          .select();
-        
-        if (createListError) throw createListError;
-        
-        // Verificar se a lista foi criada e se temos os exercícios
-        if (newWorkoutList && newWorkoutList.length > 0 && selectedWorkoutData.exercises) {
-          const workoutListId = newWorkoutList[0].id;
+            }])
+            .select();
           
-          // Preparar os exercícios para inserção na tabela workout_exercises
-          const exercisesToInsert = selectedWorkoutData.exercises.map((exercise, index) => ({
-            workout_list_id: workoutListId,
-            name: exercise.name,
-            sets: parseInt(exercise.sets) || 3,
-            reps: exercise.reps,
-            rest_time: parseInt(exercise.rest?.replace('s', '')) || 60,
-            notes: exercise.execution ? 
-              `${exercise.execution}${exercise.muscles ? ` | Músculos: ${exercise.muscles.join(', ')}` : ''}` :
-              exercise.muscles ? `Músculos trabalhados: ${exercise.muscles.join(', ')}` : '',
-            order_position: index + 1
-          }));
+          if (createListError) throw createListError;
           
-          // Inserir os exercícios na lista
-          const { error: insertExercisesError } = await supabase
-            .from('workout_exercises')
-            .insert(exercisesToInsert);
-          
-          if (insertExercisesError) throw insertExercisesError;
-          
-          toast.success('Treino selecionado e adicionado à sua lista de treinos!');
-          
-          // Opcionalmente, redirecionar para a página da nova lista de treino
-          setTimeout(() => {
-            router.push(`/workout-lists/${workoutListId}`);
-          }, 1500);
-        } else {
-          toast.success('Treino selecionado e salvo!');
+          // 2. Verificar se a lista foi criada e se temos os exercícios
+          if (newWorkoutList && newWorkoutList.length > 0 && selectedWorkoutData.exercises && selectedWorkoutData.exercises.length > 0) {
+            const workoutListId = newWorkoutList[0].id;
+            
+            // 3. Preparar os exercícios para inserção
+            // Converter os dados para o formato correto do banco
+            const exercisesToInsert = selectedWorkoutData.exercises.map((exercise, index) => {
+              // Extrair o número de repetições (ignorando texto adicional se houver)
+              let reps = exercise.reps;
+              if (typeof reps === 'string') {
+                // Pegar apenas os números no início da string
+                const repsMatch = reps.match(/^(\d+)(-\d+)?/);
+                reps = repsMatch ? repsMatch[0] : reps;
+              }
+              
+              // Processar tempo de descanso, considerando diferentes formatos
+              let restTime = 60; // Valor padrão em segundos
+              if (exercise.rest) {
+                // Remover qualquer caractere não numérico e converter para número
+                const restMatch = exercise.rest.match(/\d+/);
+                if (restMatch) {
+                  restTime = parseInt(restMatch[0]);
+                  
+                  // Se em minutos, converter para segundos
+                  if (exercise.rest.toLowerCase().includes('min')) {
+                    restTime *= 60;
+                  }
+                }
+              }
+              
+              // Criar anotações combinando execução e músculos trabalhados
+              let notes = '';
+              if (exercise.execution) {
+                notes += exercise.execution;
+              }
+              
+              if (exercise.muscles && exercise.muscles.length > 0) {
+                const musclesList = exercise.muscles.map(m => translateMuscle(m)).join(', ');
+                if (notes) {
+                  notes += `\n\nMúsculos trabalhados: ${musclesList}`;
+                } else {
+                  notes = `Músculos trabalhados: ${musclesList}`;
+                }
+              }
+              
+              if (exercise.difficulty) {
+                const difficultyTr = translateDifficulty(exercise.difficulty);
+                if (notes) {
+                  notes += `\n\nDificuldade: ${difficultyTr}`;
+                } else {
+                  notes = `Dificuldade: ${difficultyTr}`;
+                }
+              }
+              
+              // Construir objeto de exercício
+              return {
+                workout_list_id: workoutListId,
+                name: exercise.name,
+                sets: parseInt(exercise.sets) || 3,
+                reps: reps,
+                rest_time: restTime,
+                notes: notes,
+                order_position: index + 1
+              };
+            });
+            
+            // 4. Inserir os exercícios no banco de dados
+            const { error: insertExercisesError } = await supabase
+              .from('workout_exercises')
+              .insert(exercisesToInsert);
+            
+            if (insertExercisesError) throw insertExercisesError;
+            
+            // 5. Notificar usuário e redirecionar
+            toast.success('Treino adicionado com sucesso à sua lista de treinos!');
+            
+            // Redirecionar para a página da lista de treino
+            setTimeout(() => {
+              router.push(`/workout-lists/${workoutListId}`);
+            }, 1500);
+            
+          } else {
+            toast.success('Treino selecionado, mas sem exercícios para adicionar.');
+          }
+        } catch (error) {
+          console.error('Erro ao criar lista de treino:', error);
+          toast.error('Erro ao criar lista de treino a partir do treino selecionado.');
+          throw error; // Repassar o erro para ser tratado no catch externo
         }
       } else {
         toast.success('Treino selecionado e salvo!');
