@@ -3,152 +3,30 @@ const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
   skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
-  // Adicionando configurações para resolver problemas de preload
-  runtimeCaching: [
-    {
-      urlPattern: /^https:\/\/fonts\.(?:gstatic|googleapis)\.com\/(.*)$/,
-      handler: 'CacheFirst',
-      options: {
-        cacheName: 'google-fonts',
-        expiration: {
-          maxEntries: 20,
-          maxAgeSeconds: 60 * 60 * 24 * 30 // 30 dias
-        }
-      }
-    },
-    {
-      urlPattern: /\.(?:eot|otf|ttc|ttf|woff|woff2|font.css)$/i,
-      handler: 'CacheFirst',
-      options: {
-        cacheName: 'static-font-assets',
-        expiration: {
-          maxEntries: 20,
-          maxAgeSeconds: 60 * 60 * 24 * 365 // 1 ano
-        }
-      }
-    },
-    {
-      urlPattern: /\.(?:jpg|jpeg|gif|png|svg|ico|webp)$/i,
-      handler: 'CacheFirst',
-      options: {
-        cacheName: 'static-image-assets',
-        expiration: {
-          maxEntries: 50,
-          maxAgeSeconds: 60 * 60 * 24 * 30 // 30 dias
-        }
-      }
-    },
-    {
-      urlPattern: /\/_next\/image\?url=.+$/i,
-      handler: 'CacheFirst',
-      options: {
-        cacheName: 'next-image',
-        expiration: {
-          maxEntries: 50,
-          maxAgeSeconds: 60 * 60 * 24 * 30 // 30 dias
-        }
-      }
-    },
-    {
-      urlPattern: /\.(?:mp3|wav|ogg)$/i,
-      handler: 'CacheFirst',
-      options: {
-        cacheName: 'static-audio-assets',
-        expiration: {
-          maxEntries: 20,
-          maxAgeSeconds: 60 * 60 * 24 * 30 // 30 dias
-        }
-      }
-    },
-    {
-      urlPattern: /\.(?:js)$/i,
-      handler: 'StaleWhileRevalidate',
-      options: {
-        cacheName: 'static-js-assets',
-        expiration: {
-          maxEntries: 50,
-          maxAgeSeconds: 60 * 60 * 24 * 7 // 1 semana
-        }
-      }
-    },
-    {
-      urlPattern: /\.(?:css)$/i,
-      handler: 'StaleWhileRevalidate',
-      options: {
-        cacheName: 'static-style-assets',
-        expiration: {
-          maxEntries: 50,
-          maxAgeSeconds: 60 * 60 * 24 * 7 // 1 semana
-        }
-      }
-    },
-    {
-      urlPattern: /\/_next\/data\/.+\/.+\.json$/i,
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'next-data',
-        expiration: {
-          maxEntries: 50,
-          maxAgeSeconds: 60 * 60 // 1 hora
-        }
-      }
-    },
-    {
-      urlPattern: /\.(?:json|xml|csv)$/i,
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'static-data-assets',
-        expiration: {
-          maxEntries: 20,
-          maxAgeSeconds: 60 * 60 // 1 hora
-        }
-      }
-    },
-    {
-      urlPattern: ({ url }) => {
-        const isSameOrigin = self.origin === url.origin;
-        if (!isSameOrigin) return false;
-        const pathname = url.pathname;
-        // Excluir todas as API calls, recursos estáticos e outros
-        if (
-          pathname.startsWith('/api/') ||
-          pathname.startsWith('/_next/') ||
-          pathname.includes('.') // Tem extensão de arquivo
-        ) {
-          return false;
-        }
-        return true;
-      },
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'pages',
-        expiration: {
-          maxEntries: 50,
-          maxAgeSeconds: 60 * 60 // 1 hora
-        }
-      }
-    },
-    {
-      urlPattern: ({ url }) => {
-        const isSameOrigin = self.origin === url.origin;
-        return !isSameOrigin;
-      },
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'cross-origin',
-        expiration: {
-          maxEntries: 50,
-          maxAgeSeconds: 60 * 60 // 1 hora
-        },
-        networkTimeoutSeconds: 10
-      }
-    }
-  ]
+  disable: process.env.NODE_ENV === 'development'
 });
 
 const nextConfig = {
   reactStrictMode: true,
+  env: {
+    // Garantir que as variáveis de ambiente sejam explicitamente passadas
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    HF_API_TOKEN: process.env.HF_API_TOKEN,
+    HF_MODEL: process.env.HF_MODEL
+  },
+  // Configuração de runtime para garantir que as variáveis estejam disponíveis no servidor
+  serverRuntimeConfig: {
+    // Variáveis apenas disponíveis no servidor
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  },
+  // Configuração de runtime para garantir que as variáveis estejam disponíveis no cliente
+  publicRuntimeConfig: {
+    // Variáveis disponíveis no cliente e servidor
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  },
   swcMinify: true,
   async rewrites() {
     return [
@@ -159,5 +37,11 @@ const nextConfig = {
     ];
   },
 };
+
+// Log para depuração das variáveis de ambiente no momento do build
+console.log('Variáveis de ambiente disponíveis durante o build:');
+console.log('NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Definida' : 'Não definida');
+console.log('NEXT_PUBLIC_SUPABASE_ANON_KEY:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Definida' : 'Não definida');
+console.log('SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Definida' : 'Não definida');
 
 module.exports = withPWA(nextConfig); 
