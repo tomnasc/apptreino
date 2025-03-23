@@ -6,7 +6,8 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Configuração do Hugging Face
 const HF_API_TOKEN = process.env.HF_API_TOKEN;
-const HF_MODEL = process.env.HF_MODEL || 'mistralai/Mixtral-8x7B-Instruct-v0.1';
+// Usar um modelo menor e mais rápido como padrão
+const HF_MODEL = process.env.HF_MODEL || 'mistralai/Mistral-7B-Instruct-v0.2';
 
 // Helper para verificar se todas as variáveis de ambiente necessárias estão configuradas
 const checkEnvironmentVariables = () => {
@@ -32,6 +33,22 @@ const checkEnvironmentVariables = () => {
 };
 
 export default async function handler(req, res) {
+  // Definir um timeout para toda a requisição
+  res.setHeader('Connection', 'keep-alive');
+  
+  // Verificar se o cliente ainda está conectado
+  const isClientConnected = () => {
+    return !req.socket.destroyed && res.connection && !res.connection.destroyed;
+  };
+  
+  // Criar um timeout para encerrar a requisição se demorar muito
+  const apiTimeout = setTimeout(() => {
+    if (isClientConnected()) {
+      console.error('API timeout após 50 segundos');
+      return res.status(504).json({ error: 'Timeout ao processar a requisição' });
+    }
+  }, 50000); // 50 segundos
+
   // Verificar variáveis de ambiente primeiro
   const envCheck = checkEnvironmentVariables();
   if (!envCheck.success) {
@@ -184,12 +201,54 @@ export default async function handler(req, res) {
     // Tentar chamar a API do Hugging Face com timeout e retry
     let response;
     let retries = 0;
-    const maxRetries = 2;
+    const maxRetries = 1; // Reduzir para apenas 1 retry para evitar timeouts longos
+    
+    // Usar um treino offline se estiver demorando muito
+    const createOfflineWorkout = () => {
+      console.log('Criando treino offline devido a timeout ou erro');
+      return {
+        workouts: [
+          {
+            name: "Treino Básico de Emergência",
+            description: "Treino básico gerado quando o servidor de IA está ocupado",
+            exercises: [
+              {
+                name: "Agachamento",
+                sets: 3,
+                reps: "12-15",
+                rest: "60 segundos",
+                difficulty: "Iniciante",
+                muscles: ["Quadríceps", "Glúteos"],
+                execution: "Mantenha os pés na largura dos ombros, desça como se fosse sentar em uma cadeira."
+              },
+              {
+                name: "Flexão de Braço",
+                sets: 3,
+                reps: "10-12",
+                rest: "60 segundos",
+                difficulty: "Iniciante",
+                muscles: ["Peito", "Tríceps"],
+                execution: "Mantenha o corpo reto, desça até que o peito quase toque o chão."
+              },
+              {
+                name: "Prancha",
+                sets: 3,
+                reps: "30 segundos",
+                rest: "30 segundos",
+                difficulty: "Iniciante",
+                muscles: ["Core", "Abdômen"],
+                execution: "Mantenha o corpo reto apoiado nos antebraços e pontas dos pés."
+              }
+            ]
+          }
+        ]
+      };
+    };
     
     while (retries <= maxRetries) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos de timeout
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos de timeout
         
         response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
           method: 'POST',
@@ -207,14 +266,40 @@ export default async function handler(req, res) {
           break;
         } else if (response.status === 503 && retries < maxRetries) {
           // Modelo ainda carregando, tentar novamente
-          const waitTime = Math.pow(2, retries) * 1000; // Exponential backoff: 1s, 2s, 4s
+          const waitTime = 2000; // Esperar apenas 2 segundos antes de tentar novamente
           console.log(`Modelo ainda carregando, aguardando ${waitTime}ms antes de tentar novamente...`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
           retries++;
         } else {
-          // Outro tipo de erro
-          const errorText = await response.text();
-          throw new Error(`Erro na API do Hugging Face: ${response.status} - ${errorText}`);
+          // Se o modelo estiver demorando muito, criar uma resposta offline
+          console.error(`Erro na API do Hugging Face: ${response.status}`);
+          
+          // Salvar treino offline
+          const offlineWorkout = createOfflineWorkout();
+          
+          // Salvar sugestões no banco
+          const workoutsToInsert = offlineWorkout.workouts.map(workout => ({
+            assessment_id: assessmentId,
+            workout_name: workout.name,
+            workout_description: workout.description,
+            exercises: workout.exercises,
+            workout_metadata: {
+              source: 'offline',
+              model: 'fallback'
+            }
+          }));
+          
+          const { data: insertedWorkouts } = await supabaseAdmin
+            .from('ai_suggested_workouts')
+            .insert(workoutsToInsert)
+            .select();
+          
+          clearTimeout(apiTimeout);
+          return res.status(200).json({ 
+            success: true, 
+            workouts: insertedWorkouts,
+            message: 'Treino offline gerado devido a indisponibilidade do serviço de IA'
+          });
         }
       } catch (error) {
         if (error.name === 'AbortError') {
@@ -223,17 +308,40 @@ export default async function handler(req, res) {
             retries++;
             console.log(`Tentativa ${retries} de ${maxRetries}...`);
           } else {
-            throw new Error('Timeout ao chamar a API do Hugging Face após várias tentativas');
+            // Se o modelo estiver demorando muito, criar uma resposta offline
+            console.error('Gerando treino offline após timeout');
+            
+            // Salvar treino offline
+            const offlineWorkout = createOfflineWorkout();
+            
+            // Salvar sugestões no banco
+            const workoutsToInsert = offlineWorkout.workouts.map(workout => ({
+              assessment_id: assessmentId,
+              workout_name: workout.name,
+              workout_description: workout.description,
+              exercises: workout.exercises,
+              workout_metadata: {
+                source: 'offline',
+                model: 'fallback'
+              }
+            }));
+            
+            const { data: insertedWorkouts } = await supabaseAdmin
+              .from('ai_suggested_workouts')
+              .insert(workoutsToInsert)
+              .select();
+            
+            clearTimeout(apiTimeout);
+            return res.status(200).json({ 
+              success: true, 
+              workouts: insertedWorkouts,
+              message: 'Treino offline gerado devido a timeout'
+            });
           }
         } else {
           throw error;
         }
       }
-    }
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Erro na API do Hugging Face: ${response.status} - ${errorText}`);
     }
     
     console.log('Resposta recebida da API do Hugging Face, processando...');
@@ -349,10 +457,12 @@ export default async function handler(req, res) {
     
     console.log(`${insertedWorkouts?.length || 0} treinos salvos com sucesso`);
     
+    clearTimeout(apiTimeout);
     return res.status(200).json({ success: true, workouts: insertedWorkouts });
     
   } catch (error) {
     console.error("Erro interno:", error);
+    clearTimeout(apiTimeout);
     return res.status(500).json({ error: 'Erro interno', details: error.message, stack: error.stack });
   }
 } 

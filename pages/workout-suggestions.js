@@ -86,35 +86,62 @@ export default function WorkoutSuggestionsPage() {
         throw new Error('Falha ao obter token de autenticação');
       }
       
-      // Chamar a API route local em vez da função Edge
-      const response = await fetch('/api/ai-workout-suggestions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({ assessmentId })
-      });
+      // Chamar a API route local com timeout maior
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutos de timeout
       
-      // Obter o corpo da resposta para análise
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        // Extrair mensagem de erro mais detalhada
-        const errorMessage = 
-          responseData.details || 
-          responseData.error || 
-          'Falha ao gerar sugestões de treino';
-          
-        console.error('Erro detalhado:', responseData);
+      try {
+        const response = await fetch('/api/ai-workout-suggestions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ assessmentId }),
+          signal: controller.signal
+        });
         
-        throw new Error(errorMessage);
-      }
-      
-      toast.success('Sugestões de treino geradas!', { id: 'generating' });
-      
-      if (responseData?.workouts) {
-        setSuggestedWorkouts(responseData.workouts);
+        // Limpar o timeout quando a requisição for concluída
+        clearTimeout(timeoutId);
+        
+        // Verificar se a resposta é JSON antes de tentar fazer o parse
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const textResponse = await response.text();
+          console.error('Resposta não-JSON recebida:', textResponse);
+          throw new Error('Resposta inválida do servidor. Por favor, tente novamente mais tarde.');
+        }
+        
+        // Agora podemos tentar fazer o parse com segurança
+        const responseData = await response.json();
+        
+        if (!response.ok) {
+          // Extrair mensagem de erro mais detalhada
+          const errorMessage = 
+            responseData.details || 
+            responseData.error || 
+            'Falha ao gerar sugestões de treino';
+            
+          console.error('Erro detalhado:', responseData);
+          
+          throw new Error(errorMessage);
+        }
+        
+        toast.success('Sugestões de treino geradas!', { id: 'generating' });
+        
+        if (responseData?.workouts) {
+          setSuggestedWorkouts(responseData.workouts);
+        }
+      } catch (fetchError) {
+        // Limpar o timeout em caso de erro
+        clearTimeout(timeoutId);
+        
+        // Verificar se é um erro de timeout
+        if (fetchError.name === 'AbortError') {
+          throw new Error('A geração de treinos está demorando muito. Por favor, tente novamente mais tarde.');
+        }
+        
+        throw fetchError;
       }
       
     } catch (error) {
@@ -123,8 +150,53 @@ export default function WorkoutSuggestionsPage() {
       // Mensagem de erro mais amigável para o usuário
       let errorMessage = 'Erro ao gerar sugestões de treino';
       
+      // Verificar se é um erro de timeout
+      if (error.message.includes('demorando muito') || error.message.includes('timeout')) {
+        errorMessage = 'Tempo esgotado ao gerar treinos. O servidor está ocupado, tente novamente mais tarde.';
+        
+        // Gerar um treino básico como fallback
+        const fallbackWorkouts = [
+          {
+            id: 'fallback-1',
+            workout_name: 'Treino Básico de Emergência',
+            workout_description: 'Um treino básico gerado quando o servidor está ocupado',
+            exercises: [
+              {
+                name: 'Agachamento',
+                sets: 3,
+                reps: '12-15',
+                rest: '60 segundos',
+                difficulty: 'Iniciante',
+                muscles: ['Quadríceps', 'Glúteos'],
+                execution: 'Mantenha os pés na largura dos ombros, desça como se fosse sentar em uma cadeira.'
+              },
+              {
+                name: 'Flexão de Braço',
+                sets: 3,
+                reps: '10-12',
+                rest: '60 segundos',
+                difficulty: 'Iniciante',
+                muscles: ['Peito', 'Tríceps'],
+                execution: 'Mantenha o corpo reto, desça até que o peito quase toque o chão.'
+              },
+              {
+                name: 'Prancha',
+                sets: 3,
+                reps: '30 segundos',
+                rest: '30 segundos',
+                difficulty: 'Iniciante',
+                muscles: ['Core', 'Abdômen'],
+                execution: 'Mantenha o corpo reto apoiado nos antebraços e pontas dos pés.'
+              }
+            ]
+          }
+        ];
+        
+        setSuggestedWorkouts(fallbackWorkouts);
+        toast.warning('Oferecendo um treino básico enquanto o servidor está ocupado.', { id: 'fallback', duration: 5000 });
+      }
       // Verificar se é um erro de ambiente ou configuração
-      if (error.message.includes('Configuração incompleta') || 
+      else if (error.message.includes('Configuração incompleta') || 
           error.message.includes('Variáveis de ambiente')) {
         errorMessage = 'Erro de configuração do servidor. Por favor, contate o suporte.';
       } 
@@ -135,6 +207,10 @@ export default function WorkoutSuggestionsPage() {
       // Verificar se é um erro de autenticação
       else if (error.message.includes('autenticação') || error.message.includes('token')) {
         errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
+      }
+      // Verificar se é um erro de sintaxe JSON
+      else if (error.name === 'SyntaxError' || error.message.includes('JSON')) {
+        errorMessage = 'Erro ao processar a resposta do servidor. Por favor, tente novamente.';
       }
       
       toast.error(errorMessage, { id: 'generating' });
