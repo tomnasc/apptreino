@@ -217,7 +217,63 @@ export default function WorkoutSuggestionsPage() {
       );
       
       setSelectedWorkout(workoutId);
-      toast.success('Treino selecionado e salvo!');
+      
+      // Obter o treino selecionado dos dados locais
+      const selectedWorkoutData = suggestedWorkouts.find(workout => workout.id === workoutId);
+      
+      if (selectedWorkoutData) {
+        // Criar uma nova lista de treino a partir do treino sugerido selecionado
+        const { data: newWorkoutList, error: createListError } = await supabase
+          .from('workout_lists')
+          .insert([
+            { 
+              name: selectedWorkoutData.workout_name, 
+              description: selectedWorkoutData.workout_description,
+              user_id: user.id,
+              is_from_ai: true,
+              ai_source_id: workoutId
+            }
+          ])
+          .select();
+        
+        if (createListError) throw createListError;
+        
+        // Verificar se a lista foi criada e se temos os exercícios
+        if (newWorkoutList && newWorkoutList.length > 0 && selectedWorkoutData.exercises) {
+          const workoutListId = newWorkoutList[0].id;
+          
+          // Preparar os exercícios para inserção na tabela workout_exercises
+          const exercisesToInsert = selectedWorkoutData.exercises.map((exercise, index) => ({
+            workout_list_id: workoutListId,
+            name: exercise.name,
+            sets: parseInt(exercise.sets) || 3,
+            reps: exercise.reps,
+            rest_time: parseInt(exercise.rest?.replace('s', '')) || 60,
+            notes: exercise.execution || '',
+            order_position: index + 1,
+            muscles: exercise.muscles || [],
+            difficulty: exercise.difficulty || 'normal'
+          }));
+          
+          // Inserir os exercícios na lista
+          const { error: insertExercisesError } = await supabase
+            .from('workout_exercises')
+            .insert(exercisesToInsert);
+          
+          if (insertExercisesError) throw insertExercisesError;
+          
+          toast.success('Treino selecionado e adicionado à sua lista de treinos!');
+          
+          // Opcionalmente, redirecionar para a página da nova lista de treino
+          setTimeout(() => {
+            router.push(`/workout-lists/${workoutListId}`);
+          }, 1500);
+        } else {
+          toast.success('Treino selecionado e salvo!');
+        }
+      } else {
+        toast.success('Treino selecionado e salvo!');
+      }
       
     } catch (error) {
       console.error('Erro ao selecionar treino:', error);
