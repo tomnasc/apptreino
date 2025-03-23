@@ -167,9 +167,9 @@ export default function WorkoutSuggestionsPage() {
           
           const offlineData = await offlineResponse.json();
           
-          if (offlineData.success && offlineData.data) {
+          if (offlineData.success && offlineData.workouts) {
             // Atualizar UI com os treinos offline
-            setSuggestedWorkouts(offlineData.data);
+            setSuggestedWorkouts(offlineData.workouts);
             toast.dismiss('generating-offline');
             toast.success('Treinos offline gerados com sucesso');
             
@@ -317,11 +317,15 @@ export default function WorkoutSuggestionsPage() {
   // Função para renderizar exercícios, aplicando tradução quando necessário
   const renderExercises = (exercises) => {
     return exercises.map((exercise, index) => {
-      // Aplicar tradução para os músculos caso estejam em inglês
-      const translatedMuscles = exercise.muscles.map(translateMuscle);
+      // Verificar se exercise.muscles existe antes de tentar fazer o map
+      const translatedMuscles = exercise.muscles ? 
+        exercise.muscles.map(translateMuscle) : 
+        ['Não especificado'];
       
-      // Aplicar tradução para dificuldade caso esteja em inglês
-      const translatedDifficulty = translateDifficulty(exercise.difficulty);
+      // Aplicar tradução para dificuldade caso esteja em inglês e exista
+      const translatedDifficulty = exercise.difficulty ? 
+        translateDifficulty(exercise.difficulty) : 
+        'Normal';
       
       return (
         <li key={index} className="text-sm">
@@ -344,7 +348,7 @@ export default function WorkoutSuggestionsPage() {
               <p><span className="font-medium">Descanso:</span> {exercise.rest}</p>
               <p><span className="font-medium">Dificuldade:</span> {translatedDifficulty}</p>
               <p><span className="font-medium">Músculos:</span> {translatedMuscles.join(', ')}</p>
-              <p><span className="font-medium">Execução:</span> {exercise.execution}</p>
+              <p><span className="font-medium">Execução:</span> {exercise.execution || 'Mantenha a postura correta durante todo o movimento.'}</p>
             </div>
           )}
         </li>
