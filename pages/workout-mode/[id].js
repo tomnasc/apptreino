@@ -48,10 +48,6 @@ export default function WorkoutMode() {
   const lastUpdatedTimeRef = useRef(null);
   const backgroundTimeRef = useRef(null);
 
-  // Referência para o áudio de fundo
-  const backgroundAudioRef = useRef(null);
-  const audioContextRef = useRef(null);
-
   // Adicionar timerRef para controlar o timer
   const timerRef = useRef(null);
 
@@ -69,75 +65,17 @@ export default function WorkoutMode() {
   // Inicializar a referência de áudio
   useEffect(() => {
     if (typeof window !== 'undefined' && isIOS) {
-      // Criar elementos de áudio para iOS
+      // Detectar iOS apenas, sem criar elementos de áudio
       try {
-        // Audiocontext para iOS (permite continuar em segundo plano)
-        if (window.AudioContext || window.webkitAudioContext) {
-          const AudioContext = window.AudioContext || window.webkitAudioContext;
-          audioContextRef.current = new AudioContext();
-          console.log('AudioContext criado para iOS');
-        }
-        
-        // Inicializar o elemento de áudio para usar em segundo plano
-        const audio = new Audio();
-        audio.src = '/sounds/notification.mp3';
-        audio.loop = false;
-        audio.volume = 1.0;
-        
-        // Configurar atributos para aumentar chances de reprodução em segundo plano
-        audio.setAttribute('playsinline', '');
-        audio.setAttribute('webkit-playsinline', '');
-        audio.preload = 'auto';
-
-        // Evento que executa quando o arquivo termina de carregar
-        audio.oncanplaythrough = () => {
-          console.log('Áudio carregado e pronto para reprodução');
-        };
-        
-        // Lidar com erros de áudio
-        audio.onerror = (e) => {
-          console.error('Erro ao carregar áudio:', e);
-        };
-        
-        // Configurar manipulador para quando o áudio terminar
-        audio.onended = () => {
-          console.log('Áudio de notificação terminou');
-        };
-        
-        backgroundAudioRef.current = audio;
-        
-        // Pré-carregar o áudio com um "toque silencioso" para inicializar o sistema de áudio
-        document.addEventListener('touchstart', function initAudio() {
-          console.log('Inicializando sistema de áudio com interação do usuário');
-          audio.volume = 0.01;
-          audio.play().then(() => {
-            setTimeout(() => {
-              audio.pause();
-              audio.currentTime = 0;
-              audio.volume = 1.0;
-              console.log('Sistema de áudio inicializado com sucesso');
-            }, 100);
-          }).catch(e => {
-            console.log('Erro ao inicializar sistema de áudio:', e);
-          });
-          document.removeEventListener('touchstart', initAudio);
-        }, { once: true });
+        // Não criar AudioContext para evitar interrupções de mídia
+        console.log('iOS detectado, evitando criação de elementos de áudio');
       } catch (error) {
-        console.error('Erro ao configurar áudio para iOS:', error);
+        console.error('Erro ao configurar ambiente iOS:', error);
       }
     }
     
     return () => {
-      // Limpar recursos de áudio
-      if (backgroundAudioRef.current) {
-        backgroundAudioRef.current.pause();
-        backgroundAudioRef.current = null;
-      }
-      
-      if (audioContextRef.current) {
-        audioContextRef.current.close().catch(e => console.log('Erro ao fechar AudioContext:', e));
-        audioContextRef.current = null;
-      }
+      // Não é necessário limpar recursos de áudio, pois não estamos mais criando-os
     };
   }, [isIOS]);
 
@@ -270,7 +208,7 @@ export default function WorkoutMode() {
     }
     
     if (isIOS) {
-      console.log('Dispositivo iOS detectado, configurando sistema de verificação de retorno');
+      console.log('Dispositivo iOS detectado, configurando sistema de verificação sem áudio');
       
       // Temporizador específico para iOS que verifica quando o app volta ao foco
       const checkTimerOnFocus = () => {
@@ -296,7 +234,7 @@ export default function WorkoutMode() {
               localStorage.removeItem('treinoPro_restTimerDuration');
               localStorage.removeItem('treinoPro_restTimerEnd');
               
-              // Mostrar apenas o popup simples
+              // Mostrar apenas o popup simples, sem sons
               showIOSAlert();
               console.log('iOS: Alerta visual mostrado ao voltar ao foco');
             } else {
@@ -348,7 +286,7 @@ export default function WorkoutMode() {
             localStorage.removeItem('treinoPro_restTimerDuration');
             localStorage.removeItem('treinoPro_restTimerEnd');
             
-            // Apenas mostrar o popup simples
+            // Apenas mostrar o popup simples, nenhum som
             showIOSAlert();
           } else {
             // Atualizar o tempo restante com precisão de 1 casa decimal
@@ -451,19 +389,24 @@ export default function WorkoutMode() {
     }
   }, [isWorkoutActive, isIOS]);
 
-  // Remover registro do service worker que está causando problemas
+  // Garantir que o efeito de unregisterServiceWorkers remova todos os service workers
   useEffect(() => {
     const unregisterServiceWorkers = async () => {
       if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (const registration of registrations) {
-          registration.unregister();
-          console.log('Service worker desregistrado');
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            await registration.unregister();
+            console.log('Service worker desregistrado:', registration.scope);
+          }
+          console.log('Todos os service workers foram desregistrados');
+        } catch (error) {
+          console.error('Erro ao desregistrar service workers:', error);
         }
       }
     };
     
-    // Desregistrar service workers existentes
+    // Desregistrar service workers existentes imediatamente
     unregisterServiceWorkers();
   }, []);
 
@@ -890,7 +833,7 @@ export default function WorkoutMode() {
   // Função para pular o exercício atual e movê-lo para o final da ficha
   const skipExercise = () => {
     // Confirmar com o usuário 
-    if (!confirm('Deseja realmente pular este exercício? Ele será movido para a próxima posição na lista.')) {
+    if (!confirm('Deseja realmente pular este exercício? Ele será trocado com o próximo exercício.')) {
       return;
     }
 
@@ -903,23 +846,22 @@ export default function WorkoutMode() {
     // Copiar a lista de exercícios
     const updatedExercises = [...exercises];
     
-    // Remover o exercício atual
-    const skippedExercise = updatedExercises.splice(currentExerciseIndex, 1)[0];
-    
-    // Adicionar o exercício na próxima posição, não no final
-    updatedExercises.splice(currentExerciseIndex + 1, 0, skippedExercise);
+    // Trocar a posição do exercício atual com o próximo (inverter posições)
+    [updatedExercises[currentExerciseIndex], updatedExercises[currentExerciseIndex + 1]] = 
+    [updatedExercises[currentExerciseIndex + 1], updatedExercises[currentExerciseIndex]];
     
     // Atualizar o estado com a nova lista de exercícios
     setExercises(updatedExercises);
     
-    // Passamos para o próximo exercício (que agora é o que estava após o atual)
-    setCurrentExerciseIndex(currentExerciseIndex + 1);
+    // Não alteramos o índice do exercício atual, pois agora o próximo exercício está nesta posição
     
     // Resetar contadores relacionados ao exercício
     setCurrentSetIndex(0);
     setRepsCompleted(0);
-    if (updatedExercises[currentExerciseIndex + 1].time) {
-      setTimeRemaining(updatedExercises[currentExerciseIndex + 1].time);
+    
+    // Verificar se o "novo" exercício atual (que era o próximo) é baseado em tempo
+    if (updatedExercises[currentExerciseIndex].time) {
+      setTimeRemaining(updatedExercises[currentExerciseIndex].time);
       setTimerActive(false);
     }
 
@@ -1014,112 +956,37 @@ export default function WorkoutMode() {
       // Verificar permissão atual
       if (Notification.permission === 'granted') {
         setNotificationPermission(true);
-        
-        // Se for iOS, tentar registrar para notificações push se possível
-        if (isIOS) {
-          registerForPushNotifications();
-        }
       } else if (Notification.permission !== 'denied') {
         // Se ainda não negou, solicitar permissão
         Notification.requestPermission().then(permission => {
           if (permission === 'granted') {
             setNotificationPermission(true);
-            
-            // Se for iOS, tentar registrar para notificações push se possível
-            if (isIOS) {
-              registerForPushNotifications();
-            }
           }
         });
       }
     }
-  }, [isIOS]);
+  }, []);
   
-  // Função para registrar para notificações push no iOS
-  const registerForPushNotifications = () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      console.log('Notificações push não são suportadas neste navegador');
-      return;
-    }
-    
-    try {
-      console.log('Tentando registrar para notificações push');
-      
-      // Registrar service worker para notificações push
-      navigator.serviceWorker.register('/push-sw.js')
-        .then(registration => {
-          console.log('Service Worker registrado com sucesso:', registration);
-          
-          // Solicitar permissão para notificações push
-          return registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(
-              'BFnrxGZ2-TzxWgXNiP-GG_Wo-Nau0r_07i9RgQIHGdx4Wy3PoZwMx00XvoFJkP4Bx1pZ6sKCtjsZZpbTUoxnMpw'
-            )
-          });
-        })
-        .then(subscription => {
-          console.log('Inscrito para notificações push:', subscription);
-          // Aqui você poderia enviar o subscription para seu servidor
-        })
-        .catch(err => {
-          console.error('Erro ao registrar para notificações push:', err);
-        });
-    } catch (error) {
-      console.error('Erro ao configurar notificações push:', error);
-    }
-  };
-  
-  // Função auxiliar para converter a chave pública em formato adequado
-  const urlBase64ToUint8Array = (base64String) => {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding)
-      .replace(/\-/g, '+')
-      .replace(/_/g, '/');
-    
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-  };
-
   // Função para enviar notificação
   const sendRestFinishedNotification = () => {
-    if (!notificationPermission) {
-      console.log('Notificações não permitidas.');
-      
-      if ('vibrate' in navigator) {
-        navigator.vibrate([200, 100, 200, 100, 200]);
-      }
-      
-      // Mostrar alerta visual para iOS mesmo sem permissão
-      if (isIOS) {
-        showIOSAlert();
-      }
-      return;
-    }
-    
     try {
       const currentExercise = exercises[currentExerciseIndex];
       const notificationTitle = 'Descanso finalizado!';
       const notificationBody = `Hora de começar a próxima série de ${currentExercise.name}`;
       
-      // Para iOS, usar uma abordagem específica com alerta visual
+      // Para iOS, usar apenas alerta visual
       if (isIOS) {
-        console.log('Enviando notificação para iOS, standalone mode:', window.navigator.standalone);
+        console.log('Enviando notificação visual para iOS');
         
         // Mostrar alerta visual para iOS (overlay ou modal que chama atenção)
         showIOSAlert();
         
-        // Vibrar o dispositivo duas vezes para aumentar a atenção
+        // Vibrar o dispositivo para aumentar a atenção (sem sons)
         if ('vibrate' in navigator) {
-          navigator.vibrate([300, 100, 300, 100, 300]);
+          navigator.vibrate([300, 100, 300]);
         }
       } else {
-        // Abordagem padrão para outros navegadores
+        // Abordagem para outros navegadores - apenas visual e vibração
         try {
           const notification = new Notification(notificationTitle, {
             body: notificationBody,
@@ -1137,7 +1004,7 @@ export default function WorkoutMode() {
             notification.close();
           };
           
-          // Vibrar dispositivo
+          // Vibrar dispositivo (sem sons)
           if ('vibrate' in navigator) {
             navigator.vibrate([200, 100, 200]);
           }
@@ -1301,40 +1168,9 @@ export default function WorkoutMode() {
     saveTimersState();
   };
 
-  useEffect(() => {
-    // Verificar áudio a cada segundo para superar limitações do iOS
-    if (isIOS && typeof window !== 'undefined') {
-      // Intervalo para verificar se o áudio deve tocar
-      const audioCheckInterval = setInterval(() => {
-        try {
-          const notificationTimeStr = localStorage.getItem('treinoPro_audioNotificationTime');
-          if (notificationTimeStr) {
-            const notificationTime = parseInt(notificationTimeStr);
-            const now = Date.now();
-            
-            // Verificar se está na hora de tocar o áudio
-            if (now >= notificationTime) {
-              console.log('Hora de tocar o áudio de notificação!');
-              playBackgroundNotificationSound();
-              
-              // Limpar o timestamp após tocar
-              localStorage.removeItem('treinoPro_audioNotificationTime');
-            }
-          }
-        } catch (error) {
-          console.error('Erro ao verificar tempo de áudio:', error);
-        }
-      }, 1000);
-      
-      return () => {
-        clearInterval(audioCheckInterval);
-      };
-    }
-  }, [isIOS]);
-
-  // Remover referências a notificações sonoras
+  // Usar uma função vazia para o playBackgroundNotificationSound
   const playBackgroundNotificationSound = () => {
-    // Função vazia para não executar sons
+    // Função vazia para garantir que nenhum som seja reproduzido
     console.log("Notificações sonoras desativadas");
   };
 
