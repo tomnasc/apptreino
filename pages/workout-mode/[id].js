@@ -434,27 +434,70 @@ export default function WorkoutMode() {
   // Adicionar efeito para carregar estado do treino do localStorage
   useEffect(() => {
     // Verificar se há um treino ativo
-    const storedWorkoutActive = localStorage.getItem(`treinoPro_isWorkoutActive_${id}`);
-    if (storedWorkoutActive === 'true') {
-      // Carregar estado do treino do localStorage
+    if (typeof window !== 'undefined' && id) {
       try {
-        const storedExerciseIndex = localStorage.getItem(`treinoPro_currentExerciseIndex_${id}`);
-        const storedSetIndex = localStorage.getItem(`treinoPro_currentSetIndex_${id}`);
-        const storedCompletedSets = localStorage.getItem(`treinoPro_completedSets_${id}`);
-        const storedRepsHistory = localStorage.getItem(`treinoPro_setRepsHistory_${id}`);
-        const storedSessionId = localStorage.getItem(`treinoPro_sessionId_${id}`);
-        const storedStartTime = localStorage.getItem(`treinoPro_workoutStartTime_${id}`);
-        
-        if (storedExerciseIndex) setCurrentExerciseIndex(parseInt(storedExerciseIndex));
-        if (storedSetIndex) setCurrentSetIndex(parseInt(storedSetIndex));
-        if (storedCompletedSets) setCompletedSets(JSON.parse(storedCompletedSets));
-        if (storedRepsHistory) setSetRepsHistory(JSON.parse(storedRepsHistory));
-        if (storedSessionId) setSessionId(storedSessionId);
-        if (storedStartTime) setWorkoutStartTime(new Date(storedStartTime));
-        
-        setIsWorkoutActive(true);
+        const storedWorkoutActive = localStorage.getItem(`treinoPro_isWorkoutActive_${id}`);
+        if (storedWorkoutActive === 'true') {
+          // Carregar estado do treino do localStorage
+          const storedExerciseIndex = localStorage.getItem(`treinoPro_currentExerciseIndex_${id}`);
+          const storedSetIndex = localStorage.getItem(`treinoPro_currentSetIndex_${id}`);
+          const storedCompletedSets = localStorage.getItem(`treinoPro_completedSets_${id}`);
+          const storedRepsHistory = localStorage.getItem(`treinoPro_setRepsHistory_${id}`);
+          const storedSessionId = localStorage.getItem(`treinoPro_sessionId_${id}`);
+          const storedStartTime = localStorage.getItem(`treinoPro_workoutStartTime_${id}`);
+          
+          if (storedExerciseIndex) setCurrentExerciseIndex(parseInt(storedExerciseIndex) || 0);
+          if (storedSetIndex) setCurrentSetIndex(parseInt(storedSetIndex) || 0);
+          if (storedCompletedSets) {
+            try {
+              setCompletedSets(JSON.parse(storedCompletedSets) || {});
+            } catch (e) {
+              console.error('Erro ao fazer parse de completedSets:', e);
+              setCompletedSets({});
+            }
+          }
+          if (storedRepsHistory) {
+            try {
+              setSetRepsHistory(JSON.parse(storedRepsHistory) || {});
+            } catch (e) {
+              console.error('Erro ao fazer parse de setRepsHistory:', e);
+              setSetRepsHistory({});
+            }
+          }
+          if (storedSessionId) setSessionId(storedSessionId);
+          if (storedStartTime) {
+            try {
+              setWorkoutStartTime(new Date(storedStartTime));
+            } catch (e) {
+              console.error('Erro ao fazer parse de workoutStartTime:', e);
+              setWorkoutStartTime(new Date());
+            }
+          }
+          
+          setIsWorkoutActive(true);
+        }
       } catch (error) {
         console.error('Erro ao restaurar estado do treino:', error);
+        // Em caso de erro, reiniciar o estado do treino
+        setIsWorkoutActive(false);
+        setCurrentExerciseIndex(0);
+        setCurrentSetIndex(0);
+        setCompletedSets({});
+        setSetRepsHistory({});
+        
+        // Limpar o localStorage para evitar problemas futuros
+        try {
+          localStorage.removeItem(`treinoPro_isWorkoutActive_${id}`);
+          localStorage.removeItem(`treinoPro_currentExerciseIndex_${id}`);
+          localStorage.removeItem(`treinoPro_currentSetIndex_${id}`);
+          localStorage.removeItem(`treinoPro_completedSets_${id}`);
+          localStorage.removeItem(`treinoPro_setRepsHistory_${id}`);
+          localStorage.removeItem(`treinoPro_sessionId_${id}`);
+          localStorage.removeItem(`treinoPro_workoutStartTime_${id}`);
+          localStorage.removeItem('treinoPro_timerState');
+        } catch (e) {
+          console.error('Erro ao limpar localStorage:', e);
+        }
       }
     }
   }, [id]);
@@ -920,25 +963,90 @@ export default function WorkoutMode() {
       // Calcular tempo decorrido desde o início da sessão
       const startTime = new Date(sessionData.started_at);
       
-      // Buscar dados de progresso da sessão (se você tiver uma tabela de progresso)
-      // Aqui você pode adicionar código para recuperar o progresso exato do usuário
-      // Por enquanto, vamos apenas iniciar a sessão com os dados básicos
+      // Buscar detalhes da sessão para recuperar o progresso
+      try {
+        const { data: sessionDetails, error: detailsError } = await supabase
+          .from('workout_session_details')
+          .select('*')
+          .eq('session_id', sessionToResumeId)
+          .order('exercise_index', { ascending: true })
+          .order('set_index', { ascending: true });
+        
+        if (detailsError) throw detailsError;
+        
+        // Reconstruir completedSets a partir dos detalhes da sessão
+        const newCompletedSets = {};
+        const newSetRepsHistory = {};
+        
+        if (sessionDetails && sessionDetails.length > 0) {
+          // Identificar o último exercício e série concluídos
+          let lastExerciseIndex = 0;
+          let lastSetIndex = 0;
+          
+          sessionDetails.forEach(detail => {
+            const exerciseKey = `${detail.exercise_index}`;
+            
+            // Inicializar arrays se não existirem
+            if (!newCompletedSets[exerciseKey]) {
+              newCompletedSets[exerciseKey] = [];
+            }
+            if (!newSetRepsHistory[exerciseKey]) {
+              newSetRepsHistory[exerciseKey] = [];
+            }
+            
+            // Adicionar série concluída
+            newCompletedSets[exerciseKey].push(detail.set_index);
+            newSetRepsHistory[exerciseKey][detail.set_index] = detail.reps_completed;
+            
+            // Atualizar último exercício/série
+            if (detail.exercise_index > lastExerciseIndex) {
+              lastExerciseIndex = detail.exercise_index;
+              lastSetIndex = detail.set_index;
+            } else if (detail.exercise_index === lastExerciseIndex && detail.set_index > lastSetIndex) {
+              lastSetIndex = detail.set_index;
+            }
+          });
+          
+          // Configurar para o próximo exercício/série não concluído
+          const currentExerciseObj = exercises[lastExerciseIndex];
+          if (currentExerciseObj && lastSetIndex + 1 >= currentExerciseObj.sets) {
+            // Se todas as séries do último exercício foram concluídas, passar para o próximo
+            setCurrentExerciseIndex(lastExerciseIndex + 1);
+            setCurrentSetIndex(0);
+          } else {
+            // Senão, continuar no mesmo exercício, próxima série
+            setCurrentExerciseIndex(lastExerciseIndex);
+            setCurrentSetIndex(lastSetIndex + 1);
+          }
+        } else {
+          // Se não houver detalhes, começar do início
+          setCurrentExerciseIndex(0);
+          setCurrentSetIndex(0);
+        }
+        
+        // Atualizar o estado com os dados reconstruídos
+        setCompletedSets(newCompletedSets);
+        setSetRepsHistory(newSetRepsHistory);
+      } catch (detailError) {
+        console.error('Erro ao buscar detalhes da sessão:', detailError);
+        // Se falhar, simplesmente comece do início
+        setCurrentExerciseIndex(0);
+        setCurrentSetIndex(0);
+        setCompletedSets({});
+        setSetRepsHistory({});
+      }
       
+      // Configurar o estado básico da sessão
       setSessionId(sessionToResumeId);
       setWorkoutStartTime(startTime);
       setIsWorkoutActive(true);
-      setCurrentExerciseIndex(0); // Você pode ajustar isso se tiver dados de progresso
-      setCurrentSetIndex(0);      // Você pode ajustar isso se tiver dados de progresso
-      setCompletedSets({});       // Você pode ajustar isso se tiver dados de progresso
-      setSetRepsHistory({});      // Resetar o histórico de repetições
+      setRepsCompleted(0);
       
       // Configurar o exercício atual
-      const currentExercise = exercises[0];
-      if (currentExercise.time) {
+      const currentExercise = exercises[currentExerciseIndex];
+      if (currentExercise && currentExercise.time) {
         setTimeRemaining(currentExercise.time);
         setTimerActive(false); // Não inicia o timer automaticamente ao retomar
-      } else {
-        setRepsCompleted(0);
       }
       
       // Notificar o usuário
@@ -946,6 +1054,13 @@ export default function WorkoutMode() {
     } catch (error) {
       console.error('Erro ao retomar treino:', error);
       setError('Ocorreu um erro ao retomar o treino. Por favor, tente novamente.');
+      
+      // Em caso de erro, reiniciar o estado
+      setIsWorkoutActive(false);
+      setCurrentExerciseIndex(0);
+      setCurrentSetIndex(0);
+      setCompletedSets({});
+      setSetRepsHistory({});
     }
   };
 
