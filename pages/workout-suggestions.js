@@ -245,9 +245,22 @@ export default function WorkoutSuggestionsPage() {
               // Extrair o número de repetições (ignorando texto adicional se houver)
               let reps = exercise.reps;
               if (typeof reps === 'string') {
-                // Pegar apenas os números no início da string
-                const repsMatch = reps.match(/^(\d+)(-\d+)?/);
-                reps = repsMatch ? repsMatch[0] : reps;
+                // Se for um intervalo como "10-12", pega apenas o primeiro número
+                if (reps.includes('-')) {
+                  reps = reps.split('-')[0];
+                }
+                
+                // Remove qualquer texto não numérico
+                const repsMatch = reps.match(/\d+/);
+                if (repsMatch) {
+                  reps = parseInt(repsMatch[0]);
+                } else {
+                  reps = 10; // Valor padrão se não conseguir extrair um número
+                }
+              } else if (typeof reps === 'number') {
+                reps = Math.floor(reps); // Garante que é um inteiro
+              } else {
+                reps = 10; // Valor padrão caso o valor não seja string nem número
               }
               
               // Processar tempo de descanso, considerando diferentes formatos
