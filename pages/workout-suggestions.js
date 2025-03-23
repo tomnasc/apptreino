@@ -284,12 +284,29 @@ export default function WorkoutSuggestionsPage() {
                 notes += exercise.execution;
               }
               
-              if (exercise.muscles && exercise.muscles.length > 0) {
-                const musclesList = exercise.muscles.map(m => translateMuscle(m)).join(', ');
-                if (notes) {
-                  notes += `\n\nMúsculos trabalhados: ${musclesList}`;
-                } else {
-                  notes = `Músculos trabalhados: ${musclesList}`;
+              // Processar músculos com verificação de tipo
+              if (exercise.muscles) {
+                let musclesList = '';
+                
+                // Verificar se muscles é um array
+                if (Array.isArray(exercise.muscles)) {
+                  musclesList = exercise.muscles.map(m => translateMuscle(m)).join(', ');
+                } 
+                // Se for uma string, considerar como um único músculo
+                else if (typeof exercise.muscles === 'string') {
+                  musclesList = translateMuscle(exercise.muscles);
+                }
+                // Se for outro tipo (objeto, etc.), usar um valor padrão
+                else {
+                  musclesList = 'Não especificado';
+                }
+                
+                if (musclesList && musclesList.length > 0) {
+                  if (notes) {
+                    notes += `\n\nMúsculos trabalhados: ${musclesList}`;
+                  } else {
+                    notes = `Músculos trabalhados: ${musclesList}`;
+                  }
                 }
               }
               
