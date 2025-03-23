@@ -91,13 +91,18 @@ export default function WorkoutSuggestionsPage() {
       const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutos de timeout
       
       try {
+        // Primeiro tenta a API online
         const response = await fetch('/api/ai-workout-suggestions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authToken}`
           },
-          body: JSON.stringify({ assessmentId }),
+          body: JSON.stringify({ 
+            assessmentId,
+            level: assessment?.experience_level,
+            goals: assessment?.fitness_goals
+          }),
           signal: controller.signal
         });
         
@@ -132,94 +137,67 @@ export default function WorkoutSuggestionsPage() {
         if (responseData?.workouts) {
           setSuggestedWorkouts(responseData.workouts);
         }
-      } catch (fetchError) {
-        // Limpar o timeout em caso de erro
-        clearTimeout(timeoutId);
+      } catch (error) {
+        console.error('Erro ao gerar treinos online:', error);
         
-        // Verificar se é um erro de timeout
-        if (fetchError.name === 'AbortError') {
-          throw new Error('A geração de treinos está demorando muito. Por favor, tente novamente mais tarde.');
-        }
-        
-        throw fetchError;
-      }
-      
-    } catch (error) {
-      console.error('Erro ao gerar treinos:', error);
-      
-      // Mensagem de erro mais amigável para o usuário
-      let errorMessage = 'Erro ao gerar sugestões de treino';
-      
-      // Verificar se é um erro de timeout
-      if (error.message.includes('demorando muito') || error.message.includes('timeout')) {
-        errorMessage = 'Tempo esgotado ao gerar treinos. O servidor está ocupado, tente novamente mais tarde.';
-        
-        // Gerar um treino básico como fallback
-        const fallbackWorkouts = [
-          {
-            id: 'fallback-1',
-            workout_name: 'Treino Básico de Emergência',
-            workout_description: 'Um treino básico gerado quando o servidor está ocupado',
-            exercises: [
-              {
-                name: 'Agachamento',
-                sets: 3,
-                reps: '12-15',
-                rest: '60 segundos',
-                difficulty: 'Iniciante',
-                muscles: ['Quadríceps', 'Glúteos'],
-                execution: 'Mantenha os pés na largura dos ombros, desça como se fosse sentar em uma cadeira.'
-              },
-              {
-                name: 'Flexão de Braço',
-                sets: 3,
-                reps: '10-12',
-                rest: '60 segundos',
-                difficulty: 'Iniciante',
-                muscles: ['Peito', 'Tríceps'],
-                execution: 'Mantenha o corpo reto, desça até que o peito quase toque o chão.'
-              },
-              {
-                name: 'Prancha',
-                sets: 3,
-                reps: '30 segundos',
-                rest: '30 segundos',
-                difficulty: 'Iniciante',
-                muscles: ['Core', 'Abdômen'],
-                execution: 'Mantenha o corpo reto apoiado nos antebraços e pontas dos pés.'
-              }
-            ]
+        // Tentar o método offline como fallback
+        try {
+          toast.dismiss('generating');
+          toast.loading('Gerando sugestões offline...', { id: 'generating-offline' });
+          
+          console.log('Tentando gerar treinos usando método offline');
+          
+          // Chamar a API offline
+          const offlineResponse = await fetch('/api/offline-workout-suggestions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ 
+              assessmentId,
+              level: assessment?.experience_level,
+              goals: assessment?.fitness_goals
+            })
+          });
+          
+          if (!offlineResponse.ok) {
+            throw new Error('Falha na geração offline');
           }
-        ];
-        
-        setSuggestedWorkouts(fallbackWorkouts);
-        toast.warning('Oferecendo um treino básico enquanto o servidor está ocupado.', { id: 'fallback', duration: 5000 });
+          
+          const offlineData = await offlineResponse.json();
+          
+          if (offlineData.success && offlineData.data) {
+            // Atualizar UI com os treinos offline
+            setSuggestedWorkouts(offlineData.data);
+            toast.dismiss('generating-offline');
+            toast.success('Treinos offline gerados com sucesso');
+            
+            return; // Sair da função após sucesso offline
+          } else {
+            throw new Error('Dados de treino offline inválidos');
+          }
+        } catch (offlineError) {
+          console.error('Erro ao gerar treinos offline:', offlineError);
+          
+          // Mensagem de erro mais amigável para o usuário
+          let errorMessage = 'Erro ao gerar sugestões de treino';
+          
+          // Verificar se é um erro de timeout
+          if (error.message.includes('demorando muito') || error.message.includes('timeout')) {
+            errorMessage = 'Tempo esgotado ao gerar treinos. O servidor está ocupado, tente novamente mais tarde.';
+          }
+          
+          toast.dismiss('generating-offline');
+          toast.error(errorMessage);
+        }
+      } finally {
+        setGeneratingWorkouts(false);
       }
-      // Verificar se é um erro de ambiente ou configuração
-      else if (error.message.includes('Configuração incompleta') || 
-          error.message.includes('Variáveis de ambiente')) {
-        errorMessage = 'Erro de configuração do servidor. Por favor, contate o suporte.';
-      } 
-      // Verificar se é um erro do Hugging Face
-      else if (error.message.includes('Hugging Face')) {
-        errorMessage = 'Erro no serviço de IA. Por favor, tente novamente mais tarde.';
-      }
-      // Verificar se é um erro de autenticação
-      else if (error.message.includes('autenticação') || error.message.includes('token')) {
-        errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
-      }
-      // Verificar se é um erro de sintaxe JSON
-      else if (error.name === 'SyntaxError' || error.message.includes('JSON')) {
-        errorMessage = 'Erro ao processar a resposta do servidor. Por favor, tente novamente.';
-      }
-      
-      toast.error(errorMessage, { id: 'generating' });
-      
-      // Reconectar Supabase se for erro de autenticação
-      if (error.message.includes('autenticação') || error.message.includes('token')) {
-        supabase.auth.refreshSession();
-      }
-    } finally {
+    } catch (error) {
+      console.error('Erro geral ao gerar treinos:', error);
+      toast.dismiss('generating');
+      toast.error('Erro ao gerar sugestões de treino');
       setGeneratingWorkouts(false);
     }
   };
