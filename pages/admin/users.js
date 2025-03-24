@@ -75,7 +75,9 @@ export default function AdminUsers() {
   const handleEdit = (user) => {
     setEditingUser({
       ...user,
-      expiry_date: user.expiry_date ? new Date(user.expiry_date).toISOString().split('T')[0] : ''
+      expiry_date: user.expiry_date ? new Date(user.expiry_date).toISOString().split('T')[0] : '',
+      trial_start_date: user.trial_start_date ? new Date(user.trial_start_date).toISOString().split('T')[0] : '',
+      trial_days: user.trial_days || 7
     });
   };
   
@@ -88,7 +90,9 @@ export default function AdminUsers() {
         .update({
           full_name: editingUser.full_name,
           plan_type: editingUser.plan_type,
-          expiry_date: editingUser.expiry_date || null
+          expiry_date: editingUser.expiry_date || null,
+          trial_start_date: editingUser.trial_start_date || null,
+          trial_days: editingUser.trial_days || 7
         })
         .eq('id', editingUser.id);
         
@@ -217,6 +221,9 @@ export default function AdminUsers() {
                     Data de Expiração
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Avaliação Gratuita
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -274,6 +281,43 @@ export default function AdminUsers() {
                       ) : (
                         <div className="text-sm text-gray-500">
                           {user.expiry_date ? new Date(user.expiry_date).toLocaleDateString('pt-BR') : 'N/A'}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {editingUser?.id === user.id ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center">
+                            <span className="text-xs text-gray-500 mr-2">Início:</span>
+                            <input
+                              type="date"
+                              className="w-full p-2 border border-gray-300 rounded"
+                              value={editingUser.trial_start_date || ''}
+                              onChange={(e) => setEditingUser({...editingUser, trial_start_date: e.target.value})}
+                            />
+                          </div>
+                          <div className="flex items-center">
+                            <span className="text-xs text-gray-500 mr-2">Dias:</span>
+                            <input
+                              type="number"
+                              min="1"
+                              max="365"
+                              className="w-full p-2 border border-gray-300 rounded"
+                              value={editingUser.trial_days || 7}
+                              onChange={(e) => setEditingUser({...editingUser, trial_days: parseInt(e.target.value) || 7})}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500">
+                          {user.trial_start_date ? (
+                            <>
+                              <div>Início: {new Date(user.trial_start_date).toLocaleDateString('pt-BR')}</div>
+                              <div>Duração: {user.trial_days || 7} dias</div>
+                            </>
+                          ) : (
+                            'N/A'
+                          )}
                         </div>
                       )}
                     </td>

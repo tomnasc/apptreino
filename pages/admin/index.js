@@ -287,6 +287,12 @@ export default function AdminDashboard() {
             >
               Feedbacks
             </button>
+            <Link
+              href="/admin/users"
+              className="border-transparent dark-text-tertiary hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium"
+            >
+              Usuários
+            </Link>
           </nav>
         </div>
         
