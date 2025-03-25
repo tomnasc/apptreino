@@ -44,10 +44,14 @@ export default async function handler(req, res) {
   // Criar um timeout para encerrar a requisição se demorar muito
   const apiTimeout = setTimeout(() => {
     if (isClientConnected()) {
-      console.error('API timeout após 50 segundos');
-      return res.status(504).json({ error: 'Timeout ao processar a requisição' });
+      console.error('API timeout após 25 segundos');
+      return res.status(504).json({ 
+        success: false,
+        error: 'Timeout ao processar a requisição',
+        message: 'A requisição demorou muito para ser processada. Por favor, tente novamente mais tarde.'
+      });
     }
-  }, 50000); // 50 segundos
+  }, 25000); // Reduzido para 25 segundos
 
   // Verificar variáveis de ambiente primeiro
   const envCheck = checkEnvironmentVariables();
@@ -240,6 +244,7 @@ export default async function handler(req, res) {
       try {
         // Definir controller para abort
         const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 15000); // 15 segundos para cada chamada
         
         response = await fetch(
           `https://api-inference.huggingface.co/models/${HF_MODEL}`,
@@ -254,12 +259,14 @@ export default async function handler(req, res) {
           }
         );
         
+        clearTimeout(fetchTimeout);
+        
         // Se a resposta não for ok, verificar se é pelo modelo estar carregando
         if (!response.ok) {
           if (response.status === 503) {
             // Modelo ainda carregando, vamos tentar novamente
             console.log("Modelo ainda carregando, aguardando...");
-            await new Promise(resolve => setTimeout(resolve, 10000)); // Aguardar 10 segundos
+            await new Promise(resolve => setTimeout(resolve, 5000)); // Aguardar 5 segundos
             
             if (retries < maxRetries) {
               retries++;
@@ -268,12 +275,22 @@ export default async function handler(req, res) {
             } else {
               // Atingiu o máximo de retentativas
               console.error(`Erro após ${maxRetries} tentativas: Modelo ainda carregando`);
-              throw new Error('Modelo ainda carregando após várias tentativas');
+              clearTimeout(apiTimeout);
+              return res.status(503).json({
+                success: false,
+                error: 'Modelo de IA indisponível',
+                message: 'O modelo de IA está ocupado no momento. Por favor, tente novamente em alguns minutos.'
+              });
             }
           } else {
             // Outro erro diferente do modelo carregando
             console.error(`Erro na API do Hugging Face: ${response.status}`);
-            throw new Error(`Erro na API do Hugging Face: ${response.status}`);
+            clearTimeout(apiTimeout);
+            return res.status(response.status).json({
+              success: false,
+              error: `Erro no serviço de IA: ${response.status}`,
+              message: 'Ocorreu um erro ao acessar o serviço de IA. Por favor, tente novamente mais tarde.'
+            });
           }
         }
         
@@ -296,7 +313,13 @@ export default async function handler(req, res) {
             });
           }
         } else {
-          throw error;
+          console.error('Erro inesperado ao chamar a API do Hugging Face:', error);
+          clearTimeout(apiTimeout);
+          return res.status(500).json({
+            success: false,
+            error: 'Erro ao acessar serviço de IA',
+            message: 'Ocorreu um erro inesperado. Por favor, tente novamente.'
+          });
         }
       }
     }

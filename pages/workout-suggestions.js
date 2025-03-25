@@ -109,23 +109,24 @@ export default function WorkoutSuggestionsPage() {
         // Limpar o timeout quando a requisição for concluída
         clearTimeout(timeoutId);
         
-        // Verificar se a resposta é JSON antes de tentar fazer o parse
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          const textResponse = await response.text();
-          console.error('Resposta não-JSON recebida:', textResponse);
-          throw new Error('Resposta inválida do servidor. Por favor, tente novamente mais tarde.');
-        }
+        // Obter o texto da resposta para analisar
+        const textResponse = await response.text();
         
-        // Agora podemos tentar fazer o parse com segurança
-        const responseData = await response.json();
+        // Verificar se a resposta é JSON
+        let responseData;
+        try {
+          responseData = JSON.parse(textResponse);
+        } catch (e) {
+          console.error('Resposta não-JSON recebida:', textResponse);
+          throw new Error('O servidor retornou uma resposta inválida. O serviço de IA pode estar temporariamente indisponível.');
+        }
         
         if (!response.ok) {
           // Extrair mensagem de erro mais detalhada
           const errorMessage = 
-            responseData.details || 
+            responseData.message || 
             responseData.error || 
-            responseData.message ||
+            responseData.details ||
             'Falha ao gerar sugestões de treino';
             
           console.error('Erro detalhado:', responseData);
@@ -147,8 +148,10 @@ export default function WorkoutSuggestionsPage() {
         // Verificar se é um erro de timeout ou outro erro comum
         if (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('timeout')) {
           errorMessage = 'O tempo limite foi excedido. A IA está ocupada no momento, por favor tente novamente.';
+        } else if (error.message.includes('serviço de IA') || error.message.includes('indisponível')) {
+          errorMessage = error.message;
         } else if (error.message.includes('inválida')) {
-          errorMessage = 'Resposta inválida do servidor. A IA pode estar sobrecarregada, tente novamente.';
+          errorMessage = 'O servidor retornou uma resposta inválida. O serviço de IA pode estar temporariamente indisponível.';
         } else if (typeof error.message === 'string') {
           errorMessage = error.message;
         }
@@ -536,8 +539,12 @@ export default function WorkoutSuggestionsPage() {
               <div className="flex items-center">
                 <button
                   disabled
-                  className="px-4 py-2 bg-blue-600 opacity-50 text-white rounded-md text-sm font-medium focus:outline-none"
+                  className="px-4 py-2 bg-blue-600 opacity-50 text-white rounded-md text-sm font-medium focus:outline-none flex items-center"
                 >
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
                   Gerando...
                 </button>
                 <button
