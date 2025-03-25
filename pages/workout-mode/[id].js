@@ -336,13 +336,13 @@ export default function WorkoutMode() {
         }
         
         // Atualizar tempo de exercício
-        if (timerActive && timeRemaining > 0) {
+    if (timerActive && timeRemaining > 0) {
           setTimeRemaining(prev => {
             const newTime = prev - (INTERVAL_MS / 1000);
             if (newTime <= 0) {
-              handleSetCompleted();
-              return 0;
-            }
+            handleSetCompleted();
+            return 0;
+          }
             return Math.max(0, Math.floor(newTime));
           });
         }
@@ -370,8 +370,8 @@ export default function WorkoutMode() {
           saveTimersState();
         }
       }, INTERVAL_MS);
-      
-      return () => {
+
+    return () => {
         if (mainIntervalRef.current) {
           clearInterval(mainIntervalRef.current);
           mainIntervalRef.current = null;
@@ -611,12 +611,12 @@ export default function WorkoutMode() {
       // Se o primeiro exercício for baseado em tempo, configurar o timer
       if (exercises.length > 0 && exercises[0].time) {
         setTimeRemaining(exercises[0].time);
-      }
-      
-      try {
-        // Criar uma nova sessão de treino
-        const { data, error } = await supabase
-          .from('workout_sessions')
+    }
+
+    try {
+      // Criar uma nova sessão de treino
+      const { data, error } = await supabase
+        .from('workout_sessions')
           .insert({
             user_id: user.id,
             workout_list_id: id,
@@ -886,7 +886,7 @@ export default function WorkoutMode() {
     }
     
     // Sempre permitir concluir se o número mínimo de repetições for atingido
-    handleSetCompleted();
+      handleSetCompleted();
   };
 
   // Função para pular o exercício atual e movê-lo para o final da ficha
@@ -1356,7 +1356,7 @@ export default function WorkoutMode() {
   return (
     <Layout title={`Treino: ${workoutList?.name || ''}`}>
       <div className="space-y-6">
-        <div className="flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-400 rounded-lg shadow-lg p-4 text-white">
+        <div className="flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-700 dark:to-blue-500 rounded-lg shadow-lg p-4 text-white">
           <h1 className="text-2xl font-bold">
             {isWorkoutActive ? 'Treino em Andamento' : 'Iniciar Treino'}
           </h1>
@@ -1364,7 +1364,7 @@ export default function WorkoutMode() {
             {isWorkoutActive ? (
               <button
                 onClick={finishWorkout}
-                className="bg-white text-red-500 hover:bg-red-50 font-bold py-2 px-4 rounded-full shadow transition-all transform hover:scale-105"
+                className="bg-white text-red-500 hover:bg-red-50 dark:bg-white/90 dark:hover:bg-white/80 font-bold py-2 px-4 rounded-full shadow transition-all transform hover:scale-105"
               >
                 Finalizar Treino
               </button>
@@ -1378,7 +1378,7 @@ export default function WorkoutMode() {
                 </Link>
                 <button
                   onClick={startWorkout}
-                  className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-full shadow transition-all transform hover:scale-105"
+                  className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full shadow transition-all transform hover:scale-105"
                   disabled={exercises.length === 0}
                 >
                   Iniciar Treino
@@ -1389,11 +1389,11 @@ export default function WorkoutMode() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm">
+          <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 dark:border-red-600 p-4 rounded-r-lg shadow-sm">
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg
-                  className="h-5 w-5 text-red-500"
+                  className="h-5 w-5 text-red-500 dark:text-red-400"
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 20 20"
                   fill="currentColor"
@@ -1406,29 +1406,29 @@ export default function WorkoutMode() {
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
+                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
               </div>
             </div>
           </div>
         )}
 
         {!isWorkoutActive ? (
-          <div className="bg-white shadow-lg rounded-xl overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 border-b border-gray-100">
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                {workoutList?.name}
-              </h2>
-              {workoutList?.description && (
-                <p className="text-gray-600">{workoutList.description}</p>
-              )}
+          <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/40 dark:to-indigo-900/40 p-6 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">
+              {workoutList?.name}
+            </h2>
+            {workoutList?.description && (
+                <p className="text-gray-600 dark:text-gray-300">{workoutList.description}</p>
+            )}
             </div>
 
             {exercises.length === 0 ? (
               <div className="text-center py-12 px-6">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                 </svg>
-                <p className="text-gray-500 mb-6">
+                <p className="text-gray-500 dark:text-gray-400 mb-6">
                   Esta lista de treinos não possui exercícios.
                 </p>
                 <Link
@@ -1440,89 +1440,89 @@ export default function WorkoutMode() {
               </div>
             ) : (
               <div className="p-6">
-                <p className="text-gray-700 mb-6 text-center font-medium">
-                  Esta lista contém <span className="text-blue-600 font-bold">{exercises.length}</span> exercícios. Clique em "Iniciar Treino" para começar.
+                <p className="text-gray-700 dark:text-gray-300 mb-6 text-center font-medium">
+                  Esta lista contém <span className="text-blue-600 dark:text-blue-400 font-bold">{exercises.length}</span> exercícios. Clique em "Iniciar Treino" para começar.
                 </p>
                 
                 <div className="space-y-4">
-                  {exercises.map((exercise, index) => (
+                    {exercises.map((exercise, index) => (
                     <div 
                       key={exercise.id} 
-                      className="bg-gradient-to-r from-gray-50 to-white border border-gray-100 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-all"
+                      className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-all"
                     >
                       <div className="flex flex-col md:flex-row md:items-center p-4">
                         <div className="flex items-center mb-3 md:mb-0">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold mr-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 flex items-center justify-center font-bold mr-3">
                             {index + 1}
                           </div>
-                          <h3 className="text-lg font-bold text-gray-800">
+                          <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
                             {exercise.name}
-                          </h3>
+                            </h3>
                         </div>
                         
                         <div className="ml-0 md:ml-11 grid grid-cols-2 gap-x-6 gap-y-1 text-sm flex-grow">
-                          {exercise.weight && (
+                              {exercise.weight && (
                             <div className="flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 mr-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 dark:text-gray-400 mr-1">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
                               </svg>
-                              <span className="font-medium text-gray-500">Carga:</span>{' '}
-                              <span className="ml-1 font-bold text-gray-700">{exercise.weight} kg</span>
-                            </div>
-                          )}
+                                  <span className="font-medium text-gray-500 dark:text-gray-400">Carga:</span>{' '}
+                              <span className="ml-1 font-bold text-gray-700 dark:text-gray-300">{exercise.weight} kg</span>
+                                </div>
+                              )}
                           <div className="flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 mr-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 dark:text-gray-400 mr-1">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                             </svg>
-                            <span className="font-medium text-gray-500">Séries:</span>{' '}
-                            <span className="ml-1 font-bold text-gray-700">{exercise.sets}</span>
-                          </div>
-                          {exercise.reps && (
+                                <span className="font-medium text-gray-500 dark:text-gray-400">Séries:</span>{' '}
+                            <span className="ml-1 font-bold text-gray-700 dark:text-gray-300">{exercise.sets}</span>
+                              </div>
+                              {exercise.reps && (
                             <div className="flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 mr-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 dark:text-gray-400 mr-1">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
                               </svg>
-                              <span className="font-medium text-gray-500">Repetições:</span>{' '}
-                              <span className="ml-1 font-bold text-gray-700">{exercise.reps}</span>
-                            </div>
-                          )}
-                          {exercise.time && (
+                                  <span className="font-medium text-gray-500 dark:text-gray-400">Repetições:</span>{' '}
+                              <span className="ml-1 font-bold text-gray-700 dark:text-gray-300">{exercise.reps}</span>
+                                </div>
+                              )}
+                              {exercise.time && (
                             <div className="flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 mr-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 dark:text-gray-400 mr-1">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                               </svg>
-                              <span className="font-medium text-gray-500">Tempo:</span>{' '}
-                              <span className="ml-1 font-bold text-gray-700">{exercise.time} segundos</span>
+                                  <span className="font-medium text-gray-500 dark:text-gray-400">Tempo:</span>{' '}
+                              <span className="ml-1 font-bold text-gray-700 dark:text-gray-300">{exercise.time} segundos</span>
+                                </div>
+                              )}
                             </div>
+                        
+                          {exercise.video_url && (
+                            <a
+                              href={exercise.video_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-3 md:mt-0 inline-flex items-center justify-center px-4 py-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-800/40 text-blue-600 dark:text-blue-300 rounded-full text-sm font-medium transition-colors ml-auto"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-4 w-4 mr-1"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                              >
+                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                <path
+                                  fillRule="evenodd"
+                                  d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                              Ver demonstração
+                            </a>
                           )}
                         </div>
-                        
-                        {exercise.video_url && (
-                          <a
-                            href={exercise.video_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-3 md:mt-0 inline-flex items-center justify-center px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-full text-sm font-medium transition-colors ml-auto"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-4 w-4 mr-1"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
-                            >
-                              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                              <path
-                                fillRule="evenodd"
-                                d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                            Ver demonstração
-                          </a>
-                        )}
-                      </div>
                     </div>
-                  ))}
+                    ))}
                 </div>
               </div>
             )}
@@ -1530,8 +1530,8 @@ export default function WorkoutMode() {
         ) : (
           <div className="space-y-6">
             {/* Progresso do treino */}
-            <div className="bg-white shadow-lg rounded-xl overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-600 to-blue-400 p-4 flex justify-between items-center text-white">
+            <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-700 dark:to-blue-500 p-4 flex justify-between items-center text-white">
                 <h2 className="text-xl font-bold">
                   Progresso
                 </h2>
@@ -1541,87 +1541,87 @@ export default function WorkoutMode() {
               </div>
               
               <div className="p-5">
-                <div className="w-full bg-gray-200 rounded-full h-3 mb-6 overflow-hidden">
-                  <div
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-6 overflow-hidden">
+                <div
                     className="bg-gradient-to-r from-blue-500 to-indigo-500 h-3 rounded-full transition-all duration-300 ease-in-out"
-                    style={{
-                      width: `${((currentExerciseIndex + (currentSetIndex / currentExercise.sets)) / exercises.length) * 100}%`
-                    }}
-                  ></div>
-                </div>
-                
+                  style={{
+                    width: `${((currentExerciseIndex + (currentSetIndex / currentExercise.sets)) / exercises.length) * 100}%`
+                  }}
+                ></div>
+              </div>
+              
                 <div className="flex flex-wrap justify-between gap-4 text-sm">
-                  <div className="flex items-center bg-blue-50 rounded-lg px-4 py-3 flex-grow">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-blue-500 mr-2">
+                  <div className="flex items-center bg-blue-50 dark:bg-blue-900/40 rounded-lg px-4 py-3 flex-grow">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-blue-500 dark:text-blue-400 mr-2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 5.25h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5" />
                     </svg>
-                    <span className="font-medium text-gray-600">Série atual:</span>{' '}
-                    <span className="ml-2 font-bold text-blue-700">{currentSetIndex + 1} de {currentExercise.sets}</span>
-                  </div>
-                  <div className="flex items-center bg-blue-50 rounded-lg px-4 py-3 flex-grow">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-blue-500 mr-2">
+                    <span className="font-medium text-gray-600 dark:text-gray-300">Série atual:</span>{' '}
+                    <span className="ml-2 font-bold text-blue-700 dark:text-blue-300">{currentSetIndex + 1} de {currentExercise.sets}</span>
+                </div>
+                  <div className="flex items-center bg-blue-50 dark:bg-blue-900/40 rounded-lg px-4 py-3 flex-grow">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-blue-500 dark:text-blue-400 mr-2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                     </svg>
-                    <span className="font-medium text-gray-600">Tempo de treino:</span>{' '}
-                    <span className="ml-2 font-bold text-blue-700">
+                    <span className="font-medium text-gray-600 dark:text-gray-300">Tempo de treino:</span>{' '}
+                    <span className="ml-2 font-bold text-blue-700 dark:text-blue-300">
                       {formatTime(totalWorkoutTime)}
-                    </span>
+                  </span>
                   </div>
                 </div>
               </div>
             </div>
             
             {/* Exercício atual */}
-            <div className="bg-white shadow-lg rounded-xl overflow-hidden">
-              <div className="bg-gradient-to-r from-green-600 to-green-400 p-4 text-white">
+            <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+              <div className="bg-gradient-to-r from-green-600 to-green-400 dark:from-green-700 dark:to-green-500 p-4 text-white">
                 <h2 className="text-xl font-bold">
-                  Exercício Atual
-                </h2>
+                Exercício Atual
+              </h2>
               </div>
               
               <div className="p-6">
                 <div className="flex items-center mb-6">
-                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold mr-3">
+                  <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 flex items-center justify-center font-bold mr-3">
                     {currentExerciseIndex + 1}
                   </div>
-                  <h3 className="text-xl font-bold text-gray-800">
-                    {currentExercise.name}
-                  </h3>
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                  {currentExercise.name}
+                </h3>
                 </div>
                 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
                   {currentExercise.weight && (
-                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 mb-1">
+                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
                       </svg>
-                      <span className="font-medium text-gray-500 text-xs">Carga</span>
-                      <span className="font-bold text-gray-800 text-lg">{currentExercise.weight} kg</span>
+                      <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Carga</span>
+                      <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{currentExercise.weight} kg</span>
                     </div>
                   )}
-                  <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 mb-1">
+                  <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                     </svg>
-                    <span className="font-medium text-gray-500 text-xs">Séries</span>
-                    <span className="font-bold text-gray-800 text-lg">{currentSetIndex + 1} / {currentExercise.sets}</span>
+                    <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Séries</span>
+                    <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{currentSetIndex + 1} / {currentExercise.sets}</span>
                   </div>
                   {currentExercise.reps && (
-                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 mb-1">
+                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
                       </svg>
-                      <span className="font-medium text-gray-500 text-xs">Repetições</span>
-                      <span className="font-bold text-gray-800 text-lg">{repsCompleted} / {currentExercise.reps}</span>
+                      <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Repetições</span>
+                      <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{repsCompleted} / {currentExercise.reps}</span>
                     </div>
                   )}
                   {currentExercise.time && timerActive && (
-                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 mb-1">
+                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                       </svg>
-                      <span className="font-medium text-gray-500 text-xs">Tempo Restante</span>
-                      <span className="font-bold text-gray-800 text-lg">{formatTime(timeRemaining)}</span>
+                      <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Tempo Restante</span>
+                      <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{formatTime(timeRemaining)}</span>
                     </div>
                   )}
                 </div>
@@ -1629,8 +1629,8 @@ export default function WorkoutMode() {
                 {currentExercise.reps && !timerActive && (
                   <div className="mb-6">
                     <div className="flex flex-col md:flex-row items-center justify-center gap-4 mb-4">
-                      <div className="flex items-center justify-center p-2 bg-blue-50 rounded-lg text-center w-full md:w-auto">
-                        <div className="font-medium text-gray-600 mr-2">Repetições realizadas:</div>
+                      <div className="flex items-center justify-center p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-center w-full md:w-auto">
+                        <div className="font-medium text-gray-600 dark:text-gray-300 mr-2">Repetições realizadas:</div>
                         <div className="flex items-center">
                           <input
                             type="number"
@@ -1638,97 +1638,74 @@ export default function WorkoutMode() {
                             max={currentExercise.reps}
                             value={repsCompleted}
                             onChange={handleRepsChange}
-                            className="w-16 h-10 px-2 rounded-md border border-gray-300 text-center font-bold text-blue-700 text-xl"
+                            className="w-16 h-10 px-2 rounded-md border border-gray-300 dark:border-gray-600 text-center font-bold text-blue-700 dark:text-blue-400 text-xl bg-white dark:bg-gray-700"
                           />
-                          <span className="ml-2 text-gray-500">/ {currentExercise.reps}</span>
+                          <span className="ml-2 text-gray-500 dark:text-gray-400">/ {currentExercise.reps}</span>
                         </div>
                       </div>
                       
-                      <button 
+                    <button
                         onClick={handleRepsCompleted}
                         className={`px-6 py-3 rounded-full font-bold shadow transition-all w-full md:w-auto
-                          ${repsCompleted >= currentExercise.reps 
-                            ? 'bg-green-500 hover:bg-green-600 text-white'
-                            : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                          ${repsCompleted >= currentExercise.reps ? 'bg-green-500 dark:bg-green-600 hover:bg-green-600 dark:hover:bg-green-700 text-white' : 'bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white'}`}
                       >
-                        {repsCompleted === 0 ? 'Iniciar Série' : 'Concluir Série'}
+                        {repsCompleted >= currentExercise.reps ? 'Série Completa' : 'Confirmar'}
                       </button>
-                    </div>
-                    
-                    <div className="flex justify-center">
-                      {currentExerciseIndex < exercises.length - 1 && (
-                        <button 
-                          onClick={skipExercise}
-                          className="px-6 py-3 rounded-full bg-orange-500 hover:bg-orange-600 text-white font-semibold shadow transition-all text-sm"
-                        >
-                          Pular Exercício
-                        </button>
-                      )}
                     </div>
                   </div>
                 )}
                 
-                {currentExercise.time && (
-                  <div className="mb-6 flex flex-col items-center">
-                    <div className="w-48 h-48 rounded-full bg-blue-50 border-8 border-blue-100 flex flex-col items-center justify-center mb-4">
-                      <span className="text-4xl font-bold text-blue-700">{timeRemaining}</span>
-                      <span className="text-gray-500">segundos</span>
-                    </div>
-                    
-                    <div className="flex flex-col sm:flex-row gap-3 w-full justify-center items-center">
-                      {!timerActive ? (
-                        <button 
-                          onClick={() => {
-                            console.log('Iniciando cronômetro de exercício');
-                            setTimerActive(true);
-                            // Iniciar o cronômetro imediatamente
-                            const timer = setInterval(() => {
-                              setTimeRemaining(prev => {
-                                if (prev <= 1) {
-                                  clearInterval(timer);
-                                  setTimerActive(false);
-                                  handleSetCompleted();
-                                  return 0;
-                                }
-                                return prev - 1;
-                              });
-                            }, 1000);
-                            // Armazenar o timer para limpeza posterior
-                            timerRef.current = timer;
-                          }}
-                          className="px-6 py-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-bold shadow transition-all"
-                        >
-                          Iniciar Cronômetro
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => {
-                            console.log('Parando cronômetro de exercício');
-                            setTimerActive(false);
-                            // Limpar o interval quando o cronômetro for parado
-                            if (timerRef.current) {
-                              clearInterval(timerRef.current);
-                              timerRef.current = null;
-                            }
-                          }}
-                          className="px-6 py-3 rounded-full bg-red-500 hover:bg-red-600 text-white font-bold shadow transition-all"
-                        >
-                          Parar Cronômetro
-                        </button>
-                      )}
-                      
-                      {currentExerciseIndex < exercises.length - 1 && (
-                        <button 
-                          onClick={skipExercise}
-                          className="px-6 py-3 rounded-full bg-orange-500 hover:bg-orange-600 text-white font-semibold shadow transition-all text-sm"
-                        >
-                          Pular Exercício
-                        </button>
-                      )}
-                    </div>
+                {currentExercise.time && !timerActive && (
+                  <div className="flex justify-center mb-6">
+                    <button
+                      onClick={() => {
+                        setTimeRemaining(currentExercise.time);
+                        setTimerActive(true);
+                      }}
+                      className="px-6 py-3 bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-full font-bold shadow transition-all"
+                    >
+                      Iniciar Temporizador ({currentExercise.time}s)
+                    </button>
                   </div>
                 )}
-
+                
+                {timerActive && (
+                  <div className="flex flex-col items-center mb-6">
+                    <div className="w-32 h-32 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center mb-4 relative">
+                      <svg className="absolute inset-0" viewBox="0 0 100 100">
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="45"
+                          fill="none"
+                          stroke="#e5e7eb"
+                          strokeWidth="5"
+                          className="dark:stroke-gray-700"
+                        />
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="45"
+                          fill="none"
+                          stroke="#3b82f6"
+                          strokeWidth="5"
+                          strokeDasharray="283"
+                          strokeDashoffset={283 - ((timeRemaining / currentExercise.time) * 283)}
+                          transform="rotate(-90 50 50)"
+                          className="dark:stroke-blue-500"
+                        />
+                      </svg>
+                      <span className="text-4xl font-bold text-blue-700 dark:text-blue-400">{Math.ceil(timeRemaining)}s</span>
+                    </div>
+                    <button
+                      onClick={() => setTimerActive(false)}
+                      className="px-6 py-3 bg-red-500 dark:bg-red-600 hover:bg-red-600 dark:hover:bg-red-700 text-white rounded-full font-bold shadow transition-all"
+                    >
+                      Parar
+                    </button>
+                  </div>
+                )}
+                
                 {/* Timer de descanso entre séries */}
                 {restTimerActive && (
                   <div className="mt-6 p-4 bg-indigo-50 rounded-lg">
@@ -1749,7 +1726,7 @@ export default function WorkoutMode() {
                         }}
                       ></div>
                     </div>
-                  </div>
+                </div>
                 )}
                 
                 {/* Alerta para aumentar carga */}
@@ -1760,7 +1737,7 @@ export default function WorkoutMode() {
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-green-600">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                         </svg>
-                      </div>
+                    </div>
                       <div className="ml-3">
                         <h3 className="text-sm font-medium text-green-800">
                           Parabéns! Você completou todas as repetições.
@@ -1769,13 +1746,13 @@ export default function WorkoutMode() {
                           Considere aumentar a carga no próximo treino para continuar progredindo.
                         </div>
                         <div className="mt-2">
-                          <button
+                      <button
                             type="button"
                             onClick={() => setShowWeightIncreaseAlert(false)}
                             className="inline-flex items-center px-3 py-1.5 border border-green-300 shadow-sm text-xs font-medium rounded-full text-green-700 bg-white hover:bg-green-50"
-                          >
+                      >
                             Entendi
-                          </button>
+                      </button>
                         </div>
                       </div>
                     </div>
@@ -1799,95 +1776,170 @@ export default function WorkoutMode() {
                           Considere diminuir a carga para conseguir executar pelo menos 6 repetições com boa forma.
                         </div>
                         <div className="mt-2">
-                          <button
+                      <button
                             type="button"
                             onClick={() => setShowWeightDecreaseAlert(false)}
                             className="inline-flex items-center px-3 py-1.5 border border-yellow-300 shadow-sm text-xs font-medium rounded-full text-yellow-700 bg-white hover:bg-yellow-50"
-                          >
+                      >
                             Entendi
-                          </button>
+                      </button>
                         </div>
                       </div>
                     </div>
                   </div>
-                )}
+                    )}
                 
-                {videoId && (
-                  <div className="mt-6 border-t border-gray-100 pt-6">
+                {/* Controles adicionais, como a navegação entre exercícios */}
+                <div className="flex flex-wrap gap-4 justify-center">
+                  {currentExerciseIndex < exercises.length - 1 && (
+                    <button
+                      onClick={skipExercise}
+                      className="px-4 py-2 bg-orange-500 dark:bg-orange-600 hover:bg-orange-600 dark:hover:bg-orange-700 text-white rounded-lg text-sm font-medium shadow transition-all"
+                    >
+                      Pular para Próximo Exercício
+                    </button>
+                  )}
+                  
+                  {currentExercise.video_url && (
                     <button
                       onClick={toggleVideo}
-                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center mb-2"
+                      className="px-4 py-2 bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-lg text-sm font-medium shadow transition-all flex items-center"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-5 w-5 mr-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
                       >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
                       </svg>
-                      {showVideo ? 'Ocultar vídeo' : 'Ver demonstração do exercício'}
+                      {showVideo ? "Ocultar Vídeo" : "Mostrar Vídeo"}
                     </button>
-                    
-                    {showVideo && (
-                      <div className="mt-2 rounded-lg overflow-hidden shadow-lg">
-                        <YouTube
-                          videoId={videoId}
-                          opts={{
-                            width: '100%',
-                            playerVars: {
-                              autoplay: 0,
-                            },
-                          }}
-                          className="w-full"
-                        />
-                      </div>
-                    )}
+                  )}
+                </div>
+                
+                {/* Vídeo demonstrativo */}
+                {showVideo && videoId && (
+                  <div className="mt-6 rounded-lg overflow-hidden shadow-lg bg-black">
+                    <div className="relative pt-[56.25%]">
+                      <YouTube
+                        videoId={videoId}
+                        className="absolute inset-0 w-full h-full"
+                        opts={{
+                          width: '100%',
+                          height: '100%',
+                          playerVars: {
+                            autoplay: 0,
+                            controls: 1,
+                            modestbranding: 1,
+                          },
+                        }}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
             </div>
             
-            {/* Próximos Exercícios */}
-            {currentExerciseIndex < exercises.length - 1 && (
-              <div className="bg-white shadow-lg rounded-xl overflow-hidden">
-                <div className="bg-gradient-to-r from-gray-700 to-gray-600 p-4 text-white">
+            {/* Temporizador de descanso */}
+            {restTimerActive && (
+              <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+                <div className="bg-gradient-to-r from-purple-600 to-purple-400 dark:from-purple-700 dark:to-purple-500 p-4 text-white">
                   <h2 className="text-xl font-bold">
-                    Próximos Exercícios
+                    Tempo de Descanso
                   </h2>
                 </div>
                 
-                <div className="p-4">
-                  <div className="space-y-3">
-                    {exercises.slice(currentExerciseIndex + 1).map((exercise, index) => (
-                      <div 
-                        key={exercise.id} 
-                        className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                        onClick={() => skipToExercise(currentExerciseIndex + index + 1)}
-                      >
-                        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold mr-3">
-                          {currentExerciseIndex + index + 2}
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-800">{exercise.name}</h3>
-                          <p className="text-sm text-gray-500">
-                            {exercise.sets} séries{exercise.reps ? `, ${exercise.reps} repetições` : ''}
-                            {exercise.time ? `, ${exercise.time} segundos` : ''}
-                          </p>
-                        </div>
-                        <div className="ml-2">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                          </svg>
-                        </div>
-                      </div>
-                    ))}
+                <div className="p-6 flex flex-col items-center">
+                  <div className="w-36 h-36 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center mb-4 relative">
+                    <svg className="absolute inset-0" viewBox="0 0 100 100">
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="45"
+                        fill="none"
+                        stroke="#e5e7eb"
+                        strokeWidth="5"
+                        className="dark:stroke-gray-700"
+                      />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="45"
+                        fill="none"
+                        stroke="#9333ea"
+                        strokeWidth="5"
+                        strokeDasharray="283"
+                        strokeDashoffset={283 - ((restTimeRemaining / (currentExercise?.rest_time || 60)) * 283)}
+                        transform="rotate(-90 50 50)"
+                        className="dark:stroke-purple-500"
+                      />
+                    </svg>
+                    <span className="text-4xl font-bold text-purple-700 dark:text-purple-400">{Math.ceil(restTimeRemaining)}s</span>
                   </div>
+                  
+                  <p className="text-center text-gray-600 dark:text-gray-300 mb-6">
+                    Tempo de descanso antes da próxima série
+                  </p>
+                  
+                  <button
+                    onClick={() => {
+                      setRestTimerActive(false);
+                      setRestTimeRemaining(0);
+                    }}
+                    className="px-6 py-3 bg-purple-500 dark:bg-purple-600 hover:bg-purple-600 dark:hover:bg-purple-700 text-white rounded-full font-bold shadow transition-all"
+                  >
+                    Pular Descanso
+                  </button>
                 </div>
               </div>
             )}
+            
+            {/* Navegação entre exercícios */}
+            <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+              <div className="p-4 border-b border-gray-100 dark:border-gray-700">
+                <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                  Outros Exercícios
+                </h2>
+              </div>
+              
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                {exercises.map((exercise, index) => (
+                  <div 
+                    key={exercise.id} 
+                    className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700 ${index === currentExerciseIndex ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3 ${
+                          index === currentExerciseIndex 
+                            ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300' 
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                        }`}>
+                          {index + 1}
+                        </div>
+                        <span className={`font-medium ${
+                          index === currentExerciseIndex 
+                            ? 'text-blue-600 dark:text-blue-300' 
+                            : 'text-gray-700 dark:text-gray-200'
+                        }`}>
+                          {exercise.name}
+                        </span>
+                      </div>
+                      
+                      {index !== currentExerciseIndex && (
+                        <button
+                          onClick={() => skipToExercise(index)}
+                          className="text-sm px-3 py-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md transition-colors"
+                        >
+                          Ir para
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
