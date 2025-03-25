@@ -18,17 +18,17 @@
   --header-border: #e5e7eb;
   --nav-active: #3b82f6;
   --nav-inactive: #6b7280;
-  --button-primary-bg: #3b82f6;
+  --button-primary-bg: var(--primary);
   --button-primary-hover: #2563eb;
   --button-primary-text: #ffffff;
-  --button-secondary-bg: #10b981;
-  --button-secondary-hover: #059669;
+  --button-secondary-bg: var(--secondary);
+  --button-secondary-hover: var(--secondary-dark);
   --button-secondary-text: #ffffff;
   --button-danger-bg: #ef4444;
   --button-danger-hover: #dc2626;
   --button-danger-text: #ffffff;
   --button-outline-border: #d1d5db;
-  --button-outline-text: #1f2937;
+  --button-outline-text: var(--foreground);
   --button-outline-hover: #f3f4f6;
 }
 
@@ -38,27 +38,18 @@
   --primary-dark: #3b82f6;
   --secondary: #34d399;
   --secondary-dark: #10b981;
-  --background: #0f172a; /* Fundo mais escuro para maior contraste */
-  --foreground: #f3f4f6; /* Texto principal mais claro */
-  --card-bg: #1e293b; /* Fundo do card mais claro para maior contraste */
+  --background: #0f172a;
+  --foreground: #f3f4f6;
+  --card-bg: #1e293b;
   --card-border: #334155;
   --input-bg: #1e293b;
   --input-border: #475569;
-  --header-bg: #1e293b; /* Header mais claro que o fundo */
+  --header-bg: #1e293b;
   --header-border: #334155;
-  --nav-active: #60a5fa;
-  --nav-inactive: #cbd5e1; /* Texto inativo mais visível */
-  --button-primary-bg: #3b82f6;
-  --button-primary-hover: #2563eb;
-  --button-primary-text: #ffffff;
-  --button-secondary-bg: #10b981;
-  --button-secondary-hover: #059669;
-  --button-secondary-text: #ffffff;
-  --button-danger-bg: #ef4444;
-  --button-danger-hover: #dc2626;
-  --button-danger-text: #ffffff;
+  --nav-active: var(--primary);
+  --nav-inactive: #cbd5e1;
   --button-outline-border: #475569;
-  --button-outline-text: #f3f4f6;
+  --button-outline-text: var(--foreground);
   --button-outline-hover: #374151;
 }
 
@@ -72,29 +63,36 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition-colors;
+    @apply bg-[var(--button-primary-bg)] hover:bg-[var(--button-primary-hover)] 
+      text-[var(--button-primary-text)] font-bold py-2 px-4 rounded transition-colors;
   }
   
   .btn-secondary {
-    @apply bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition-colors;
+    @apply bg-[var(--button-secondary-bg)] hover:bg-[var(--button-secondary-hover)] 
+      text-[var(--button-secondary-text)] font-bold py-2 px-4 rounded transition-colors;
   }
   
   .btn-danger {
-    @apply bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition-colors;
+    @apply bg-[var(--button-danger-bg)] hover:bg-[var(--button-danger-hover)] 
+      text-[var(--button-danger-text)] font-bold py-2 px-4 rounded transition-colors;
   }
   
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 transition-colors;
+    @apply bg-[var(--card-bg)] dark:bg-[var(--card-bg)] 
+      border border-[var(--card-border)] dark:border-[var(--card-border)]
+      rounded-lg shadow-md p-6 transition-colors;
   }
   
   .input {
-    @apply w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 
-      rounded-md py-2 px-3 text-gray-900 dark:text-white
-      focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+    @apply w-full border border-[var(--input-border)] 
+      bg-[var(--input-bg)] text-[var(--foreground)]
+      rounded-md py-2 px-3
+      placeholder-gray-500 dark:placeholder-gray-400
+      focus:outline-none focus:ring-2 focus:ring-[var(--primary)] 
       focus:border-transparent transition-colors;
   }
 
-  /* Classes específicas para melhorar contraste no modo escuro */
+  /* Classes para melhorar contraste no modo escuro */
   .dark-text-primary {
     @apply text-gray-900 dark:text-gray-100;
   }
@@ -108,21 +106,18 @@ body {
   }
   
   .dark-card {
-    @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700;
+    @apply bg-[var(--card-bg)] border border-[var(--card-border)];
   }
   
   .dark-highlight {
     @apply bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200;
   }
-
-  /* Classe para inputs com melhor contraste */
+  
   .dark-input {
-    @apply w-full border border-gray-300 dark:border-gray-600 
-      rounded-md py-2 px-3 
-      bg-white dark:bg-gray-700 
-      text-gray-900 dark:text-white
+    @apply bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 
+      text-gray-900 dark:text-gray-100 rounded-md py-2 px-3
       placeholder-gray-500 dark:placeholder-gray-400
       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
       focus:border-transparent transition-colors;
   }
-} 
+}
