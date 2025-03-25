@@ -91,7 +91,7 @@ export default function WorkoutSuggestionsPage() {
       const timeoutId = setTimeout(() => controller.abort(), 240000); // 4 minutos de timeout
       
       try {
-        // Primeiro tenta a API online
+        // Chamada para a API de geração de treinos
         const response = await fetch('/api/ai-workout-suggestions', {
           method: 'POST',
           headers: {
@@ -138,20 +138,22 @@ export default function WorkoutSuggestionsPage() {
           setSuggestedWorkouts(responseData.workouts);
         }
       } catch (error) {
-        console.error('Erro ao gerar treinos online:', error);
+        console.error('Erro ao gerar treinos:', error);
         
         // Mensagem de erro mais amigável para o usuário
         let errorMessage = 'Erro ao gerar sugestões de treino';
         
         // Verificar se é um erro de timeout ou outro erro comum
         if (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('timeout')) {
-          errorMessage = 'O tempo limite foi excedido. A IA está ocupada no momento, por favor tente novamente mais tarde.';
+          errorMessage = 'O tempo limite foi excedido. A IA está ocupada no momento, por favor tente novamente.';
         } else if (error.message.includes('inválida')) {
-          errorMessage = 'Resposta inválida do servidor. A IA pode estar sobrecarregada, tente novamente mais tarde.';
+          errorMessage = 'Resposta inválida do servidor. A IA pode estar sobrecarregada, tente novamente.';
         }
         
         toast.dismiss('generating');
         toast.error(errorMessage);
+      } finally {
+        setGeneratingWorkouts(false);
       }
     } catch (error) {
       console.error('Erro geral ao gerar treinos:', error);
@@ -525,14 +527,30 @@ export default function WorkoutSuggestionsPage() {
         )}
         
         {/* Botão para gerar novas sugestões */}
-        <div className="flex justify-end mb-6">
-          <button
-            onClick={generateWorkouts}
-            disabled={generatingWorkouts}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-md text-sm font-medium focus:outline-none disabled:opacity-50"
-          >
-            {generatingWorkouts ? 'Gerando...' : 'Gerar Novas Sugestões'}
-          </button>
+        <div className="flex justify-end mb-6 space-x-2">
+          {generatingWorkouts ? (
+            <>
+              <button
+                disabled
+                className="px-4 py-2 bg-blue-600 opacity-50 text-white rounded-md text-sm font-medium focus:outline-none"
+              >
+                Gerando...
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-800 text-white rounded-md text-sm font-medium focus:outline-none"
+              >
+                Tentar Novamente
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={generateWorkouts}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-md text-sm font-medium focus:outline-none"
+            >
+              Gerar Novas Sugestões
+            </button>
+          )}
         </div>
         
         {/* Lista de treinos sugeridos */}
