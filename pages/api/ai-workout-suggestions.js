@@ -147,15 +147,15 @@ export default async function handler(req, res) {
     - Duração de treino: ${assessment.workout_duration} minutos
     
     Para cada rotina de treino, DEVE CONTER EXATAMENTE 8 EXERCÍCIOS EM PT-BR, inclua:
-    1. Nome da rotina
-    2. Breve descrição e objetivo
+    1. Nome da rotina EM PT-BR
+    2. Breve descrição e objetivo EM PT-BR
     3. Lista de exercícios, cada um com:
-       - Nome do exercício
+       - Nome do exercício EM PT-BR
        - Séries e repetições
        - Descanso entre séries
        - Músculos trabalhados
     
-    IMPORTANTE: Sua resposta deve ser TOTALMENTE em PT-BR, incluindo todos os nomes de exercícios, descrições e demais textos.
+    IMPORTANTE: Sua resposta deve ser TOTALMENTE em PT-BR, incluindo todos os nomes de exercícios, rotinas, descrições e demais textos.
     
     Formate sua resposta como um objeto JSON com a seguinte estrutura:
     {
