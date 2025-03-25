@@ -125,6 +125,7 @@ export default function WorkoutSuggestionsPage() {
           const errorMessage = 
             responseData.details || 
             responseData.error || 
+            responseData.message ||
             'Falha ao gerar sugestões de treino';
             
           console.error('Erro detalhado:', responseData);
@@ -148,6 +149,8 @@ export default function WorkoutSuggestionsPage() {
           errorMessage = 'O tempo limite foi excedido. A IA está ocupada no momento, por favor tente novamente.';
         } else if (error.message.includes('inválida')) {
           errorMessage = 'Resposta inválida do servidor. A IA pode estar sobrecarregada, tente novamente.';
+        } else if (typeof error.message === 'string') {
+          errorMessage = error.message;
         }
         
         toast.dismiss('generating');
@@ -530,18 +533,20 @@ export default function WorkoutSuggestionsPage() {
         <div className="flex justify-end mb-6 space-x-2">
           {generatingWorkouts ? (
             <>
-              <button
-                disabled
-                className="px-4 py-2 bg-blue-600 opacity-50 text-white rounded-md text-sm font-medium focus:outline-none"
-              >
-                Gerando...
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-800 text-white rounded-md text-sm font-medium focus:outline-none"
-              >
-                Tentar Novamente
-              </button>
+              <div className="flex items-center">
+                <button
+                  disabled
+                  className="px-4 py-2 bg-blue-600 opacity-50 text-white rounded-md text-sm font-medium focus:outline-none"
+                >
+                  Gerando...
+                </button>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="ml-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-800 text-white rounded-md text-sm font-medium focus:outline-none"
+                >
+                  Tentar Novamente
+                </button>
+              </div>
             </>
           ) : (
             <button

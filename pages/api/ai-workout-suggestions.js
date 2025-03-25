@@ -131,7 +131,7 @@ export default async function handler(req, res) {
     // Criar prompt para o modelo - Usando um prompt mais técnico e específico para PT-BR
     const prompt = `
     Você é um profesor de educação física e especialista em treinamento de força e condicionamento físico.
-    Crie 3 rotinas de treino diferentes, CONTENDO 8 EXERCÍCIOS CADA, EM PT-BR, para uma pessoa com as seguintes características:
+    Por favor, crie 3 rotinas de treino diferentes, contendo de 7 a 10 exercícios cada, para uma pessoa com as seguintes características:
     - Altura: ${assessment.height} cm
     - Peso: ${assessment.weight} kg
     - Idade: ${assessment.age} anos
@@ -142,14 +142,16 @@ export default async function handler(req, res) {
     - Dias de treino por semana: ${assessment.workout_days_per_week}
     - Duração de treino: ${assessment.workout_duration} minutos
     
-    Cada Rotina, DEVE CONTER EXATAMENTE 8 EXERCÍCIOS CADA, EM PT-BR, inclua:
+    Para cada rotina de treino, que deve conter de 7 a 10 exercícios, inclua:
     1. Nome da rotina
     2. Breve descrição e objetivo
     3. Lista de exercícios, cada um com:
        - Nome do exercício
        - Séries e repetições
        - Descanso entre séries
+       - Nível de dificuldade
        - Músculos trabalhados
+       - Descrição da execução
     
     IMPORTANTE: Sua resposta deve ser TOTALMENTE em PT-BR, incluindo todos os nomes de exercícios, descrições e demais textos.
     
@@ -173,33 +175,13 @@ export default async function handler(req, res) {
     }
     
     Exemplos de termos em português para usar:
-- Para “Bench Press” use “Supino reto”
-- Para “Deadlift” use “Levantamento terra”
-- Para “Squat” use “Agachamento”
-- Para “Pull-up” use “Barra fixa”
-- Para “Push-up” use “Flexão de braços”
-- Para “Lat Pulldown” use “Puxada na frente”
-- Para “Barbell Row” use “Remada curvada”
-- Para “Overhead Press” use “Desenvolvimento com barra”
-- Para “Bicep Curl” use “Rosca direta”
-- Para “Tricep Dips” use “Mergulho de tríceps”
-- Para “Lunges” use “Avanço”
-- Para “Leg Press” use “Leg press”
-- Para “Leg Curl” use “Flexão de perna”
-- Para “Leg Extension” use “Extensão de perna”
-- Para “Chest Fly” use “Crucifixo”
-- Para “Cable Cross Over” use “Crossover no cabo”
-- Para “Ab Crunch” use “Abdominal crunch”
-- Para “Russian Twists” use “Torção russa”
-- Para “Plank” use “Prancha”
-- Para “Mountain Climbers” use “Escalador”
-- Para “Glute Bridge” use “Ponte de glúteo”
-- Para “Calf Raise” use “Elevação de panturrilha”
-- Para “Kettlebell Swing” use “Baloiço com kettlebell”
-- Para “Seated Row” use “Remada sentado”
-- Para “Face Pull” use “Puxada para o rosto”
-- Para “Dumbbell Shoulder Press” use “Desenvolvimento com halteres”
-- Para “Barbell Squat” use “Agachamento com barra”
+    - Use "Agachamento" em vez de "Squat"
+    - Use "Supino" em vez de "Bench Press"
+    - Use "Levantamento Terra" em vez de "Deadlift"
+    - Use "Rosca Direta" em vez de "Bicep Curl"
+    - Use "Puxada Alta" em vez de "Lat Pulldown"
+    - Níveis de dificuldade: "Iniciante", "Intermediário", "Avançado"
+    - Nomes de músculos em português: "Peito", "Costas", "Pernas", "Ombros", "Bíceps", "Tríceps", "Abdômen", "Glúteos", "Quadríceps", "Isquiotibiais"
     `;
     
     // Configuração para o modelo instruído
@@ -222,40 +204,44 @@ export default async function handler(req, res) {
     
     while (retries <= maxRetries) {
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 segundos de timeout
-
+        response = await fetch(
+          `https://api-inference.huggingface.co/models/${HF_MODEL}`,
+          {
+            headers: { 
+              Authorization: `Bearer ${HF_API_TOKEN}`,
+              "Content-Type": "application/json"
+            },
+            method: "POST",
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          }
+        );
         
-        response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${HF_API_TOKEN}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          break;
-        } else if (response.status === 503 && retries < maxRetries) {
-          // Modelo ainda carregando, tentar novamente
-          const waitTime = 2000; // Esperar apenas 2 segundos antes de tentar novamente
-          console.log(`Modelo ainda carregando, aguardando ${waitTime}ms antes de tentar novamente...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-          retries++;
-        } else {
-          // Erro na API, retornar erro para o cliente
-          console.error(`Erro na API do Hugging Face: ${response.status}`);
-          clearTimeout(apiTimeout);
-          return res.status(500).json({ 
-            success: false, 
-            error: 'Erro ao gerar sugestões de treino',
-            message: 'O serviço de IA está indisponível no momento. Por favor, tente novamente mais tarde.'
-          });
+        // Se a resposta não for ok, verificar se é pelo modelo estar carregando
+        if (!response.ok) {
+          if (response.status === 503) {
+            // Modelo ainda carregando, vamos tentar novamente
+            console.log("Modelo ainda carregando, aguardando...");
+            await new Promise(resolve => setTimeout(resolve, 10000)); // Aguardar 10 segundos
+            
+            if (retries < maxRetries) {
+              retries++;
+              console.log(`Tentativa ${retries} de ${maxRetries}...`);
+              continue;
+            } else {
+              // Atingiu o máximo de retentativas
+              console.error(`Erro após ${maxRetries} tentativas: Modelo ainda carregando`);
+              throw new Error('Modelo ainda carregando após várias tentativas');
+            }
+          } else {
+            // Outro erro diferente do modelo carregando
+            console.error(`Erro na API do Hugging Face: ${response.status}`);
+            throw new Error(`Erro na API do Hugging Face: ${response.status}`);
+          }
         }
+        
+        // Se chegou aqui, a requisição foi bem-sucedida
+        break;
       } catch (error) {
         if (error.name === 'AbortError') {
           console.error('Timeout ao chamar a API do Hugging Face');
@@ -263,13 +249,13 @@ export default async function handler(req, res) {
             retries++;
             console.log(`Tentativa ${retries} de ${maxRetries}...`);
           } else {
-            // Retornar erro de timeout para o cliente
-            console.error('Timeout após várias tentativas');
+            // Se o modelo estiver demorando muito, retornar erro
+            console.error('Timeout após múltiplas tentativas');
             clearTimeout(apiTimeout);
             return res.status(504).json({ 
               success: false, 
-              error: 'Timeout',
-              message: 'O serviço de IA está demorando muito para responder. Por favor, tente novamente mais tarde.'
+              error: 'Timeout ao gerar sugestões de treino',
+              message: 'O servidor de IA está demorando muito para responder. Por favor, tente novamente mais tarde.'
             });
           }
         } else {
@@ -290,37 +276,51 @@ export default async function handler(req, res) {
     
     // Extrair e processar o JSON da resposta
     let suggestedWorkouts;
+    
     try {
-      // Tentar extrair JSON da resposta - modelos podem formatar saídas diferentemente
-      const jsonMatch = responseContent.match(/```json\n([\s\S]*)\n```/) || 
-                      responseContent.match(/```\n([\s\S]*)\n```/) ||
-                      responseContent.match(/{[\s\S]*}/);
+      // Identificar onde começa o JSON na resposta
+      const jsonStart = responseContent.indexOf('{');
+      const jsonEnd = responseContent.lastIndexOf('}') + 1;
       
-      const jsonString = jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseContent;
-      
-      // Alguns modelos podem fornecer texto antes ou depois do JSON
-      const cleanedJsonString = jsonString.replace(/^[\s\S]*?({[\s\S]*})[\s\S]*$/, '$1');
-      
-      console.log("String JSON para parse:", cleanedJsonString);
-      
-      suggestedWorkouts = JSON.parse(cleanedJsonString);
-      
-      // Se o JSON não tiver a propriedade workouts, adicionar
-      if (!suggestedWorkouts.workouts && Array.isArray(suggestedWorkouts)) {
-        suggestedWorkouts = { workouts: suggestedWorkouts };
-      } else if (!suggestedWorkouts.workouts) {
-        // Caso não seja possível extrair um array, criar um objeto vazio
-        throw new Error('Formato de resposta inválido');
+      if (jsonStart > -1 && jsonEnd > jsonStart) {
+        // Extrair apenas a parte JSON da resposta
+        const jsonStr = responseContent.substring(jsonStart, jsonEnd);
+        suggestedWorkouts = JSON.parse(jsonStr);
+      } else {
+        throw new Error('Formato de resposta inválido: não foi possível encontrar JSON válido');
       }
       
-      console.log("Workouts estruturados:", JSON.stringify(suggestedWorkouts));
+      // Validar se temos o formato esperado
+      if (!suggestedWorkouts.workouts || !Array.isArray(suggestedWorkouts.workouts)) {
+        throw new Error('Formato de resposta inválido: "workouts" não encontrado ou não é um array');
+      }
+      
+      // Processar os treinos
+      suggestedWorkouts.workouts = suggestedWorkouts.workouts.map(workout => {
+        return {
+          ...workout,
+          exercises: Array.isArray(workout.exercises) ? workout.exercises.map(exercise => {
+            return {
+              ...exercise,
+              // Garantir que todos os campos existam
+              name: exercise.name || 'Exercício',
+              sets: exercise.sets || 3,
+              reps: exercise.reps || '10',
+              rest: exercise.rest || '60 segundos',
+              difficulty: exercise.difficulty || 'Intermediário',
+              muscles: Array.isArray(exercise.muscles) ? exercise.muscles : ['Não especificado'],
+              execution: exercise.execution || 'Sem descrição'
+            };
+          }) : []
+        };
+      });
     } catch (parseError) {
       console.error("Erro ao processar resposta da IA:", parseError, "Resposta:", responseContent);
       clearTimeout(apiTimeout);
       return res.status(500).json({ 
         success: false, 
-        error: 'Erro ao processar resposta',
-        message: 'Não foi possível processar a resposta da IA. Por favor, tente novamente mais tarde.'
+        error: 'Erro ao processar resposta da IA',
+        message: 'O servidor encontrou um problema ao processar a resposta do modelo de IA. Por favor, tente novamente.'
       });
     }
     
