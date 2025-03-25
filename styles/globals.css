@@ -2,64 +2,93 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Definição de variáveis CSS globais */
 :root {
-  /* Cores para o modo claro (padrão) */
-  --primary: #3b82f6;
-  --primary-dark: #1d4ed8;
-  --secondary: #10b981;
-  --secondary-dark: #059669;
-  --background: #f9fafb;
-  --foreground: #1f2937;
-  --card-bg: #ffffff;
-  --card-border: #e5e7eb;
-  --input-bg: #ffffff;
-  --input-border: #d1d5db;
-  --header-bg: #ffffff;
-  --header-border: #e5e7eb;
-  --nav-active: #3b82f6;
-  --nav-inactive: #6b7280;
-  --button-primary-bg: #3b82f6;
-  --button-primary-hover: #2563eb;
-  --button-primary-text: #ffffff;
-  --button-secondary-bg: #10b981;
-  --button-secondary-hover: #059669;
-  --button-secondary-text: #ffffff;
-  --button-danger-bg: #ef4444;
-  --button-danger-hover: #dc2626;
-  --button-danger-text: #ffffff;
-  --button-outline-border: #d1d5db;
-  --button-outline-text: #1f2937;
-  --button-outline-hover: #f3f4f6;
+  /* Tema claro - cores base */
+  --color-primary: #3b82f6;
+  --color-primary-dark: #1d4ed8;
+  --color-secondary: #10b981;
+  --color-secondary-dark: #059669;
+  --color-danger: #ef4444;
+  --color-danger-dark: #dc2626;
+  --color-white: #ffffff;
+  --color-gray-50: #f9fafb;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-500: #6b7280;
+  --color-gray-900: #1f2937;
+
+  /* Tema claro - variáveis semânticas */
+  --background: var(--color-gray-50);
+  --foreground: var(--color-gray-900);
+  --card-bg: var(--color-white);
+  --card-border: var(--color-gray-200);
+  --input-bg: var(--color-white);
+  --input-border: var(--color-gray-300);
+  --header-bg: var(--color-white);
+  --header-border: var(--color-gray-200);
+  --nav-active: var(--color-primary);
+  --nav-inactive: var(--color-gray-500);
+  
+  /* Botões - tema claro */
+  --button-primary-bg: var(--color-primary);
+  --button-primary-hover: var(--color-primary-dark);
+  --button-primary-text: var(--color-white);
+  --button-secondary-bg: var(--color-secondary);
+  --button-secondary-hover: var(--color-secondary-dark);
+  --button-secondary-text: var(--color-white);
+  --button-danger-bg: var(--color-danger);
+  --button-danger-hover: var(--color-danger-dark);
+  --button-danger-text: var(--color-white);
+  --button-outline-border: var(--color-gray-300);
+  --button-outline-text: var(--color-gray-900);
+  --button-outline-hover: var(--color-gray-50);
 }
 
+/* Tema escuro */
 [data-theme="dark"] {
-  /* Cores para o modo escuro - melhorado para contraste */
-  --primary: #60a5fa;
-  --primary-dark: #3b82f6;
-  --secondary: #34d399;
-  --secondary-dark: #10b981;
-  --background: #0f172a; /* Fundo mais escuro para maior contraste */
-  --foreground: #f3f4f6; /* Texto principal mais claro */
-  --card-bg: #1e293b; /* Fundo do card mais claro para maior contraste */
-  --card-border: #334155;
-  --input-bg: #1e293b;
-  --input-border: #475569;
-  --header-bg: #1e293b; /* Header mais claro que o fundo */
-  --header-border: #334155;
-  --nav-active: #60a5fa;
-  --nav-inactive: #cbd5e1; /* Texto inativo mais visível */
-  --button-primary-bg: #3b82f6;
-  --button-primary-hover: #2563eb;
-  --button-primary-text: #ffffff;
-  --button-secondary-bg: #10b981;
-  --button-secondary-hover: #059669;
-  --button-secondary-text: #ffffff;
-  --button-danger-bg: #ef4444;
-  --button-danger-hover: #dc2626;
-  --button-danger-text: #ffffff;
-  --button-outline-border: #475569;
-  --button-outline-text: #f3f4f6;
-  --button-outline-hover: #374151;
+  /* Tema escuro - cores base */
+  --color-primary: #60a5fa;
+  --color-primary-dark: #3b82f6;
+  --color-secondary: #34d399;
+  --color-secondary-dark: #10b981;
+  --color-danger: #ef4444;
+  --color-danger-dark: #dc2626;
+  --color-white: #ffffff;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-600: #475569;
+  --color-slate-500: #64748b;
+  --color-slate-400: #94a3b8;
+  --color-slate-300: #cbd5e1;
+  --color-gray-100: #f3f4f6;
+  --color-gray-700: #374151;
+
+  /* Tema escuro - variáveis semânticas */
+  --background: var(--color-slate-900);
+  --foreground: var(--color-gray-100);
+  --card-bg: var(--color-slate-800);
+  --card-border: var(--color-slate-600);
+  --input-bg: var(--color-slate-800);
+  --input-border: var(--color-slate-600);
+  --header-bg: var(--color-slate-800);
+  --header-border: var(--color-slate-600);
+  --nav-active: var(--color-primary);
+  --nav-inactive: var(--color-slate-300);
+
+  /* Botões - tema escuro */
+  --button-primary-bg: var(--color-primary);
+  --button-primary-hover: var(--color-primary-dark);
+  --button-primary-text: var(--color-white);
+  --button-secondary-bg: var(--color-secondary);
+  --button-secondary-hover: var(--color-secondary-dark);
+  --button-secondary-text: var(--color-white);
+  --button-danger-bg: var(--color-danger);
+  --button-danger-hover: var(--color-danger-dark);
+  --button-danger-text: var(--color-white);
+  --button-outline-border: var(--color-slate-600);
+  --button-outline-text: var(--color-gray-100);
+  --button-outline-hover: var(--color-gray-700);
 }
 
 body {
@@ -71,58 +100,61 @@ body {
 }
 
 @layer components {
+  /* Botões base */
+  .btn {
+    @apply font-bold py-2 px-4 rounded transition-colors duration-200;
+  }
+
   .btn-primary {
-    @apply bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition-colors;
+    @apply btn bg-[var(--button-primary-bg)] hover:bg-[var(--button-primary-hover)] text-[var(--button-primary-text)];
   }
   
   .btn-secondary {
-    @apply bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition-colors;
+    @apply btn bg-[var(--button-secondary-bg)] hover:bg-[var(--button-secondary-hover)] text-[var(--button-secondary-text)];
   }
   
   .btn-danger {
-    @apply bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition-colors;
+    @apply btn bg-[var(--button-danger-bg)] hover:bg-[var(--button-danger-hover)] text-[var(--button-danger-text)];
+  }
+
+  .btn-outline {
+    @apply btn border border-[var(--button-outline-border)] text-[var(--button-outline-text)] hover:bg-[var(--button-outline-hover)];
   }
   
+  /* Cards */
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 transition-colors;
+    @apply bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg shadow-md p-6 transition-colors duration-200;
   }
   
+  /* Inputs */
+  .input-base {
+    @apply w-full rounded-md py-2 px-3 transition-colors duration-200 focus:outline-none focus:ring-2;
+  }
+
   .input {
-    @apply w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 
-      rounded-md py-2 px-3 text-gray-900 dark:text-white
-      focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
-      focus:border-transparent transition-colors;
+    @apply input-base
+      border border-[var(--input-border)]
+      bg-[var(--input-bg)]
+      text-[var(--foreground)]
+      focus:ring-[var(--color-primary)]
+      focus:border-transparent;
   }
 
-  /* Classes específicas para melhorar contraste no modo escuro */
-  .dark-text-primary {
-    @apply text-gray-900 dark:text-gray-100;
+  /* Texto com contraste otimizado */
+  .text-primary {
+    @apply text-[var(--foreground)];
   }
 
-  .dark-text-secondary {
-    @apply text-gray-600 dark:text-gray-300;
+  .text-secondary {
+    @apply text-[var(--nav-inactive)];
   }
 
-  .dark-text-tertiary {
-    @apply text-gray-500 dark:text-gray-400;
+  .text-tertiary {
+    @apply text-[var(--nav-inactive)] opacity-80;
   }
   
-  .dark-card {
-    @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700;
+  /* Destaque */
+  .highlight {
+    @apply bg-[var(--color-primary)] bg-opacity-10 text-[var(--color-primary-dark)];
   }
-  
-  .dark-highlight {
-    @apply bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200;
-  }
-
-  /* Classe para inputs com melhor contraste */
-  .dark-input {
-    @apply w-full border border-gray-300 dark:border-gray-600 
-      rounded-md py-2 px-3 
-      bg-white dark:bg-gray-700 
-      text-gray-900 dark:text-white
-      placeholder-gray-500 dark:placeholder-gray-400
-      focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
-      focus:border-transparent transition-colors;
-  }
-} 
+}
