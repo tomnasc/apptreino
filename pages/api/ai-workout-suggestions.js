@@ -131,7 +131,7 @@ export default async function handler(req, res) {
     // Criar prompt para o modelo - Usando um prompt mais técnico e específico para PT-BR
     const prompt = `
     Você é um profesor de educação física e especialista em treinamento de força e condicionamento físico.
-    Por favor, crie 3 rotinas de treino diferentes, contendo de 7 a 10 exercícios cada, para uma pessoa com as seguintes características:
+    Crie 3 rotinas de treino diferentes, CONTENDO 8 EXERCÍCIOS CADA, EM PT-BR, para uma pessoa com as seguintes características:
     - Altura: ${assessment.height} cm
     - Peso: ${assessment.weight} kg
     - Idade: ${assessment.age} anos
@@ -142,16 +142,14 @@ export default async function handler(req, res) {
     - Dias de treino por semana: ${assessment.workout_days_per_week}
     - Duração de treino: ${assessment.workout_duration} minutos
     
-    Para cada rotina de treino, que deve conter de 7 a 10 exercícios, inclua:
+    Cada Rotina, DEVE CONTER EXATAMENTE 8 EXERCÍCIOS CADA, EM PT-BR, inclua:
     1. Nome da rotina
     2. Breve descrição e objetivo
     3. Lista de exercícios, cada um com:
        - Nome do exercício
        - Séries e repetições
        - Descanso entre séries
-       - Nível de dificuldade
        - Músculos trabalhados
-       - Descrição da execução
     
     IMPORTANTE: Sua resposta deve ser TOTALMENTE em PT-BR, incluindo todos os nomes de exercícios, descrições e demais textos.
     
@@ -175,13 +173,33 @@ export default async function handler(req, res) {
     }
     
     Exemplos de termos em português para usar:
-    - Use "Agachamento" em vez de "Squat"
-    - Use "Supino" em vez de "Bench Press"
-    - Use "Levantamento Terra" em vez de "Deadlift"
-    - Use "Rosca Direta" em vez de "Bicep Curl"
-    - Use "Puxada Alta" em vez de "Lat Pulldown"
-    - Níveis de dificuldade: "Iniciante", "Intermediário", "Avançado"
-    - Nomes de músculos em português: "Peito", "Costas", "Pernas", "Ombros", "Bíceps", "Tríceps", "Abdômen", "Glúteos", "Quadríceps", "Isquiotibiais"
+- Para “Bench Press” use “Supino reto”
+- Para “Deadlift” use “Levantamento terra”
+- Para “Squat” use “Agachamento”
+- Para “Pull-up” use “Barra fixa”
+- Para “Push-up” use “Flexão de braços”
+- Para “Lat Pulldown” use “Puxada na frente”
+- Para “Barbell Row” use “Remada curvada”
+- Para “Overhead Press” use “Desenvolvimento com barra”
+- Para “Bicep Curl” use “Rosca direta”
+- Para “Tricep Dips” use “Mergulho de tríceps”
+- Para “Lunges” use “Avanço”
+- Para “Leg Press” use “Leg press”
+- Para “Leg Curl” use “Flexão de perna”
+- Para “Leg Extension” use “Extensão de perna”
+- Para “Chest Fly” use “Crucifixo”
+- Para “Cable Cross Over” use “Crossover no cabo”
+- Para “Ab Crunch” use “Abdominal crunch”
+- Para “Russian Twists” use “Torção russa”
+- Para “Plank” use “Prancha”
+- Para “Mountain Climbers” use “Escalador”
+- Para “Glute Bridge” use “Ponte de glúteo”
+- Para “Calf Raise” use “Elevação de panturrilha”
+- Para “Kettlebell Swing” use “Baloiço com kettlebell”
+- Para “Seated Row” use “Remada sentado”
+- Para “Face Pull” use “Puxada para o rosto”
+- Para “Dumbbell Shoulder Press” use “Desenvolvimento com halteres”
+- Para “Barbell Squat” use “Agachamento com barra”
     `;
     
     // Configuração para o modelo instruído
@@ -205,7 +223,8 @@ export default async function handler(req, res) {
     while (retries <= maxRetries) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos de timeout
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 segundos de timeout
+
         
         response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
           method: 'POST',
