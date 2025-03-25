@@ -125,7 +125,7 @@ export default function WorkoutMode() {
 
   // Função para carregar estado dos timers do localStorage com uso de timestamps absolutos
   const loadTimersState = () => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && id) {
       try {
         const savedState = localStorage.getItem('treinoPro_timerState');
         if (savedState) {
@@ -134,7 +134,7 @@ export default function WorkoutMode() {
           lastUpdatedTimeRef.current = now;
           
           // Verificar se o estado é válido e corresponde à sessão atual
-          if (state.workoutId === id && state.sessionId === sessionId && state.isWorkoutActive) {
+          if (state && state.workoutId === id && state.sessionId === sessionId && state.isWorkoutActive) {
             console.log('Carregando estado dos timers do localStorage');
             
             // Restaurar o tempo de treino total
@@ -177,8 +177,12 @@ export default function WorkoutMode() {
             }
             
             // Restaurar índices
-            setCurrentExerciseIndex(state.currentExerciseIndex);
-            setCurrentSetIndex(state.currentSetIndex);
+            if (state.currentExerciseIndex !== undefined) {
+              setCurrentExerciseIndex(state.currentExerciseIndex);
+            }
+            if (state.currentSetIndex !== undefined) {
+              setCurrentSetIndex(state.currentSetIndex);
+            }
           } else {
             // Se o estado não corresponder, limpar
             localStorage.removeItem('treinoPro_timerState');
@@ -186,6 +190,8 @@ export default function WorkoutMode() {
         }
       } catch (error) {
         console.error('Erro ao carregar o estado dos timers:', error);
+        // Em caso de erro, limpar o localStorage
+        localStorage.removeItem('treinoPro_timerState');
       }
     }
   };
@@ -450,7 +456,12 @@ export default function WorkoutMode() {
           if (storedSetIndex) setCurrentSetIndex(parseInt(storedSetIndex) || 0);
           if (storedCompletedSets) {
             try {
-              setCompletedSets(JSON.parse(storedCompletedSets) || {});
+              const parsedSets = JSON.parse(storedCompletedSets);
+              if (parsedSets && typeof parsedSets === 'object') {
+                setCompletedSets(parsedSets);
+              } else {
+                setCompletedSets({});
+              }
             } catch (e) {
               console.error('Erro ao fazer parse de completedSets:', e);
               setCompletedSets({});
@@ -458,7 +469,12 @@ export default function WorkoutMode() {
           }
           if (storedRepsHistory) {
             try {
-              setSetRepsHistory(JSON.parse(storedRepsHistory) || {});
+              const parsedHistory = JSON.parse(storedRepsHistory);
+              if (parsedHistory && typeof parsedHistory === 'object') {
+                setSetRepsHistory(parsedHistory);
+              } else {
+                setSetRepsHistory({});
+              }
             } catch (e) {
               console.error('Erro ao fazer parse de setRepsHistory:', e);
               setSetRepsHistory({});
@@ -1332,8 +1348,10 @@ export default function WorkoutMode() {
     );
   }
 
-  const currentExercise = isWorkoutActive ? exercises[currentExerciseIndex] : null;
-  const videoId = currentExercise ? getYoutubeVideoId(currentExercise.video_url) : null;
+  const currentExercise = isWorkoutActive && exercises.length > 0 && currentExerciseIndex < exercises.length 
+    ? exercises[currentExerciseIndex] 
+    : null;
+  const videoId = currentExercise ? getYoutubeVideoId(currentExercise?.video_url) : null;
 
   return (
     <Layout title={`Treino: ${workoutList?.name || ''}`}>
