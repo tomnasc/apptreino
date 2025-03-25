@@ -204,6 +204,9 @@ export default async function handler(req, res) {
     
     while (retries <= maxRetries) {
       try {
+        // Definir controller para abort
+        const controller = new AbortController();
+        
         response = await fetch(
           `https://api-inference.huggingface.co/models/${HF_MODEL}`,
           {
