@@ -168,7 +168,7 @@ export default function AssessmentPage() {
                   max="250"
                   value={assessment.height}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 dark-card border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="dark-input w-full"
                   required
                 />
               </div>
@@ -186,7 +186,7 @@ export default function AssessmentPage() {
                   step="0.1"
                   value={assessment.weight}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 dark-card border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="dark-input w-full"
                   required
                 />
               </div>
@@ -203,7 +203,7 @@ export default function AssessmentPage() {
                   max="100"
                   value={assessment.age}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 dark-card border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="dark-input w-full"
                   required
                 />
               </div>
@@ -217,7 +217,7 @@ export default function AssessmentPage() {
                   name="experience_level"
                   value={assessment.experience_level}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 dark-card border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="dark-input w-full"
                 >
                   {experienceLevels.map(level => (
                     <option key={level.value} value={level.value}>
@@ -236,7 +236,7 @@ export default function AssessmentPage() {
                   name="fitness_goal"
                   value={assessment.fitness_goal}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 dark-card border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="dark-input w-full"
                 >
                   {fitnessGoals.map(goal => (
                     <option key={goal.value} value={goal.value}>
@@ -261,7 +261,7 @@ export default function AssessmentPage() {
                   multiple
                   value={assessment.health_limitations}
                   onChange={(e) => handleMultiSelectChange(e, 'health_limitations')}
-                  className="w-full px-3 py-2 dark-card border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-32"
+                  className="dark-input w-full h-32"
                 >
                   {healthLimitationOptions.map(option => (
                     <option key={option.value} value={option.value}>
@@ -282,7 +282,7 @@ export default function AssessmentPage() {
                   multiple
                   value={assessment.available_equipment}
                   onChange={(e) => handleMultiSelectChange(e, 'available_equipment')}
-                  className="w-full px-3 py-2 dark-card border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-32"
+                  className="dark-input w-full h-32"
                 >
                   {equipmentOptions.map(option => (
                     <option key={option.value} value={option.value}>
@@ -302,7 +302,7 @@ export default function AssessmentPage() {
                   name="workout_days_per_week"
                   value={assessment.workout_days_per_week}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 dark-card border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="dark-input w-full"
                 >
                   {[1, 2, 3, 4, 5, 6, 7].map(num => (
                     <option key={num} value={num}>
@@ -321,7 +321,7 @@ export default function AssessmentPage() {
                   name="workout_duration"
                   value={assessment.workout_duration}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 dark-card border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="dark-input w-full"
                 >
                   {[30, 45, 60, 75, 90, 120].map(num => (
                     <option key={num} value={num}>

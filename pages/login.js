@@ -27,10 +27,10 @@ export default function Login() {
         <meta name="description" content="Faça login para acessar o Treino na Mão" />
       </Head>
 
-      <div className="card max-w-md w-full">
+      <div className="dark-card max-w-md w-full">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-center mb-2">Login</h1>
-          <p className="text-gray-600 text-center">
+          <h1 className="text-2xl font-bold text-center mb-2 dark-text-primary">Login</h1>
+          <p className="dark-text-secondary text-center">
             Entre com sua conta para acessar seus treinos
           </p>
         </div>
@@ -39,8 +39,21 @@ export default function Login() {
         {redirectUrl && (
           <Auth
             supabaseClient={supabase}
-            appearance={{ theme: ThemeSupa }}
-            theme="light"
+            appearance={{ 
+              theme: ThemeSupa,
+              variables: {
+                default: {
+                  colors: {
+                    brand: 'var(--primary)',
+                    brandAccent: 'var(--primary-dark)',
+                  }
+                }
+              }
+            }}
+            theme={typeof window !== 'undefined' && 
+                  window.document.documentElement.classList.contains('dark') 
+                  ? 'dark' 
+                  : 'light'}
             providers={[]}
             redirectTo={redirectUrl}
             localization={{
