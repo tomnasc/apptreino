@@ -131,7 +131,7 @@ export default async function handler(req, res) {
     // Criar prompt para o modelo - Usando um prompt mais técnico e específico para PT-BR
     const prompt = `
     Você é um profesor de educação física e especialista em treinamento de força e condicionamento físico.
-    Por favor, crie 3 rotinas de treino diferentes para uma pessoa com as seguintes características:
+    Por favor, crie 3 rotinas de treino diferentes, contendo de 7 a 10 exercícios cada, para uma pessoa com as seguintes características:
     - Altura: ${assessment.height} cm
     - Peso: ${assessment.weight} kg
     - Idade: ${assessment.age} anos
@@ -142,7 +142,7 @@ export default async function handler(req, res) {
     - Dias de treino por semana: ${assessment.workout_days_per_week}
     - Duração de treino: ${assessment.workout_duration} minutos
     
-    Para cada rotina de treino, inclua:
+    Para cada rotina de treino, que deve conter de 7 a 10 exercícios, inclua:
     1. Nome da rotina
     2. Breve descrição e objetivo
     3. Lista de exercícios, cada um com:
@@ -167,9 +167,7 @@ export default async function handler(req, res) {
               "sets": 3,
               "reps": "10-12",
               "rest": "60 segundos",
-              "difficulty": "Intermediário",
-              "muscles": ["Peito", "Tríceps"],
-              "execution": "Descrição da execução"
+              
             }
           ]
         }
@@ -204,48 +202,6 @@ export default async function handler(req, res) {
     let retries = 0;
     const maxRetries = 1; // Reduzir para apenas 1 retry para evitar timeouts longos
     
-    // Usar um treino offline se estiver demorando muito
-    const createOfflineWorkout = () => {
-      console.log('Criando treino offline devido a timeout ou erro');
-      return {
-        workouts: [
-          {
-            name: "Treino Básico de Emergência",
-            description: "Treino básico gerado quando o servidor de IA está ocupado",
-            exercises: [
-              {
-                name: "Agachamento",
-                sets: 3,
-                reps: "12-15",
-                rest: "60 segundos",
-                difficulty: "Iniciante",
-                muscles: ["Quadríceps", "Glúteos"],
-                execution: "Mantenha os pés na largura dos ombros, desça como se fosse sentar em uma cadeira."
-              },
-              {
-                name: "Flexão de Braço",
-                sets: 3,
-                reps: "10-12",
-                rest: "60 segundos",
-                difficulty: "Iniciante",
-                muscles: ["Peito", "Tríceps"],
-                execution: "Mantenha o corpo reto, desça até que o peito quase toque o chão."
-              },
-              {
-                name: "Prancha",
-                sets: 3,
-                reps: "30 segundos",
-                rest: "30 segundos",
-                difficulty: "Iniciante",
-                muscles: ["Core", "Abdômen"],
-                execution: "Mantenha o corpo reto apoiado nos antebraços e pontas dos pés."
-              }
-            ]
-          }
-        ]
-      };
-    };
-    
     while (retries <= maxRetries) {
       try {
         const controller = new AbortController();
@@ -272,34 +228,13 @@ export default async function handler(req, res) {
           await new Promise(resolve => setTimeout(resolve, waitTime));
           retries++;
         } else {
-          // Se o modelo estiver demorando muito, criar uma resposta offline
+          // Erro na API, retornar erro para o cliente
           console.error(`Erro na API do Hugging Face: ${response.status}`);
-          
-          // Salvar treino offline
-          const offlineWorkout = createOfflineWorkout();
-          
-          // Salvar sugestões no banco
-          const workoutsToInsert = offlineWorkout.workouts.map(workout => ({
-            assessment_id: assessmentId,
-            workout_name: workout.name,
-            workout_description: workout.description,
-            exercises: workout.exercises,
-            workout_metadata: {
-              source: 'offline',
-              model: 'fallback'
-            }
-          }));
-          
-          const { data: insertedWorkouts } = await supabaseAdmin
-            .from('ai_suggested_workouts')
-            .insert(workoutsToInsert)
-            .select();
-          
           clearTimeout(apiTimeout);
-          return res.status(200).json({ 
-            success: true, 
-            workouts: insertedWorkouts,
-            message: 'Treino offline gerado devido a indisponibilidade do serviço de IA'
+          return res.status(500).json({ 
+            success: false, 
+            error: 'Erro ao gerar sugestões de treino',
+            message: 'O serviço de IA está indisponível no momento. Por favor, tente novamente mais tarde.'
           });
         }
       } catch (error) {
@@ -309,34 +244,13 @@ export default async function handler(req, res) {
             retries++;
             console.log(`Tentativa ${retries} de ${maxRetries}...`);
           } else {
-            // Se o modelo estiver demorando muito, criar uma resposta offline
-            console.error('Gerando treino offline após timeout');
-            
-            // Salvar treino offline
-            const offlineWorkout = createOfflineWorkout();
-            
-            // Salvar sugestões no banco
-            const workoutsToInsert = offlineWorkout.workouts.map(workout => ({
-              assessment_id: assessmentId,
-              workout_name: workout.name,
-              workout_description: workout.description,
-              exercises: workout.exercises,
-              workout_metadata: {
-                source: 'offline',
-                model: 'fallback'
-              }
-            }));
-            
-            const { data: insertedWorkouts } = await supabaseAdmin
-              .from('ai_suggested_workouts')
-              .insert(workoutsToInsert)
-              .select();
-            
+            // Retornar erro de timeout para o cliente
+            console.error('Timeout após várias tentativas');
             clearTimeout(apiTimeout);
-            return res.status(200).json({ 
-              success: true, 
-              workouts: insertedWorkouts,
-              message: 'Treino offline gerado devido a timeout'
+            return res.status(504).json({ 
+              success: false, 
+              error: 'Timeout',
+              message: 'O serviço de IA está demorando muito para responder. Por favor, tente novamente mais tarde.'
             });
           }
         } else {
@@ -376,60 +290,19 @@ export default async function handler(req, res) {
       if (!suggestedWorkouts.workouts && Array.isArray(suggestedWorkouts)) {
         suggestedWorkouts = { workouts: suggestedWorkouts };
       } else if (!suggestedWorkouts.workouts) {
-        // Caso não seja possível extrair um array, criar um objeto com o primeiro workout
-        suggestedWorkouts = { 
-          workouts: [
-            {
-              name: "Treino Personalizado",
-              description: "Treino personalizado baseado na sua avaliação",
-              exercises: suggestedWorkouts.exercises || []
-            }
-          ] 
-        };
+        // Caso não seja possível extrair um array, criar um objeto vazio
+        throw new Error('Formato de resposta inválido');
       }
       
       console.log("Workouts estruturados:", JSON.stringify(suggestedWorkouts));
     } catch (parseError) {
       console.error("Erro ao processar resposta da IA:", parseError, "Resposta:", responseContent);
-      
-      // Criar um treino padrão em caso de erro
-      suggestedWorkouts = {
-        workouts: [
-          {
-            name: "Treino Básico",
-            description: "Treino básico gerado devido a um erro de processamento",
-            exercises: [
-              {
-                name: "Agachamento",
-                sets: 3,
-                reps: "12-15",
-                rest: "60 segundos",
-                difficulty: "Iniciante",
-                muscles: ["Quadríceps", "Glúteos"],
-                execution: "Mantenha os pés na largura dos ombros, desça como se fosse sentar em uma cadeira."
-              },
-              {
-                name: "Flexão de Braço",
-                sets: 3,
-                reps: "10-12",
-                rest: "60 segundos",
-                difficulty: "Iniciante",
-                muscles: ["Peito", "Tríceps"],
-                execution: "Mantenha o corpo reto, desça até que o peito quase toque o chão."
-              },
-              {
-                name: "Prancha",
-                sets: 3,
-                reps: "30 segundos",
-                rest: "30 segundos",
-                difficulty: "Iniciante",
-                muscles: ["Core", "Abdômen"],
-                execution: "Mantenha o corpo reto apoiado nos antebraços e pontas dos pés."
-              }
-            ]
-          }
-        ]
-      };
+      clearTimeout(apiTimeout);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Erro ao processar resposta',
+        message: 'Não foi possível processar a resposta da IA. Por favor, tente novamente mais tarde.'
+      });
     }
     
     console.log('Salvando sugestões no banco de dados...');
