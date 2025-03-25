@@ -131,7 +131,7 @@ export default async function handler(req, res) {
     // Criar prompt para o modelo - Usando um prompt mais técnico e específico para PT-BR
     const prompt = `
     Você é um profesor de educação física e especialista em treinamento de força e condicionamento físico.
-    Por favor, crie 3 rotinas de treino diferentes, contendo de 7 a 10 exercícios cada, para uma pessoa com as seguintes características:
+    Crie 3 rotinas de treino diferentes, CONTENDO EXATAMENTE 8 EXERCÍCIOS EM PT-BR DE CADA ROTINA, para uma pessoa com as seguintes características:
     - Altura: ${assessment.height} cm
     - Peso: ${assessment.weight} kg
     - Idade: ${assessment.age} anos
@@ -142,16 +142,14 @@ export default async function handler(req, res) {
     - Dias de treino por semana: ${assessment.workout_days_per_week}
     - Duração de treino: ${assessment.workout_duration} minutos
     
-    Para cada rotina de treino, que deve conter de 7 a 10 exercícios, inclua:
+    Para cada rotina de treino, DEVE CONTER EXATAMENTE 8 EXERCÍCIOS EM PT-BR, inclua:
     1. Nome da rotina
     2. Breve descrição e objetivo
     3. Lista de exercícios, cada um com:
        - Nome do exercício
        - Séries e repetições
        - Descanso entre séries
-       - Nível de dificuldade
        - Músculos trabalhados
-       - Descrição da execução
     
     IMPORTANTE: Sua resposta deve ser TOTALMENTE em PT-BR, incluindo todos os nomes de exercícios, descrições e demais textos.
     
@@ -174,14 +172,50 @@ export default async function handler(req, res) {
       ]
     }
     
-    Exemplos de termos em português para usar:
-    - Use "Agachamento" em vez de "Squat"
-    - Use "Supino" em vez de "Bench Press"
-    - Use "Levantamento Terra" em vez de "Deadlift"
-    - Use "Rosca Direta" em vez de "Bicep Curl"
-    - Use "Puxada Alta" em vez de "Lat Pulldown"
-    - Níveis de dificuldade: "Iniciante", "Intermediário", "Avançado"
-    - Nomes de músculos em português: "Peito", "Costas", "Pernas", "Ombros", "Bíceps", "Tríceps", "Abdômen", "Glúteos", "Quadríceps", "Isquiotibiais"
+    Exemplos de termos EM PR-BR para usar:
+- "Barbell Squat" - "Agachamento Livre"  
+- "Leg Press" - "Leg Press"  
+- "Leg Extension" - "Cadeira Extensora"  
+- "Leg Curl" - "Cadeira Flexora"  
+- "Romanian Deadlift" - "Levantamento Terra Romeno"  
+- "Bulgarian Split Squat" - "Agachamento Búlgaro"  
+- "Walking Lunge" - "Avanço"  
+- "Hack Squat" - "Agachamento Hack"  
+- "Sissy Squat" - "Agachamento Sissy"  
+- "Calf Raise" - "Elevação de Panturrilha"  
+- "Bench Press" - "Supino Reto"  
+- "Incline Bench Press" - "Supino Inclinado"  
+- "Decline Bench Press" - "Supino Declinado"  
+- "Dumbbell Fly" - "Crucifixo com Halteres"  
+- "Cable Crossover" - "Crossover na Polia"  
+- "Dips" - "Paralelas"  
+- "Pull-up" - "Barra Fixa Pegada Pronada"  
+- "Chin-up" - "Barra Fixa Pegada Supinada"  
+- "Lat Pulldown" - "Puxador Frente"  
+- "Seated Row" - "Remada Baixa"  
+- "Bent-over Row" - "Remada Curvada"  
+- "T-bar Row" - "Remada Cavalo"  
+- "Deadlift" - "Levantamento Terra"  
+- "Shrug" - "Encolhimento de Ombros"  
+- "Shoulder Press" - "Desenvolvimento de Ombros"  
+- "Arnold Press" - "Desenvolvimento Arnold"  
+- "Lateral Raise" - "Elevação Lateral"  
+- "Front Raise" - "Elevação Frontal"  
+- "Rear Delt Fly" - "Crucifixo Inverso"  
+- "Bicep Curl" - "Rosca Direta"  
+- "Hammer Curl" - "Rosca Martelo"  
+- "Concentration Curl" - "Rosca Concentrada"  
+- "Preacher Curl" - "Rosca Scott"  
+- "Triceps Pushdown" - "Tríceps Corda"  
+- "Skull Crusher" - "Tríceps Francês"  
+- "Overhead Triceps Extension" - "Tríceps Testa"  
+- "Dips (Triceps)" - "Mergulho no Banco"  
+- "Hanging Leg Raise" - "Elevação de Pernas Suspenso"  
+- "Crunch" - "Abdominal Supra"  
+- "Reverse Crunch" - "Abdominal Infra"  
+- "Russian Twist" - "Abdominal Oblíquo"  
+- "Plank" - "Prancha"  
+- "Side Plank" - "Prancha Lateral"  
     `;
     
     // Configuração para o modelo instruído
