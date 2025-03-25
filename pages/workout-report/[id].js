@@ -553,9 +553,9 @@ export default function WorkoutReport() {
                 </div>
               </div>
               
-              <div className="mt-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <div className="mt-6 bg-gray-50 p-4 rounded-lg border border-gray-200 overflow-x-auto">
                 <h4 className="text-sm font-medium text-gray-800 mb-3">Progresso das Repetições por Série</h4>
-                <div className="h-64">
+                <div className="h-64 min-w-[500px]">
                   <div className="h-full flex items-end justify-between space-x-1">
                     {sessionDetails
                       .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
@@ -575,7 +575,7 @@ export default function WorkoutReport() {
                         return (
                           <div 
                             key={index}
-                            className="relative w-full h-full flex flex-col justify-end"
+                            className="relative flex-1 h-full flex flex-col justify-end min-w-[20px]"
                           >
                             <div 
                               className={`rounded-t w-full ${barColor}`}
@@ -589,7 +589,7 @@ Repetições: ${detail.reps_completed || 'N/A'}/${targetReps}
 Carga: ${detail.weight_used ? `${detail.weight_used} kg` : 'N/A'}
 Tempo: ${detail.execution_time ? `${detail.execution_time}s` : 'N/A'}`}
                             />
-                            <div className="text-xs text-gray-500 truncate text-center mt-1" style={{transform: 'rotate(-45deg)', transformOrigin: 'left top', width: '20px'}}>
+                            <div className="text-xs text-gray-500 truncate text-center mt-1 transform -rotate-45 origin-top-left whitespace-nowrap">
                               {index + 1}
                             </div>
                           </div>
@@ -667,4 +667,4 @@ Tempo: ${detail.execution_time ? `${detail.execution_time}s` : 'N/A'}`}
       </div>
     </Layout>
   );
-} 
+}
