@@ -245,7 +245,7 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
       try {
         // Definir controller para abort
         const controller = new AbortController();
-        const fetchTimeout = setTimeout(() => controller.abort(), 35000); // Aumentado para 35 segundos para cada chamada
+        const fetchTimeout = setTimeout(() => controller.abort(), 60000); // Aumentado para 60 segundos para cada chamada
         
         console.log(`Tentativa ${retries + 1} de ${maxRetries + 1} para chamar a API do Hugging Face...`);
         response = await fetch(
