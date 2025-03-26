@@ -4,6 +4,13 @@ import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { toast } from 'react-hot-toast';
 import Layout from '../components/Layout';
 import PhysicalProgressPage from './physical-progress';
+import dynamic from 'next/dynamic';
+
+// Importação dinâmica dos componentes
+const FitnessGoals = dynamic(() => import('./fitness-goals'));
+const BodyMeasurements = dynamic(() => import('./body-measurements'));
+const PhysicalProgress = dynamic(() => import('./physical-progress'));
+const FitnessReports = dynamic(() => import('./fitness-reports'));
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -122,7 +129,7 @@ export default function ProfilePage() {
 
         {/* Abas de navegação */}
         <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex space-x-8">
+          <nav className="-mb-px flex flex-wrap gap-4">
             <button
               onClick={() => setSelectedTab('profile')}
               className={`${
@@ -402,42 +409,26 @@ export default function ProfilePage() {
           )}
 
           {selectedTab === 'goals' && (
-            <div>
-              {/* Conteúdo da aba de objetivos */}
-              <iframe
-                src="/fitness-goals"
-                className="w-full h-[calc(100vh-300px)] border-none"
-              />
+            <div className="min-h-[500px]">
+              <FitnessGoals />
             </div>
           )}
 
           {selectedTab === 'measurements' && (
-            <div>
-              {/* Conteúdo da aba de medidas corporais */}
-              <iframe
-                src="/body-measurements"
-                className="w-full h-[calc(100vh-300px)] border-none"
-              />
+            <div className="min-h-[500px]">
+              <BodyMeasurements />
             </div>
           )}
 
           {selectedTab === 'progress' && (
-            <div>
-              {/* Conteúdo da aba de evolução física */}
-              <iframe
-                src="/physical-progress"
-                className="w-full h-[calc(100vh-300px)] border-none"
-              />
+            <div className="min-h-[500px]">
+              <PhysicalProgress />
             </div>
           )}
 
           {selectedTab === 'reports' && (
-            <div>
-              {/* Conteúdo da aba de relatórios */}
-              <iframe
-                src="/fitness-reports"
-                className="w-full h-[calc(100vh-300px)] border-none"
-              />
+            <div className="min-h-[500px]">
+              <FitnessReports />
             </div>
           )}
         </div>
