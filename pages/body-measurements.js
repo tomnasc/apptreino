@@ -102,7 +102,15 @@ export default function BodyMeasurementsPage() {
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Detalhes do erro ao salvar medidas:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error;
+      }
       
       toast.success('Medidas salvas com sucesso!');
       
@@ -131,7 +139,7 @@ export default function BodyMeasurementsPage() {
       
     } catch (error) {
       console.error('Erro ao salvar medidas:', error);
-      toast.error('Erro ao salvar suas medidas');
+      toast.error(`Erro ao salvar suas medidas: ${error.message || 'Verifique se a tabela user_body_measurements existe'}`);
     } finally {
       setSaving(false);
     }
