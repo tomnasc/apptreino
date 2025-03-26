@@ -3,91 +3,58 @@ import { useRouter } from 'next/router';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { toast } from 'react-hot-toast';
 import Layout from '../components/Layout';
-import dynamic from 'next/dynamic';
 import { FiUser, FiTarget, FiRuler, FiActivity, FiFileText } from 'react-icons/fi';
-
-// Importação dinâmica dos componentes
-const FitnessGoalsContent = dynamic(() => import('../components/profile/FitnessGoalsContent'), {
-  loading: () => <div className="flex justify-center items-center h-64">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-  </div>
-});
-
-const BodyMeasurementsContent = dynamic(() => import('../components/profile/BodyMeasurementsContent'), {
-  loading: () => <div className="flex justify-center items-center h-64">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-  </div>
-});
-
-const PhysicalProgressContent = dynamic(() => import('../components/profile/PhysicalProgressContent'), {
-  loading: () => <div className="flex justify-center items-center h-64">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-  </div>
-});
-
-const FitnessReportsContent = dynamic(() => import('../components/profile/FitnessReportsContent'), {
-  loading: () => <div className="flex justify-center items-center h-64">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-  </div>
-});
 
 export default function ProfilePage() {
   const router = useRouter();
   const supabase = useSupabaseClient();
   const user = useUser();
-  
   const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState('profile'); // profile, goals, reports, measurements, progress
-  const [profile, setProfile] = useState(null);
+  const [profileData, setProfileData] = useState(null);
+  const [selectedTab, setSelectedTab] = useState('profile');
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
-    full_name: '',
-    birth_date: '',
-    gender: '',
+    name: '',
+    email: '',
+    bio: '',
+    age: '',
     height: '',
-    fitness_level: 'beginner',
-    training_frequency: '3',
-    health_conditions: '',
-    preferred_training_time: 'morning'
+    experience_level: 'beginner'
   });
 
   useEffect(() => {
     if (!user) {
       router.push('/login');
-      return;
+    } else {
+      loadProfile();
     }
-    loadProfile();
   }, [user]);
 
   const loadProfile = async () => {
     try {
       setLoading(true);
-      
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
 
       if (error) throw error;
 
       if (data) {
-        setProfile(data);
+        setProfileData(data);
         setFormData({
-          full_name: data.full_name || '',
-          birth_date: data.birth_date || '',
-          gender: data.gender || '',
+          name: data.name || '',
+          email: data.email || user.email || '',
+          bio: data.bio || '',
+          age: data.age || '',
           height: data.height || '',
-          fitness_level: data.fitness_level || 'beginner',
-          training_frequency: data.training_frequency || '3',
-          health_conditions: data.health_conditions || '',
-          preferred_training_time: data.preferred_training_time || 'morning'
+          experience_level: data.experience_level || 'beginner'
         });
       }
-      
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
-      toast.error('Erro ao carregar dados do perfil');
+      toast.error('Erro ao carregar perfil');
     } finally {
       setLoading(false);
     }
@@ -96,36 +63,34 @@ export default function ProfilePage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      setLoading(true);
-      
-      const { error } = await supabase
-        .from('user_profiles')
-        .upsert({
-          id: user.id,
-          ...formData,
-          updated_at: new Date().toISOString()
-        });
+      const { error } = await supabase.from('user_profiles').upsert({
+        user_id: user.id,
+        name: formData.name,
+        email: formData.email,
+        bio: formData.bio,
+        age: formData.age,
+        height: formData.height,
+        experience_level: formData.experience_level,
+        updated_at: new Date().toISOString()
+      });
 
       if (error) throw error;
 
       toast.success('Perfil atualizado com sucesso!');
       setEditMode(false);
       loadProfile();
-      
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
       toast.error('Erro ao atualizar perfil');
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
+    setFormData({
+      ...formData,
       [name]: value
-    }));
+    });
   };
 
   const tabs = [
@@ -159,7 +124,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex justify-center items-center h-[70vh]">
+        <div className="flex justify-center items-center h-screen">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
         </div>
       </Layout>
@@ -201,53 +166,71 @@ export default function ProfilePage() {
         <div className="dark-card rounded-lg shadow-md p-6">
           {selectedTab === 'profile' && (
             <div>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold dark-text-primary">Dados Pessoais</h2>
+                <button
+                  onClick={() => setEditMode(!editMode)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+                >
+                  {editMode ? 'Cancelar' : 'Editar'}
+                </button>
+              </div>
+
               {editMode ? (
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid md:grid-cols-2 gap-6">
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium dark-text-tertiary mb-1">
+                      Nome
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      className="dark-input w-full"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium dark-text-tertiary mb-1">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      className="dark-input w-full"
+                      required
+                      disabled
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium dark-text-tertiary mb-1">
+                      Biografia
+                    </label>
+                    <textarea
+                      name="bio"
+                      value={formData.bio}
+                      onChange={handleChange}
+                      className="dark-input w-full h-24"
+                    />
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium dark-text-tertiary mb-1">
-                        Nome Completo
+                        Idade
                       </label>
                       <input
-                        type="text"
-                        name="full_name"
-                        value={formData.full_name}
+                        type="number"
+                        name="age"
+                        value={formData.age}
                         onChange={handleChange}
                         className="dark-input w-full"
-                        required
                       />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium dark-text-tertiary mb-1">
-                        Data de Nascimento
-                      </label>
-                      <input
-                        type="date"
-                        name="birth_date"
-                        value={formData.birth_date}
-                        onChange={handleChange}
-                        className="dark-input w-full"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium dark-text-tertiary mb-1">
-                        Gênero
-                      </label>
-                      <select
-                        name="gender"
-                        value={formData.gender}
-                        onChange={handleChange}
-                        className="dark-input w-full"
-                        required
-                      >
-                        <option value="">Selecione...</option>
-                        <option value="male">Masculino</option>
-                        <option value="female">Feminino</option>
-                        <option value="other">Outro</option>
-                      </select>
                     </div>
 
                     <div>
@@ -260,162 +243,78 @@ export default function ProfilePage() {
                         value={formData.height}
                         onChange={handleChange}
                         className="dark-input w-full"
-                        min="100"
-                        max="250"
-                        required
                       />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium dark-text-tertiary mb-1">
-                        Nível de Condicionamento
-                      </label>
-                      <select
-                        name="fitness_level"
-                        value={formData.fitness_level}
-                        onChange={handleChange}
-                        className="dark-input w-full"
-                        required
-                      >
-                        <option value="beginner">Iniciante</option>
-                        <option value="intermediate">Intermediário</option>
-                        <option value="advanced">Avançado</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium dark-text-tertiary mb-1">
-                        Frequência de Treino (dias por semana)
-                      </label>
-                      <select
-                        name="training_frequency"
-                        value={formData.training_frequency}
-                        onChange={handleChange}
-                        className="dark-input w-full"
-                        required
-                      >
-                        <option value="2">2 dias</option>
-                        <option value="3">3 dias</option>
-                        <option value="4">4 dias</option>
-                        <option value="5">5 dias</option>
-                        <option value="6">6 dias</option>
-                      </select>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium dark-text-tertiary mb-1">
-                        Condições de Saúde
-                      </label>
-                      <textarea
-                        name="health_conditions"
-                        value={formData.health_conditions}
-                        onChange={handleChange}
-                        className="dark-input w-full h-24"
-                        placeholder="Liste quaisquer condições de saúde relevantes..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium dark-text-tertiary mb-1">
-                        Horário Preferido para Treino
-                      </label>
-                      <select
-                        name="preferred_training_time"
-                        value={formData.preferred_training_time}
-                        onChange={handleChange}
-                        className="dark-input w-full"
-                        required
-                      >
-                        <option value="morning">Manhã</option>
-                        <option value="afternoon">Tarde</option>
-                        <option value="evening">Noite</option>
-                      </select>
                     </div>
                   </div>
 
-                  <div className="flex justify-end space-x-3">
-                    <button
-                      type="button"
-                      onClick={() => setEditMode(false)}
-                      className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark-text-primary hover:bg-gray-50 dark:hover:bg-gray-800"
+                  <div>
+                    <label className="block text-sm font-medium dark-text-tertiary mb-1">
+                      Nível de Experiência
+                    </label>
+                    <select
+                      name="experience_level"
+                      value={formData.experience_level}
+                      onChange={handleChange}
+                      className="dark-input w-full"
                     >
-                      Cancelar
-                    </button>
+                      <option value="beginner">Iniciante</option>
+                      <option value="intermediate">Intermediário</option>
+                      <option value="advanced">Avançado</option>
+                    </select>
+                  </div>
+
+                  <div className="flex justify-end">
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-md"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
                     >
-                      Salvar
+                      Salvar Alterações
                     </button>
                   </div>
                 </form>
               ) : (
-                <div>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <h3 className="text-sm font-medium dark-text-tertiary">Nome Completo</h3>
-                      <p className="dark-text-primary mt-1">{profile?.full_name || '-'}</p>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-medium dark-text-tertiary">Data de Nascimento</h3>
-                      <p className="dark-text-primary mt-1">
-                        {profile?.birth_date ? new Date(profile.birth_date).toLocaleDateString() : '-'}
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-medium dark-text-tertiary">Gênero</h3>
-                      <p className="dark-text-primary mt-1">
-                        {profile?.gender === 'male' ? 'Masculino' :
-                         profile?.gender === 'female' ? 'Feminino' :
-                         profile?.gender === 'other' ? 'Outro' : '-'}
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-medium dark-text-tertiary">Altura</h3>
-                      <p className="dark-text-primary mt-1">{profile?.height ? `${profile.height} cm` : '-'}</p>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-medium dark-text-tertiary">Nível de Condicionamento</h3>
-                      <p className="dark-text-primary mt-1">
-                        {profile?.fitness_level === 'beginner' ? 'Iniciante' :
-                         profile?.fitness_level === 'intermediate' ? 'Intermediário' :
-                         profile?.fitness_level === 'advanced' ? 'Avançado' : '-'}
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-medium dark-text-tertiary">Frequência de Treino</h3>
-                      <p className="dark-text-primary mt-1">
-                        {profile?.training_frequency ? `${profile.training_frequency} dias por semana` : '-'}
-                      </p>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <h3 className="text-sm font-medium dark-text-tertiary">Condições de Saúde</h3>
-                      <p className="dark-text-primary mt-1">{profile?.health_conditions || 'Nenhuma condição registrada'}</p>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-medium dark-text-tertiary">Horário Preferido para Treino</h3>
-                      <p className="dark-text-primary mt-1">
-                        {profile?.preferred_training_time === 'morning' ? 'Manhã' :
-                         profile?.preferred_training_time === 'afternoon' ? 'Tarde' :
-                         profile?.preferred_training_time === 'evening' ? 'Noite' : '-'}
-                      </p>
-                    </div>
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-medium dark-text-tertiary">Nome</h3>
+                    <p className="dark-text-primary">{profileData?.name || 'Não informado'}</p>
                   </div>
 
-                  <div className="mt-6 flex justify-end">
-                    <button
-                      onClick={() => setEditMode(true)}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-md"
-                    >
-                      Editar Perfil
-                    </button>
+                  <div>
+                    <h3 className="text-sm font-medium dark-text-tertiary">Email</h3>
+                    <p className="dark-text-primary">{profileData?.email || user?.email || 'Não informado'}</p>
+                  </div>
+
+                  {profileData?.bio && (
+                    <div>
+                      <h3 className="text-sm font-medium dark-text-tertiary">Biografia</h3>
+                      <p className="dark-text-primary">{profileData.bio}</p>
+                    </div>
+                  )}
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {profileData?.age && (
+                      <div>
+                        <h3 className="text-sm font-medium dark-text-tertiary">Idade</h3>
+                        <p className="dark-text-primary">{profileData.age} anos</p>
+                      </div>
+                    )}
+
+                    {profileData?.height && (
+                      <div>
+                        <h3 className="text-sm font-medium dark-text-tertiary">Altura</h3>
+                        <p className="dark-text-primary">{profileData.height} cm</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-medium dark-text-tertiary">Nível de Experiência</h3>
+                    <p className="dark-text-primary">
+                      {profileData?.experience_level === 'beginner' && 'Iniciante'}
+                      {profileData?.experience_level === 'intermediate' && 'Intermediário'}
+                      {profileData?.experience_level === 'advanced' && 'Avançado'}
+                      {!profileData?.experience_level && 'Não informado'}
+                    </p>
                   </div>
                 </div>
               )}
@@ -423,26 +322,30 @@ export default function ProfilePage() {
           )}
 
           {selectedTab === 'goals' && (
-            <div className="min-h-[500px]">
-              <FitnessGoalsContent userId={user?.id} />
+            <div className="text-center p-6">
+              <h2 className="text-xl font-semibold dark-text-primary mb-4">Objetivos</h2>
+              <p className="dark-text-secondary">Esta seção está em manutenção. Tente novamente mais tarde.</p>
             </div>
           )}
 
           {selectedTab === 'measurements' && (
-            <div className="min-h-[500px]">
-              <BodyMeasurementsContent userId={user?.id} />
+            <div className="text-center p-6">
+              <h2 className="text-xl font-semibold dark-text-primary mb-4">Medidas Corporais</h2>
+              <p className="dark-text-secondary">Esta seção está em manutenção. Tente novamente mais tarde.</p>
             </div>
           )}
 
           {selectedTab === 'progress' && (
-            <div className="min-h-[500px]">
-              <PhysicalProgressContent userId={user?.id} />
+            <div className="text-center p-6">
+              <h2 className="text-xl font-semibold dark-text-primary mb-4">Evolução Física</h2>
+              <p className="dark-text-secondary">Esta seção está em manutenção. Tente novamente mais tarde.</p>
             </div>
           )}
 
           {selectedTab === 'reports' && (
-            <div className="min-h-[500px]">
-              <FitnessReportsContent userId={user?.id} />
+            <div className="text-center p-6">
+              <h2 className="text-xl font-semibold dark-text-primary mb-4">Relatórios</h2>
+              <p className="dark-text-secondary">Esta seção está em manutenção. Tente novamente mais tarde.</p>
             </div>
           )}
         </div>
