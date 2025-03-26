@@ -4,6 +4,7 @@ import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import Layout from '../../components/Layout';
 import Link from 'next/link';
 import YouTube from 'react-youtube';
+import Head from 'next/head';
 
 export default function WorkoutMode() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export default function WorkoutMode() {
   const [restTimeRemaining, setRestTimeRemaining] = useState(0);
   const [showWeightIncreaseAlert, setShowWeightIncreaseAlert] = useState(false);
   const [showWeightDecreaseAlert, setShowWeightDecreaseAlert] = useState(false);
-  const [setRepsHistory, setSetRepsHistory] = useState({}); // Armazenar histórico de repetições por série
+  const [setRepsHistory, setSetRepsHistory] = useState({});
   const [notificationPermission, setNotificationPermission] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   
@@ -50,6 +51,8 @@ export default function WorkoutMode() {
 
   // Adicionar timerRef para controlar o timer
   const timerRef = useRef(null);
+  // Referência para o timer de exercício
+  const exerciseTimerRef = useRef(null);
 
   // Detectar se é um dispositivo iOS
   useEffect(() => {
@@ -59,25 +62,50 @@ export default function WorkoutMode() {
       const iOS = !!ua.match(/iPad/i) || !!ua.match(/iPhone/i);
       setIsIOS(iOS);
       console.log('Dispositivo iOS detectado:', iOS);
-    }
-  }, []);
-
-  // Inicializar a referência de áudio
-  useEffect(() => {
-    if (typeof window !== 'undefined' && isIOS) {
-      // Detectar iOS apenas, sem criar elementos de áudio
-      try {
-        // Não criar AudioContext para evitar interrupções de mídia
-        console.log('iOS detectado, evitando criação de elementos de áudio');
-      } catch (error) {
-        console.error('Erro ao configurar ambiente iOS:', error);
+      
+      // Inicializar timer quando o componente é montado
+      if (iOS) {
+        document.addEventListener('click', initializeAudioForIOS);
       }
     }
     
     return () => {
-      // Não é necessário limpar recursos de áudio, pois não estamos mais criando-os
+      if (isIOS && typeof window !== 'undefined') {
+        document.removeEventListener('click', initializeAudioForIOS);
+      }
     };
-  }, [isIOS]);
+  }, []);
+  
+  // Função para inicializar comportamento de áudio no iOS (permite que os timers funcionem)
+  const initializeAudioForIOS = () => {
+    try {
+      // Cria um contexto de áudio para "desbloquear" timers no iOS
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const silentBuffer = audioContext.createBuffer(1, 1, 22050);
+      const source = audioContext.createBufferSource();
+      source.buffer = silentBuffer;
+      source.connect(audioContext.destination);
+      source.start(0);
+      
+      // Cria um oscilador silencioso para manter o contexto de áudio ativo
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 0; // Volume zero (silencioso)
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      oscillator.start();
+      
+      console.log('Contexto de áudio inicializado para iOS');
+      document.removeEventListener('click', initializeAudioForIOS);
+      
+      // Salva referências ao contexto de áudio para evitar coleta de lixo
+      window.audioContext = audioContext;
+      window.oscillator = oscillator;
+      window.gainNode = gainNode;
+    } catch (e) {
+      console.error('Erro ao inicializar áudio para iOS:', e);
+    }
+  };
 
   // Função para salvar estado dos timers no localStorage
   const saveTimersState = () => {
@@ -123,7 +151,7 @@ export default function WorkoutMode() {
     }
   };
 
-  // Função para carregar estado dos timers do localStorage com uso de timestamps absolutos
+  // Função para carregar estado dos timers do localStorage
   const loadTimersState = () => {
     if (typeof window !== 'undefined' && id) {
       try {
@@ -131,13 +159,24 @@ export default function WorkoutMode() {
         if (savedState) {
           const state = JSON.parse(savedState);
           const now = Date.now();
-          lastUpdatedTimeRef.current = now;
           
           // Verificar se o estado é válido e corresponde à sessão atual
-          if (state && state.workoutId === id && state.sessionId === sessionId && state.isWorkoutActive) {
+          if (state && state.workoutId === id && state.isWorkoutActive) {
             console.log('Carregando estado dos timers do localStorage');
             
-            // Restaurar o tempo de treino total
+            // Restaurar estado do treino
+            setIsWorkoutActive(true);
+            setSessionId(state.sessionId);
+            
+            // Restaurar índices
+            if (state.currentExerciseIndex !== undefined) {
+              setCurrentExerciseIndex(state.currentExerciseIndex);
+            }
+            if (state.currentSetIndex !== undefined) {
+              setCurrentSetIndex(state.currentSetIndex);
+            }
+            
+            // Restaurar tempo de treino total
             if (state.workoutStartTime) {
               const elapsed = Math.floor((now - state.workoutStartTime) / 1000);
               setTotalWorkoutTime(elapsed);
@@ -145,7 +184,7 @@ export default function WorkoutMode() {
               workoutStartRef.current = state.workoutStartTime;
             }
             
-            // Restaurar o tempo de exercício
+            // Restaurar timers
             if (state.exerciseEndTime && state.timerActive) {
               const remaining = Math.max(0, (state.exerciseEndTime - now) / 1000);
               if (remaining > 0) {
@@ -158,30 +197,17 @@ export default function WorkoutMode() {
               }
             }
             
-            // Restaurar o tempo de descanso com maior precisão
             if (state.restEndTime && state.restTimerActive) {
               const remaining = Math.max(0, (state.restEndTime - now) / 1000);
-              console.log(`Tempo de descanso restante: ${remaining}s`);
               if (remaining > 0) {
                 setRestTimeRemaining(remaining);
                 setRestTimerActive(true);
                 restTimerEndRef.current = state.restEndTime;
               } else {
-                // O temporizador deveria ter terminado enquanto estava em segundo plano
                 setRestTimeRemaining(0);
                 setRestTimerActive(false);
                 restTimerEndRef.current = null;
-                // Enviar notificação se o temporizador acabou enquanto estava em segundo plano
-                sendRestFinishedNotification();
               }
-            }
-            
-            // Restaurar índices
-            if (state.currentExerciseIndex !== undefined) {
-              setCurrentExerciseIndex(state.currentExerciseIndex);
-            }
-            if (state.currentSetIndex !== undefined) {
-              setCurrentSetIndex(state.currentSetIndex);
             }
           } else {
             // Se o estado não corresponder, limpar
@@ -190,7 +216,6 @@ export default function WorkoutMode() {
         }
       } catch (error) {
         console.error('Erro ao carregar o estado dos timers:', error);
-        // Em caso de erro, limpar o localStorage
         localStorage.removeItem('treinoPro_timerState');
       }
     }
@@ -198,202 +223,67 @@ export default function WorkoutMode() {
 
   // Temporizador absoluto para iOS - usado para verificar o tempo quando o app volta ao foco
   useEffect(() => {
-    // Identificar iOS de forma mais abrangente
-    const detectIOS = () => {
-      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-      if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
-        return true;
-      }
-      return /iOS/.test(userAgent);
-    };
-    
-    if (typeof window !== 'undefined') {
-      const isIOSDevice = detectIOS();
-      setIsIOS(isIOSDevice);
-      console.log('Detectando iOS:', isIOSDevice);
-    }
-    
-    if (isIOS) {
-      console.log('Dispositivo iOS detectado, configurando sistema de verificação sem áudio');
-      
-      // Temporizador específico para iOS que verifica quando o app volta ao foco
-      const checkTimerOnFocus = () => {
-        if (document.visibilityState === 'visible' && isWorkoutActive) {
-          console.log('iOS: Aplicativo voltou ao foco, verificando temporizadores');
-          
-          const now = Date.now();
-          
-          // Verificar timer de descanso usando valores absolutos do localStorage para maior precisão
-          const endTimeStr = localStorage.getItem('treinoPro_restTimerEnd');
-          
-          if (endTimeStr && restTimerActive) {
-            const endTime = parseInt(endTimeStr);
-            const remaining = Math.max(0, (endTime - now) / 1000);
-            console.log(`iOS: Tempo de descanso restante: ${remaining.toFixed(1)}s (end: ${new Date(endTime).toLocaleTimeString()})`);
-            
-            if (remaining <= 0) {
-              console.log('iOS: Timer de descanso finalizado enquanto em segundo plano');
-              setRestTimerActive(false);
-              setRestTimeRemaining(0);
-              restTimerEndRef.current = null;
-              localStorage.removeItem('treinoPro_restTimerStart');
-              localStorage.removeItem('treinoPro_restTimerDuration');
-              localStorage.removeItem('treinoPro_restTimerEnd');
-              
-              // Mostrar apenas o popup simples, sem sons
-              showIOSAlert();
-              console.log('iOS: Alerta visual mostrado ao voltar ao foco');
-            } else {
-              // Atualizar o tempo restante com valor preciso do localStorage
-              setRestTimeRemaining(remaining);
-              // Atualizar referência local para manter consistência
-              restTimerEndRef.current = endTime;
-            }
-          }
-        }
-      };
-      
-      // Salvar timestamp quando o app vai para segundo plano
-      const saveTimestampOnBlur = () => {
-        if (document.visibilityState === 'hidden' && isWorkoutActive) {
-          console.log('iOS: Aplicativo em segundo plano, salvando timestamp preciso');
-          const now = Date.now();
-          localStorage.setItem('treinoPro_backgroundTimestamp', now.toString());
-          
-          // Salvar estado atual dos timers antes de ir para segundo plano
-          if (restTimerActive && restTimerEndRef.current) {
-            localStorage.setItem('treinoPro_restTimerEnd', restTimerEndRef.current.toString());
-            console.log(`iOS: Timer terminará em: ${new Date(restTimerEndRef.current).toLocaleTimeString()}`);
-          }
-        }
-      };
-      
-      // Eventos para detectar mudanças de foco no iOS
-      document.addEventListener('visibilitychange', checkTimerOnFocus);
-      document.addEventListener('visibilitychange', saveTimestampOnBlur);
-      window.addEventListener('focus', checkTimerOnFocus);
-      window.addEventListener('blur', saveTimestampOnBlur);
-      window.addEventListener('pageshow', checkTimerOnFocus);
-      window.addEventListener('pagehide', saveTimestampOnBlur);
-      
-      // Verificar a cada 1 segundo enquanto o app estiver visível
-      const visibleInterval = setInterval(() => {
-        if (isWorkoutActive && document.visibilityState === 'visible' && restTimerActive && restTimerEndRef.current) {
-          const now = Date.now();
-          const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
-          
-          // Verificar se o timer acabou
-          if (remaining <= 0) {
-            console.log('iOS: Tempo de descanso finalizado enquanto app visível');
-            setRestTimerActive(false);
-            setRestTimeRemaining(0);
-            restTimerEndRef.current = null;
-            localStorage.removeItem('treinoPro_restTimerStart');
-            localStorage.removeItem('treinoPro_restTimerDuration');
-            localStorage.removeItem('treinoPro_restTimerEnd');
-            
-            // Apenas mostrar o popup simples, nenhum som
-            showIOSAlert();
-          } else {
-            // Atualizar o tempo restante com precisão de 1 casa decimal
-            const newRestTime = Number(remaining.toFixed(1));
-            setRestTimeRemaining(newRestTime);
-          }
-        }
-      }, 100); // Intervalo menor para maior precisão quando visível
-      
-      return () => {
-        document.removeEventListener('visibilitychange', checkTimerOnFocus);
-        document.removeEventListener('visibilitychange', saveTimestampOnBlur);
-        window.removeEventListener('focus', checkTimerOnFocus);
-        window.removeEventListener('blur', saveTimestampOnBlur);
-        window.removeEventListener('pageshow', checkTimerOnFocus);
-        window.removeEventListener('pagehide', saveTimestampOnBlur);
-        clearInterval(visibleInterval);
-      };
-    }
-  }, [isIOS, isWorkoutActive, restTimerActive]);
-
-  // Efeito para inicializar o intervalo principal com maior estabilidade
-  useEffect(() => {
+    // Configurar o timer principal que atualiza ambos os cronômetros
     if (isWorkoutActive) {
-      // Limpar qualquer intervalo existente
-      if (mainIntervalRef.current) {
-        clearInterval(mainIntervalRef.current);
-      }
-      
-      // Definir o intervalo de atualização para 1000ms (1s) para evitar oscilações
-      const INTERVAL_MS = 1000;
-      
-      // Criar novo intervalo para atualizar todos os timers frequentemente
       mainIntervalRef.current = setInterval(() => {
-        const now = Date.now();
-        
         // Atualizar tempo total de treino
-        if (workoutStartTime) {
-          const elapsed = Math.floor((now - workoutStartTime.getTime()) / 1000);
-          setTotalWorkoutTime(elapsed);
+        if (workoutStartRef.current) {
+          const elapsedTime = Math.floor((Date.now() - workoutStartRef.current) / 1000);
+          setTotalWorkoutTime(elapsedTime);
         }
         
-        // Atualizar tempo de exercício
-    if (timerActive && timeRemaining > 0) {
-          setTimeRemaining(prev => {
-            const newTime = prev - (INTERVAL_MS / 1000);
-            if (newTime <= 0) {
-            handleSetCompleted();
-            return 0;
-          }
-            return Math.max(0, Math.floor(newTime));
+        // Atualizar o timer do exercício
+        if (timerActive && timeRemaining > 0) {
+          setTimeRemaining(prevTime => {
+            const newTime = Math.max(0, prevTime - 0.1);
+            
+            // Quando o timer chegar a zero
+            if (prevTime > 0 && newTime <= 0) {
+              // Parar o timer
+              setTimerActive(false);
+              
+              // Atualizar estado como série completada
+              handleSetCompleted();
+              
+              // Enviar notificação
+              if (Notification.permission === 'granted') {
+                new Notification('Série completa!', {
+                  body: 'Tempo concluído para este exercício!',
+                  icon: '/favicon.ico'
+                });
+              }
+            }
+            
+            return newTime;
           });
         }
         
-        // Atualizar tempo de descanso, evitando atualizações em iOS (que usa sua própria lógica)
-        if (restTimerActive && restTimerEndRef.current && !isIOS) {
-          const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
-          
-          // Verificar se o timer acabou
-          if (remaining <= 0) {
-            console.log('Tempo de descanso finalizado!');
-            setRestTimerActive(false);
-            setRestTimeRemaining(0);
-            restTimerEndRef.current = null;
-            // Enviar notificação para trazer o app para o primeiro plano
-            sendRestFinishedNotification();
-          } else {
-            // Atualizar o tempo restante (usando floor para evitar flutuações)
-            setRestTimeRemaining(Math.floor(remaining));
-          }
+        // Atualizar o timer de descanso
+        if (restTimerActive && restTimeRemaining > 0) {
+          setRestTimeRemaining(prevTime => {
+            const newTime = Math.max(0, prevTime - 0.1);
+            
+            // Quando o timer de descanso chegar a zero
+            if (prevTime > 0 && newTime <= 0) {
+              // Parar o timer de descanso
+              setRestTimerActive(false);
+              
+              // Enviar notificação
+              sendRestFinishedNotification();
+            }
+            
+            return newTime;
+          });
         }
-        
-        // Salvar estado continuamente apenas se não for iOS (iOS tem sua própria lógica)
-        if (!isIOS) {
-          saveTimersState();
-        }
-      }, INTERVAL_MS);
-
+      }, 100);
+    }
+    
     return () => {
-        if (mainIntervalRef.current) {
-          clearInterval(mainIntervalRef.current);
-          mainIntervalRef.current = null;
-        }
-      };
-    } else {
-      // Limpar o intervalo quando o treino não estiver ativo
       if (mainIntervalRef.current) {
         clearInterval(mainIntervalRef.current);
-        mainIntervalRef.current = null;
       }
-      
-      // Limpar o estado do timer no localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('treinoPro_timerState');
-        localStorage.removeItem('treinoPro_restTimerStart');
-        localStorage.removeItem('treinoPro_restTimerDuration');
-        localStorage.removeItem('treinoPro_restTimerEnd');
-        localStorage.removeItem('treinoPro_backgroundTimestamp');
-      }
-    }
-  }, [isWorkoutActive, isIOS]);
+    };
+  }, [isWorkoutActive, timerActive, restTimerActive]);
 
   // Garantir que o efeito de unregisterServiceWorkers remova todos os service workers
   useEffect(() => {
@@ -1338,6 +1228,71 @@ export default function WorkoutMode() {
     setCurrentSetStartTime(new Date());
   };
 
+  // Efeito para lidar com eventos de visibilidade (quando o app fica em segundo plano)
+  useEffect(() => {
+    if (isIOS && isWorkoutActive) {
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'hidden') {
+          // Salvando timestamp quando o app vai para segundo plano
+          const now = Date.now();
+          localStorage.setItem('treinoPro_backgroundTimestamp', now.toString());
+          
+          // Salvando estado dos timers
+          saveTimersState();
+        } else if (document.visibilityState === 'visible') {
+          // Verificando e atualizando os temporizadores quando o app volta ao foco
+          const backgroundTimestamp = localStorage.getItem('treinoPro_backgroundTimestamp');
+          if (backgroundTimestamp) {
+            const timeDiff = (Date.now() - parseInt(backgroundTimestamp)) / 1000;
+            
+            // Atualizar temporizador de exercício
+            if (timerActive && timeRemaining > 0) {
+              const newTimeRemaining = Math.max(0, timeRemaining - timeDiff);
+              if (newTimeRemaining <= 0) {
+                setTimerActive(false);
+                setTimeRemaining(0);
+                // Ao invés de chamar handleSetCompleted diretamente, fazemos apenas a ação principal
+                const exerciseKey = `${currentExerciseIndex}`;
+                const updatedCompletedSets = { ...completedSets };
+                if (!updatedCompletedSets[exerciseKey]) {
+                  updatedCompletedSets[exerciseKey] = [];
+                }
+                updatedCompletedSets[exerciseKey].push(currentSetIndex);
+                setCompletedSets(updatedCompletedSets);
+              } else {
+                setTimeRemaining(newTimeRemaining);
+              }
+            }
+            
+            // Atualizar temporizador de descanso
+            if (restTimerActive && restTimeRemaining > 0) {
+              const newRestTimeRemaining = Math.max(0, restTimeRemaining - timeDiff);
+              if (newRestTimeRemaining <= 0) {
+                setRestTimerActive(false);
+                setRestTimeRemaining(0);
+                sendRestFinishedNotification();
+              } else {
+                setRestTimeRemaining(newRestTimeRemaining);
+              }
+            }
+          }
+        }
+      };
+      
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    }
+  }, [isIOS, isWorkoutActive, timerActive, restTimerActive, timeRemaining, restTimeRemaining, currentExerciseIndex, currentSetIndex, completedSets]);
+
+  // Efeito para carregar o estado do treino ao iniciar a página
+  useEffect(() => {
+    if (id && exercises.length > 0 && !loading) {
+      loadTimersState();
+    }
+  }, [id, exercises, loading]);
+
   if (loading) {
     return (
       <Layout title="Carregando...">
@@ -1355,6 +1310,16 @@ export default function WorkoutMode() {
 
   return (
     <Layout title={`Treino: ${workoutList?.name || ''}`}>
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <meta name="theme-color" content="#3b82f6" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="TreinoPro" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/icon-192x192.png" />
+      </Head>
       <div className="space-y-6">
         <div className="flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-700 dark:to-blue-500 rounded-lg shadow-lg p-4 text-white">
           <h1 className="text-2xl font-bold">
@@ -1661,6 +1626,25 @@ export default function WorkoutMode() {
                       onClick={() => {
                         setTimeRemaining(currentExercise.time);
                         setTimerActive(true);
+                        
+                        // Inicializar o timer para iOS
+                        if (isIOS) {
+                          // Limpar qualquer timer existente
+                          if (exerciseTimerRef.current) {
+                            clearInterval(exerciseTimerRef.current);
+                          }
+                          
+                          const now = Date.now();
+                          exerciseTimerEndRef.current = now + (currentExercise.time * 1000);
+                          
+                          // Salvar no localStorage para persistência
+                          localStorage.setItem('treinoPro_exerciseTimerStart', now.toString());
+                          localStorage.setItem('treinoPro_exerciseTimerDuration', currentExercise.time.toString());
+                          localStorage.setItem('treinoPro_exerciseTimerEnd', exerciseTimerEndRef.current.toString());
+                        }
+                        
+                        // Salvar o estado
+                        saveTimersState();
                       }}
                       className="px-6 py-3 bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-full font-bold shadow transition-all"
                     >
@@ -1704,29 +1688,6 @@ export default function WorkoutMode() {
                       Parar
                     </button>
                   </div>
-                )}
-                
-                {/* Timer de descanso entre séries */}
-                {restTimerActive && (
-                  <div className="mt-6 p-4 bg-indigo-50 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-indigo-500 mr-2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                        </svg>
-                        <span className="font-medium text-indigo-700">Descanso:</span>
-                      </div>
-                      <div className="text-xl font-bold text-indigo-700">{formatTime(restTimeRemaining)}</div>
-                    </div>
-                    <div className="w-full bg-indigo-100 rounded-full h-2 mt-2">
-                      <div 
-                        className="bg-indigo-500 h-2 rounded-full"
-                        style={{
-                          width: `${(restTimeRemaining / currentExercise.rest_time) * 100}%`
-                        }}
-                      ></div>
-                    </div>
-                </div>
                 )}
                 
                 {/* Alerta para aumentar carga */}
