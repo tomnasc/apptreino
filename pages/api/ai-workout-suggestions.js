@@ -239,7 +239,7 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
     // Tentar chamar a API do Hugging Face com timeout e retry
     let response;
     let retries = 0;
-    const maxRetries = 1; // Aumentado para 1 retentativas
+    const maxRetries = 2; // Aumentado para 2 retentativas
     
     while (retries <= maxRetries) {
       try {
@@ -247,7 +247,7 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
         const controller = new AbortController();
         const fetchTimeout = setTimeout(() => controller.abort(), 60000); // Aumentado para 60 segundos para cada chamada
         
-        console.log(`Tentativa ${retries + 1} de ${maxRetries + 1} para chamar a API do Hugging Face...`);
+        console.log(`Tentativa ${retries + 2} de ${maxRetries + 2} para chamar a API do Hugging Face...`);
         response = await fetch(
           `https://api-inference.huggingface.co/models/${modelToUse}`,
           {
