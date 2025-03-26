@@ -3,14 +3,13 @@ import { useRouter } from 'next/router';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { toast } from 'react-hot-toast';
 import Layout from '../components/Layout';
-import PhysicalProgressPage from './physical-progress';
-import dynamic from 'next/dynamic';
+import { FiUser, FiTarget, FiRuler, FiActivity, FiFileText } from 'react-icons/fi';
 
-// Importação dinâmica dos componentes
-const FitnessGoals = dynamic(() => import('./fitness-goals'));
-const BodyMeasurements = dynamic(() => import('./body-measurements'));
-const PhysicalProgress = dynamic(() => import('./physical-progress'));
-const FitnessReports = dynamic(() => import('./fitness-reports'));
+// Importação dos componentes de conteúdo
+import FitnessGoalsContent from '../components/profile/FitnessGoalsContent';
+import BodyMeasurementsContent from '../components/profile/BodyMeasurementsContent';
+import PhysicalProgressContent from '../components/profile/PhysicalProgressContent';
+import FitnessReportsContent from '../components/profile/FitnessReportsContent';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -109,6 +108,34 @@ export default function ProfilePage() {
     }));
   };
 
+  const tabs = [
+    {
+      id: 'profile',
+      label: 'Dados Pessoais',
+      icon: FiUser
+    },
+    {
+      id: 'goals',
+      label: 'Objetivos',
+      icon: FiTarget
+    },
+    {
+      id: 'measurements',
+      label: 'Medidas Corporais',
+      icon: FiRuler
+    },
+    {
+      id: 'progress',
+      label: 'Evolução Física',
+      icon: FiActivity
+    },
+    {
+      id: 'reports',
+      label: 'Relatórios',
+      icon: FiFileText
+    }
+  ];
+
   if (loading) {
     return (
       <Layout>
@@ -129,57 +156,24 @@ export default function ProfilePage() {
 
         {/* Abas de navegação */}
         <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex flex-wrap gap-4">
-            <button
-              onClick={() => setSelectedTab('profile')}
-              className={`${
-                selectedTab === 'profile'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent dark-text-tertiary hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
-            >
-              Dados Pessoais
-            </button>
-            <button
-              onClick={() => setSelectedTab('goals')}
-              className={`${
-                selectedTab === 'goals'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent dark-text-tertiary hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
-            >
-              Objetivos
-            </button>
-            <button
-              onClick={() => setSelectedTab('measurements')}
-              className={`${
-                selectedTab === 'measurements'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent dark-text-tertiary hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
-            >
-              Medidas Corporais
-            </button>
-            <button
-              onClick={() => setSelectedTab('progress')}
-              className={`${
-                selectedTab === 'progress'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent dark-text-tertiary hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
-            >
-              Evolução Física
-            </button>
-            <button
-              onClick={() => setSelectedTab('reports')}
-              className={`${
-                selectedTab === 'reports'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent dark-text-tertiary hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
-            >
-              Relatórios
-            </button>
+          <nav className="-mb-px flex overflow-x-auto">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setSelectedTab(tab.id)}
+                  className={`${
+                    selectedTab === tab.id
+                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                      : 'border-transparent dark-text-tertiary hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
+                  } flex items-center space-x-2 whitespace-nowrap py-4 px-6 border-b-2 font-medium transition-colors duration-200`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
           </nav>
         </div>
 
@@ -410,25 +404,25 @@ export default function ProfilePage() {
 
           {selectedTab === 'goals' && (
             <div className="min-h-[500px]">
-              <FitnessGoals />
+              <FitnessGoalsContent userId={user?.id} />
             </div>
           )}
 
           {selectedTab === 'measurements' && (
             <div className="min-h-[500px]">
-              <BodyMeasurements />
+              <BodyMeasurementsContent userId={user?.id} />
             </div>
           )}
 
           {selectedTab === 'progress' && (
             <div className="min-h-[500px]">
-              <PhysicalProgress />
+              <PhysicalProgressContent userId={user?.id} />
             </div>
           )}
 
           {selectedTab === 'reports' && (
             <div className="min-h-[500px]">
-              <FitnessReports />
+              <FitnessReportsContent userId={user?.id} />
             </div>
           )}
         </div>
