@@ -1346,32 +1346,57 @@ export default function WorkoutMode() {
     if (!currentExercise || !isWorkoutActive) return;
     
     try {
+      // Obter o ID do exercício atual para garantir que estamos atualizando o exercício certo
+      const exerciseId = currentExercise.id;
+      
       // Copiar a lista de exercícios
       const updatedExercises = [...exercises];
       
-      // Atualizar o peso do exercício atual
-      updatedExercises[currentExerciseIndex] = {
-        ...updatedExercises[currentExerciseIndex],
+      // Encontrar o índice correto do exercício pelo ID (em vez de usar currentExerciseIndex)
+      const exerciseIndex = updatedExercises.findIndex(ex => ex.id === exerciseId);
+      
+      if (exerciseIndex === -1) {
+        console.error('Exercício não encontrado na lista:', exerciseId);
+        return;
+      }
+      
+      // Atualizar o peso do exercício encontrado
+      updatedExercises[exerciseIndex] = {
+        ...updatedExercises[exerciseIndex],
         weight: newWeight
       };
       
       // Atualizar o estado com a nova lista de exercícios
       setExercises(updatedExercises);
       
-      // Atualizar no banco de dados se necessário
+      // Atualizar no banco de dados na tabela workout_session_details (para o treino atual)
       if (sessionId) {
-        const { error } = await supabase
+        const { error: sessionDetailError } = await supabase
           .from('workout_session_details')
           .update({
             weight_used: newWeight
           })
           .eq('session_id', sessionId)
-          .eq('exercise_id', currentExercise.id)
+          .eq('exercise_id', exerciseId)
           .eq('set_index', currentSetIndex);
           
-        if (error) {
-          console.error('Erro ao atualizar carga no banco de dados:', error);
+        if (sessionDetailError) {
+          console.error('Erro ao atualizar carga na sessão:', sessionDetailError);
         }
+      }
+      
+      // Atualizar na tabela workout_exercises (para manter nos próximos treinos)
+      const { error: exerciseUpdateError } = await supabase
+        .from('workout_exercises')
+        .update({
+          weight: newWeight
+        })
+        .eq('id', exerciseId);
+        
+      if (exerciseUpdateError) {
+        console.error('Erro ao atualizar carga permanente:', exerciseUpdateError);
+      } else {
+        console.log(`Carga atualizada com sucesso para ${newWeight}kg no exercício ${currentExercise.name}`);
       }
     } catch (error) {
       console.error('Erro ao atualizar carga:', error);
