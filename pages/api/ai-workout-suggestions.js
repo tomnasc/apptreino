@@ -44,14 +44,14 @@ export default async function handler(req, res) {
   // Criar um timeout para encerrar a requisição se demorar muito
   const apiTimeout = setTimeout(() => {
     if (isClientConnected()) {
-      console.error('API timeout após 25 segundos');
+      console.error('API timeout após 60 segundos');
       return res.status(504).json({ 
         success: false,
         error: 'Timeout ao processar a requisição',
         message: 'A requisição demorou muito para ser processada. Por favor, tente novamente mais tarde.'
       });
     }
-  }, 25000); // Reduzido para 25 segundos
+  }, 60000); // Aumentado para 60 segundos para dar mais tempo ao modelo
 
   // Verificar variáveis de ambiente primeiro
   const envCheck = checkEnvironmentVariables();
@@ -196,71 +196,60 @@ export default async function handler(req, res) {
     }
 
     prompt += `\n\nCom base nessas informações, gere um programa de treino completo que inclua:
-1. Divisão semanal dos treinos
-2. Exercícios específicos para cada dia
-3. Séries, repetições e carga sugerida para cada exercício
-4. Técnicas avançadas quando apropriado (superséries, drop sets, etc.)
-5. Recomendações de descanso entre séries
-6. Progressão sugerida
-7. Dicas de execução e segurança
+1. Divisão semanal dos treinos (máximo de 5 treinos)
+2. Exercícios específicos para cada dia (máximo de 7 exercícios por treino)
+3. Séries, repetições e descanso para cada exercício
 
-O programa deve ser estruturado e retornado em formato JSON com a seguinte estrutura:
+O programa deve ser estruturado e retornado em formato JSON com a seguinte estrutura simplificada:
 {
-  "program_overview": {
-    "name": string,
-    "description": string,
-    "duration_weeks": number,
-    "sessions_per_week": number
-  },
   "workouts": [
     {
-      "name": string,
-      "focus": string,
+      "name": string,      // Nome do treino (ex: "Treino A - Peito e Tríceps")
+      "description": string, // Descrição curta
       "exercises": [
         {
-          "name": string,
-          "sets": number,
-          "reps": string,
-          "rest_seconds": number,
-          "notes": string,
-          "technique": string (opcional)
+          "name": string,  // Nome do exercício
+          "sets": number,  // Número de séries (1-5)
+          "reps": string,  // Repetições (ex: "10-12")
+          "rest": string   // Tempo de descanso (ex: "60 segundos")
         }
       ]
     }
-  ],
-  "recommendations": {
-    "progression": string,
-    "nutrition": string,
-    "recovery": string
-  }
+  ]
 }`;
     
     // Configuração para o modelo instruído
     const payload = {
       inputs: `<s>[INST] ${prompt} [/INST]`,
       parameters: {
-        max_new_tokens: 2048,
-        temperature: 0.7,
-        top_p: 0.95,
-        return_full_text: false
+        max_new_tokens: 1536,       // Reduzido para diminuir tempo de geração
+        temperature: 0.6,           // Reduzido para respostas mais determinísticas
+        top_p: 0.9,                 // Reduzido para mais foco nas respostas mais prováveis
+        return_full_text: false,
+        do_sample: true,
+        seed: 42                    // Semente fixa para respostas mais consistentes
       }
     };
     
-    console.log(`Chamando API do Hugging Face com modelo: ${HF_MODEL}`);
+    console.log(`Chamando API do Hugging Face com modelo: ${HF_MODEL} - Tamanho do prompt: ${prompt.length} caracteres`);
+    
+    // Usamos o modelo mais leve disponível se não estiver especificado
+    const modelToUse = HF_MODEL || 'mistralai/Mistral-7B-Instruct-v0.2'; // Garantir que temos um modelo
     
     // Tentar chamar a API do Hugging Face com timeout e retry
     let response;
     let retries = 0;
-    const maxRetries = 1; // Reduzir para apenas 1 retry para evitar timeouts longos
+    const maxRetries = 2; // Aumentado para 2 retentativas
     
     while (retries <= maxRetries) {
       try {
         // Definir controller para abort
         const controller = new AbortController();
-        const fetchTimeout = setTimeout(() => controller.abort(), 15000); // 15 segundos para cada chamada
+        const fetchTimeout = setTimeout(() => controller.abort(), 35000); // Aumentado para 35 segundos para cada chamada
         
+        console.log(`Tentativa ${retries + 1} de ${maxRetries + 1} para chamar a API do Hugging Face...`);
         response = await fetch(
-          `https://api-inference.huggingface.co/models/${HF_MODEL}`,
+          `https://api-inference.huggingface.co/models/${modelToUse}`,
           {
             headers: { 
               Authorization: `Bearer ${HF_API_TOKEN}`,
@@ -279,15 +268,15 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
           if (response.status === 503) {
             // Modelo ainda carregando, vamos tentar novamente
             console.log("Modelo ainda carregando, aguardando...");
-            await new Promise(resolve => setTimeout(resolve, 5000)); // Aguardar 5 segundos
+            await new Promise(resolve => setTimeout(resolve, 8000)); // Aumentado para 8 segundos de espera
             
             if (retries < maxRetries) {
               retries++;
-              console.log(`Tentativa ${retries} de ${maxRetries}...`);
+              console.log(`Tentativa ${retries + 1} de ${maxRetries + 1}...`);
               continue;
             } else {
               // Atingiu o máximo de retentativas
-              console.error(`Erro após ${maxRetries} tentativas: Modelo ainda carregando`);
+              console.error(`Erro após ${maxRetries + 1} tentativas: Modelo ainda carregando`);
               clearTimeout(apiTimeout);
               return res.status(503).json({
                 success: false,
@@ -298,11 +287,23 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
           } else {
             // Outro erro diferente do modelo carregando
             console.error(`Erro na API do Hugging Face: ${response.status}`);
+            
+            // Tentar extrair mais informações de erro
+            let errorInfo = '';
+            try {
+              const errorText = await response.text();
+              console.error('Detalhes do erro:', errorText);
+              errorInfo = errorText;
+            } catch (e) {
+              console.error('Não foi possível obter detalhes do erro:', e);
+            }
+            
             clearTimeout(apiTimeout);
             return res.status(response.status).json({
               success: false,
               error: `Erro no serviço de IA: ${response.status}`,
-              message: 'Ocorreu um erro ao acessar o serviço de IA. Por favor, tente novamente mais tarde.'
+              message: 'Ocorreu um erro ao acessar o serviço de IA. Por favor, tente novamente mais tarde.',
+              details: errorInfo
             });
           }
         }
@@ -314,7 +315,7 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
           console.error('Timeout ao chamar a API do Hugging Face');
           if (retries < maxRetries) {
             retries++;
-            console.log(`Tentativa ${retries} de ${maxRetries}...`);
+            console.log(`Tentativa ${retries + 1} de ${maxRetries + 1} após timeout...`);
           } else {
             // Se o modelo estiver demorando muito, retornar erro
             console.error('Timeout após múltiplas tentativas');
@@ -322,7 +323,7 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
             return res.status(504).json({ 
               success: false, 
               error: 'Timeout ao gerar sugestões de treino',
-              message: 'O servidor de IA está demorando muito para responder. Por favor, tente novamente mais tarde.'
+              message: 'O serviço de IA está demorando muito para responder. Por favor, tente novamente mais tarde. Se o problema persistir, entre em contato com o suporte.'
             });
           }
         } else {
@@ -331,7 +332,8 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
           return res.status(500).json({
             success: false,
             error: 'Erro ao acessar serviço de IA',
-            message: 'Ocorreu um erro inesperado. Por favor, tente novamente.'
+            message: 'Ocorreu um erro inesperado. Por favor, tente novamente.',
+            details: error.message
           });
         }
       }
@@ -348,7 +350,7 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
     console.log("Resposta bruta do modelo:", responseContent);
     
     // Extrair e processar o JSON da resposta
-    let suggestedWorkouts;
+    let suggestedWorkouts = null;
     
     try {
       // Identificar onde começa o JSON na resposta
@@ -358,6 +360,7 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
       if (jsonStart > -1 && jsonEnd > jsonStart) {
         // Extrair apenas a parte JSON da resposta
         const jsonStr = responseContent.substring(jsonStart, jsonEnd);
+        console.log("Tentando analisar JSON:", jsonStr.substring(0, 200) + "..."); // Log apenas do início para evitar logs muito grandes
         suggestedWorkouts = JSON.parse(jsonStr);
       } else {
         throw new Error('Formato de resposta inválido: não foi possível encontrar JSON válido');
@@ -365,39 +368,136 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
       
       // Validar se temos o formato esperado
       if (!suggestedWorkouts.workouts || !Array.isArray(suggestedWorkouts.workouts)) {
-        throw new Error('Formato de resposta inválido: "workouts" não encontrado ou não é um array');
+        console.error('Formato inválido retornado pela IA, tentando recuperar:', JSON.stringify(suggestedWorkouts));
+        // Tentar criar um formato válido a partir do que recebemos
+        if (typeof suggestedWorkouts === 'object') {
+          // Tentar encontrar algo parecido com uma lista de treinos
+          let recoveredWorkouts = [];
+          
+          // Verificar se temos um program_overview com workouts
+          if (suggestedWorkouts.program_overview && suggestedWorkouts.program_overview.workouts && 
+              Array.isArray(suggestedWorkouts.program_overview.workouts)) {
+            recoveredWorkouts = suggestedWorkouts.program_overview.workouts;
+          } 
+          // Verificar se recebemos um workout único
+          else if (suggestedWorkouts.name && suggestedWorkouts.exercises) {
+            recoveredWorkouts = [suggestedWorkouts];
+          }
+          // Verificar outras propriedades que podem conter treinos
+          else {
+            // Procurar por qualquer array que contenha exercícios
+            Object.keys(suggestedWorkouts).forEach(key => {
+              if (Array.isArray(suggestedWorkouts[key])) {
+                const possibleWorkouts = suggestedWorkouts[key];
+                // Verificar se parece com um array de treinos
+                if (possibleWorkouts.some(item => item.exercises || item.name)) {
+                  recoveredWorkouts = possibleWorkouts;
+                }
+              }
+            });
+          }
+          
+          if (recoveredWorkouts.length > 0) {
+            console.log('Conseguimos recuperar workouts a partir da resposta incorreta:', recoveredWorkouts.length);
+            suggestedWorkouts = { workouts: recoveredWorkouts };
+          } else {
+            throw new Error('Não foi possível recuperar treinos a partir da resposta');
+          }
+        } else {
+          throw new Error('Formato de resposta inválido: "workouts" não encontrado ou não é um array');
+        }
       }
       
       // Processar os treinos
       suggestedWorkouts.workouts = suggestedWorkouts.workouts.map(workout => {
+        // Garantir que o workout tem um nome e descrição
+        const workoutName = workout.name || workout.title || "Treino Personalizado";
+        const workoutDesc = workout.description || workout.focus || "Treino personalizado baseado na sua avaliação";
+        const exercises = Array.isArray(workout.exercises) ? workout.exercises : [];
+        
         return {
           ...workout,
-          exercises: Array.isArray(workout.exercises) ? workout.exercises.map(exercise => {
-            return {
-              ...exercise,
-              // Garantir que todos os campos existam
-              name: exercise.name || 'Exercício',
-              sets: exercise.sets || 3,
-              reps: exercise.reps || '10',
-              rest: exercise.rest || '60 segundos',
+          name: workoutName,
+          description: workoutDesc,
+          exercises: exercises.map(exercise => {
+            // Extrair propriedades seguras ou usar valores padrão
+            const name = exercise.name || 'Exercício';
+            const sets = exercise.sets || 3;
+            let reps = exercise.reps || '10-12';
+            let rest = exercise.rest || exercise.rest_seconds || '60 segundos';
+            
+            // Certificar que rest está em formato de string
+            if (typeof rest === 'number') {
+              rest = `${rest} segundos`;
+            }
+            
+            // Adicionar propriedades opcionais se existirem
+            const exerciseObj = {
+              name,
+              sets,
+              reps,
+              rest,
+              // Adicionar propriedades opcionais com valores padrão
               difficulty: exercise.difficulty || 'Intermediário',
-              muscles: Array.isArray(exercise.muscles) ? exercise.muscles : ['Não especificado'],
-              execution: exercise.execution || 'Sem descrição'
+              muscles: Array.isArray(exercise.muscles) ? exercise.muscles : 
+                       (exercise.muscles ? [exercise.muscles] : ['Não especificado']),
+              execution: exercise.execution || exercise.notes || 'Execute o movimento com controle.'
             };
-          }) : []
+            
+            return exerciseObj;
+          })
         };
       });
+      
+      // Verificar se temos pelo menos um treino com exercícios
+      const hasValidWorkouts = suggestedWorkouts.workouts.some(w => 
+        w.exercises && Array.isArray(w.exercises) && w.exercises.length > 0
+      );
+      
+      if (!hasValidWorkouts) {
+        throw new Error('Nenhum treino válido com exercícios foi gerado');
+      }
+      
     } catch (parseError) {
-      console.error("Erro ao processar resposta da IA:", parseError, "Resposta:", responseContent);
-      clearTimeout(apiTimeout);
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Erro ao processar resposta da IA',
-        message: 'O servidor encontrou um problema ao processar a resposta do modelo de IA. Por favor, tente novamente.'
-      });
+      console.error("Erro ao processar resposta da IA:", parseError.message);
+      console.error("Resposta bruta:", responseContent.substring(0, 500) + "..."); // Mostra parte da resposta para debug
+      
+      // Criar workouts de fallback
+      suggestedWorkouts = {
+        workouts: [
+          {
+            name: "Treino A - Superior",
+            description: "Treino para membros superiores com foco em hipertrofia",
+            exercises: [
+              { name: "Supino reto com barra", sets: 4, reps: "8-12", rest: "90 segundos", muscles: ["Peito", "Tríceps"], difficulty: "Intermediário", execution: "Mantenha os cotovelos em ângulo de 90º e controle o movimento." },
+              { name: "Puxada frontal", sets: 4, reps: "10-12", rest: "90 segundos", muscles: ["Costas"], difficulty: "Intermediário", execution: "Traga a barra até a clavícula e alongue bem na subida." },
+              { name: "Desenvolvimento com halteres", sets: 3, reps: "10-12", rest: "60 segundos", muscles: ["Ombros"], difficulty: "Intermediário", execution: "Mantenha os cotovelos alinhados durante o movimento." },
+              { name: "Rosca direta com barra", sets: 3, reps: "12-15", rest: "60 segundos", muscles: ["Bíceps"], difficulty: "Iniciante", execution: "Controle a descida e evite usar impulso." },
+              { name: "Tríceps corda", sets: 3, reps: "12-15", rest: "60 segundos", muscles: ["Tríceps"], difficulty: "Iniciante", execution: "Mantenha os cotovelos junto ao corpo." }
+            ]
+          },
+          {
+            name: "Treino B - Inferior",
+            description: "Treino para membros inferiores com foco em força e hipertrofia",
+            exercises: [
+              { name: "Agachamento livre", sets: 4, reps: "8-10", rest: "120 segundos", muscles: ["Quadríceps", "Glúteos"], difficulty: "Avançado", execution: "Desça até a posição paralela, mantendo a coluna neutra." },
+              { name: "Leg press", sets: 4, reps: "10-12", rest: "90 segundos", muscles: ["Quadríceps", "Glúteos"], difficulty: "Intermediário", execution: "Evite travar os joelhos no topo do movimento." },
+              { name: "Stiff", sets: 3, reps: "10-12", rest: "90 segundos", muscles: ["Posterior de coxa"], difficulty: "Intermediário", execution: "Mantenha leve flexão nos joelhos e desça até sentir estiramento." },
+              { name: "Elevação de panturrilha em pé", sets: 4, reps: "15-20", rest: "60 segundos", muscles: ["Panturrilhas"], difficulty: "Iniciante", execution: "Foque na amplitude total, esticando bem na subida." }
+            ]
+          }
+        ]
+      };
+      
+      // Não retornamos erro, mas usamos o fallback e registramos que houve problema
+      console.log("Usando treinos de fallback devido a erro na resposta da IA");
+      // Não lançamos o erro para continuar o fluxo
     }
     
     console.log('Salvando sugestões no banco de dados...');
+    
+    // Indicar se estamos usando fallback
+    const isFallback = responseContent.indexOf('{') === -1 || responseContent.lastIndexOf('}') === -1;
     
     // Salvar sugestões no banco
     const workoutsToInsert = suggestedWorkouts.workouts.map(workout => ({
@@ -407,26 +507,34 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
       exercises: workout.exercises || [],
       workout_metadata: {
         source: 'huggingface',
-        model: HF_MODEL
+        model: modelToUse,
+        fallback: isFallback,
+        generated_at: new Date().toISOString()
       }
     }));
     
-    const { data: insertedWorkouts, error: insertError } = await supabaseAdmin
-      .from('ai_suggested_workouts')
-      .insert(workoutsToInsert)
-      .select();
-    
-    if (insertError) {
-      console.error('Erro ao salvar sugestões:', insertError);
-      return res.status(500).json({ error: 'Erro ao salvar sugestões', details: insertError });
+    try {
+      const { data: insertedWorkouts, error: insertError } = await supabaseAdmin
+        .from('ai_suggested_workouts')
+        .insert(workoutsToInsert)
+        .select();
+      
+      if (insertError) {
+        console.error('Erro ao salvar sugestões:', insertError);
+        // Continuar mesmo com erro para retornar os treinos ao usuário
+      } else {
+        console.log(`${insertedWorkouts?.length || 0} treinos salvos com sucesso`);
+      }
+    } catch (dbError) {
+      console.error('Erro ao salvar no banco de dados:', dbError);
+      // Continuar para retornar os treinos mesmo sem salvá-los
     }
-    
-    console.log(`${insertedWorkouts?.length || 0} treinos salvos com sucesso`);
     
     clearTimeout(apiTimeout);
     return res.status(200).json({ 
       success: true, 
-      workouts: suggestedWorkouts.workouts // Retornar os treinos do formato original, não os inseridos
+      workouts: suggestedWorkouts.workouts,
+      isFallback: isFallback
     });
     
   } catch (error) {

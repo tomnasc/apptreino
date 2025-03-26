@@ -120,7 +120,16 @@ export default function WorkoutSuggestionsPage() {
       
       if (data.workouts && Array.isArray(data.workouts)) {
         setSuggestedWorkouts(data.workouts);
-        toast.success('Sugestões de treino geradas com sucesso!');
+        
+        // Verificar se estamos usando o fallback e avisar o usuário
+        if (data.isFallback) {
+          toast.success('Sugestões de treino geradas! (usando modelo de reserva)', {
+            duration: 5000,
+            icon: '⚠️'
+          });
+        } else {
+          toast.success('Sugestões de treino geradas com sucesso!');
+        }
       } else {
         throw new Error('Formato de resposta inválido');
       }
