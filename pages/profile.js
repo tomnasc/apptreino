@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { toast } from 'react-hot-toast';
@@ -21,25 +21,79 @@ export default function ProfilePage() {
     height: '',
     experience_level: 'beginner'
   });
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!user) {
+    // Redirecionar para login se não houver usuário
+    if (user === null) {
       router.push('/login');
-    } else {
+      return;
+    }
+    
+    // Não fazer nada se o usuário ainda estiver carregando
+    if (user === undefined) {
+      return;
+    }
+    
+    // Carregar o perfil quando tivermos um usuário válido
+    if (user) {
       loadProfile();
     }
-  }, [user]);
+  }, [user, router]);
 
   const loadProfile = async () => {
+    if (!user || !user.id) {
+      setError("Usuário não encontrado");
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
+      setError(null);
+      
+      // Tentar carregar o perfil pelo ID
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('id', user.id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro na consulta:', error);
+        
+        // Se o perfil não existir, tente criar um novo
+        if (error.code === 'PGRST116') { // Código para "no results found"
+          const { data: newProfile, error: createError } = await supabase
+            .from('user_profiles')
+            .insert([{ 
+              id: user.id,
+              email: user.email,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }])
+            .select('*')
+            .single();
+            
+          if (createError) {
+            throw createError;
+          }
+          
+          setProfileData(newProfile || {});
+          setFormData({
+            name: newProfile?.name || '',
+            email: newProfile?.email || user.email || '',
+            bio: newProfile?.bio || '',
+            age: newProfile?.age || '',
+            height: newProfile?.height || '',
+            experience_level: newProfile?.experience_level || 'beginner'
+          });
+          
+          return;
+        }
+        
+        throw error;
+      }
 
       if (data) {
         setProfileData(data);
@@ -51,9 +105,36 @@ export default function ProfilePage() {
           height: data.height || '',
           experience_level: data.experience_level || 'beginner'
         });
+      } else {
+        // Criar um perfil se não existir
+        const { data: newProfile, error: createError } = await supabase
+          .from('user_profiles')
+          .insert([{ 
+            id: user.id,
+            email: user.email,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }])
+          .select('*')
+          .single();
+          
+        if (createError) {
+          throw createError;
+        }
+        
+        setProfileData(newProfile || {});
+        setFormData({
+          name: newProfile?.name || '',
+          email: newProfile?.email || user.email || '',
+          bio: newProfile?.bio || '',
+          age: newProfile?.age || '',
+          height: newProfile?.height || '',
+          experience_level: newProfile?.experience_level || 'beginner'
+        });
       }
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
+      setError("Não foi possível carregar seu perfil. Tente novamente mais tarde.");
       toast.error('Erro ao carregar perfil');
     } finally {
       setLoading(false);
@@ -62,7 +143,15 @@ export default function ProfilePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!user || !user.id) {
+      toast.error('Usuário não identificado');
+      return;
+    }
+    
     try {
+      setLoading(true);
+      setError(null);
+      
       const { error } = await supabase.from('user_profiles').upsert({
         id: user.id,
         name: formData.name,
@@ -81,7 +170,10 @@ export default function ProfilePage() {
       loadProfile();
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
+      setError("Não foi possível atualizar seu perfil. Tente novamente mais tarde.");
       toast.error('Erro ao atualizar perfil');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -121,16 +213,52 @@ export default function ProfilePage() {
     }
   ];
 
-  if (loading) {
+  // Mostrar carregamento apenas quando o usuário estiver definido mas não temos dados ainda
+  if (loading && user !== undefined) {
     return (
       <Layout>
-        <div className="flex justify-center items-center h-screen">
+        <div className="flex justify-center items-center h-64 mt-8">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
         </div>
       </Layout>
     );
   }
 
+  // Mostrar erro se houver
+  if (error) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="dark-card rounded-lg shadow-md p-6 text-center">
+            <h2 className="text-xl font-semibold dark-text-primary mb-4">Erro</h2>
+            <p className="dark-text-secondary mb-4">{error}</p>
+            <button 
+              onClick={() => {
+                setError(null);
+                loadProfile();
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+            >
+              Tentar Novamente
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Esperar até que tenhamos um usuário e um perfil antes de renderizar o conteúdo principal
+  if (!user || !profileData) {
+    return (
+      <Layout>
+        <div className="flex justify-center items-center h-64 mt-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Renderização normal da página
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
