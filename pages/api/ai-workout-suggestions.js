@@ -204,11 +204,11 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
 {
   "workouts": [
     {
-      "name": string,      // Nome do treino (ex: "Treino A - Peito e Tríceps")
-      "description": string, // Descrição curta
+      "name": string,      // Nome do treino EM PT-BR(ex: "Treino A - Peito e Tríceps")
+      "description": string, // Descrição curta EM PT-BR
       "exercises": [
         {
-          "name": string,  // Nome do exercício
+          "name": string,  // Nome do exercício EM PT-BR
           "sets": number,  // Número de séries (1-5)
           "reps": string,  // Repetições (ex: "10-12")
           "rest": string   // Tempo de descanso (ex: "60 segundos")
