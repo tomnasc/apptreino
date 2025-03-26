@@ -197,7 +197,7 @@ export default async function handler(req, res) {
 
     prompt += `\n\nCom base nessas informações, gere um programa de treino completo que inclua:
 1. Divisão semanal dos treinos (máximo de 5 treinos)
-2. Exercícios específicos para cada dia (máximo de 7 exercícios por treino)
+2. Exercícios específicos para cada dia (exatamente 7 exercícios por treino)
 3. Séries, repetições e descanso para cada exercício
 
 UTILIZE OS NOMES DOS EXERCÍCIOS EM PT-BR, NÃO USE NOMES INGLÊS.
