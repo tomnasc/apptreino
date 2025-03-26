@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { toast } from 'react-hot-toast';
 import Layout from '../components/Layout';
-import { FiUser, FiTarget, FiRuler, FiActivity, FiFileText } from 'react-icons/fi';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -11,7 +10,6 @@ export default function ProfilePage() {
   const user = useUser();
   const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState(null);
-  const [selectedTab, setSelectedTab] = useState('profile');
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -23,36 +21,24 @@ export default function ProfilePage() {
   });
   const [error, setError] = useState(null);
 
+  // Verificar autenticação
   useEffect(() => {
-    // Redirecionar para login se não houver usuário
     if (user === null) {
       router.push('/login');
-      return;
-    }
-    
-    // Não fazer nada se o usuário ainda estiver carregando
-    if (user === undefined) {
-      return;
-    }
-    
-    // Carregar o perfil quando tivermos um usuário válido
-    if (user) {
+    } else if (user !== undefined) {
+      // Carregar perfil apenas quando tivermos certeza que temos um usuário
       loadProfile();
     }
   }, [user, router]);
 
+  // Carregar dados do perfil
   const loadProfile = async () => {
-    if (!user || !user.id) {
-      setError("Usuário não encontrado");
-      setLoading(false);
-      return;
-    }
+    if (!user) return;
     
     try {
       setLoading(true);
       setError(null);
       
-      // Tentar carregar o perfil pelo ID
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -60,42 +46,44 @@ export default function ProfilePage() {
         .single();
 
       if (error) {
-        console.error('Erro na consulta:', error);
-        
-        // Se o perfil não existir, tente criar um novo
-        if (error.code === 'PGRST116') { // Código para "no results found"
-          const { data: newProfile, error: createError } = await supabase
-            .from('user_profiles')
-            .insert([{ 
-              id: user.id,
-              email: user.email,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }])
-            .select('*')
-            .single();
+        // Se o perfil não existir, tentamos criar um novo
+        if (error.code === 'PGRST116') {
+          try {
+            const { data: newProfile, error: createError } = await supabase
+              .from('user_profiles')
+              .insert([{ 
+                id: user.id,
+                email: user.email,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }])
+              .select()
+              .single();
+              
+            if (createError) throw createError;
             
-          if (createError) {
-            throw createError;
+            if (newProfile) {
+              setProfileData(newProfile);
+              setFormData({
+                name: newProfile.name || '',
+                email: newProfile.email || user.email || '',
+                bio: newProfile.bio || '',
+                age: newProfile.age || '',
+                height: newProfile.height || '',
+                experience_level: newProfile.experience_level || 'beginner'
+              });
+            }
+          } catch (createError) {
+            console.error('Erro ao criar perfil:', createError);
+            setError('Não foi possível criar seu perfil. Tente novamente mais tarde.');
+            toast.error('Erro ao criar perfil');
           }
-          
-          setProfileData(newProfile || {});
-          setFormData({
-            name: newProfile?.name || '',
-            email: newProfile?.email || user.email || '',
-            bio: newProfile?.bio || '',
-            age: newProfile?.age || '',
-            height: newProfile?.height || '',
-            experience_level: newProfile?.experience_level || 'beginner'
-          });
-          
-          return;
+        } else {
+          console.error('Erro ao carregar perfil:', error);
+          setError('Não foi possível carregar seu perfil. Tente novamente mais tarde.');
+          toast.error('Erro ao carregar perfil');
         }
-        
-        throw error;
-      }
-
-      if (data) {
+      } else if (data) {
         setProfileData(data);
         setFormData({
           name: data.name || '',
@@ -105,63 +93,36 @@ export default function ProfilePage() {
           height: data.height || '',
           experience_level: data.experience_level || 'beginner'
         });
-      } else {
-        // Criar um perfil se não existir
-        const { data: newProfile, error: createError } = await supabase
-          .from('user_profiles')
-          .insert([{ 
-            id: user.id,
-            email: user.email,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }])
-          .select('*')
-          .single();
-          
-        if (createError) {
-          throw createError;
-        }
-        
-        setProfileData(newProfile || {});
-        setFormData({
-          name: newProfile?.name || '',
-          email: newProfile?.email || user.email || '',
-          bio: newProfile?.bio || '',
-          age: newProfile?.age || '',
-          height: newProfile?.height || '',
-          experience_level: newProfile?.experience_level || 'beginner'
-        });
       }
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
-      setError("Não foi possível carregar seu perfil. Tente novamente mais tarde.");
+      setError('Não foi possível carregar seu perfil. Tente novamente mais tarde.');
       toast.error('Erro ao carregar perfil');
     } finally {
       setLoading(false);
     }
   };
 
+  // Salvar alterações do perfil
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!user || !user.id) {
-      toast.error('Usuário não identificado');
-      return;
-    }
+    if (!user) return;
     
     try {
       setLoading(true);
-      setError(null);
       
-      const { error } = await supabase.from('user_profiles').upsert({
-        id: user.id,
-        name: formData.name,
-        email: formData.email,
-        bio: formData.bio,
-        age: formData.age,
-        height: formData.height,
-        experience_level: formData.experience_level,
-        updated_at: new Date().toISOString()
-      });
+      const { error } = await supabase
+        .from('user_profiles')
+        .upsert({
+          id: user.id,
+          name: formData.name,
+          email: formData.email,
+          bio: formData.bio,
+          age: formData.age ? Number(formData.age) : null,
+          height: formData.height ? Number(formData.height) : null,
+          experience_level: formData.experience_level,
+          updated_at: new Date().toISOString()
+        });
 
       if (error) throw error;
 
@@ -170,68 +131,42 @@ export default function ProfilePage() {
       loadProfile();
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
-      setError("Não foi possível atualizar seu perfil. Tente novamente mais tarde.");
       toast.error('Erro ao atualizar perfil');
     } finally {
       setLoading(false);
     }
   };
 
+  // Atualizar campos do formulário
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       [name]: value
-    });
+    }));
   };
 
-  const tabs = [
-    {
-      id: 'profile',
-      label: 'Dados Pessoais',
-      icon: FiUser
-    },
-    {
-      id: 'goals',
-      label: 'Objetivos',
-      icon: FiTarget
-    },
-    {
-      id: 'measurements',
-      label: 'Medidas Corporais',
-      icon: FiRuler
-    },
-    {
-      id: 'progress',
-      label: 'Evolução Física',
-      icon: FiActivity
-    },
-    {
-      id: 'reports',
-      label: 'Relatórios',
-      icon: FiFileText
-    }
-  ];
-
-  // Mostrar carregamento apenas quando o usuário estiver definido mas não temos dados ainda
-  if (loading && user !== undefined) {
+  // Renderização de carregamento
+  if (loading) {
     return (
       <Layout>
-        <div className="flex justify-center items-center h-64 mt-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          </div>
         </div>
       </Layout>
     );
   }
 
-  // Mostrar erro se houver
+  // Renderização de erro
   if (error) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-8">
-          <div className="dark-card rounded-lg shadow-md p-6 text-center">
-            <h2 className="text-xl font-semibold dark-text-primary mb-4">Erro</h2>
-            <p className="dark-text-secondary mb-4">{error}</p>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 text-center">
+            <h2 className="text-xl font-semibold mb-4">Erro</h2>
+            <p className="mb-4 text-gray-600 dark:text-gray-300">{error}</p>
             <button 
               onClick={() => {
                 setError(null);
@@ -247,233 +182,149 @@ export default function ProfilePage() {
     );
   }
 
-  // Esperar até que tenhamos um usuário e um perfil antes de renderizar o conteúdo principal
-  if (!user || !profileData) {
-    return (
-      <Layout>
-        <div className="flex justify-center items-center h-64 mt-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-        </div>
-      </Layout>
-    );
-  }
-
-  // Renderização normal da página
+  // Renderização principal
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold dark-text-primary mb-2">Meu Perfil</h1>
-          <p className="dark-text-secondary">Gerencie suas informações pessoais e acompanhe seu progresso.</p>
-        </div>
+        <h1 className="text-2xl font-bold mb-6">Meu Perfil</h1>
+        
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold">Dados Pessoais</h2>
+            <button
+              onClick={() => setEditMode(!editMode)}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+            >
+              {editMode ? 'Cancelar' : 'Editar'}
+            </button>
+          </div>
 
-        {/* Abas de navegação */}
-        <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex overflow-x-auto">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setSelectedTab(tab.id)}
-                  className={`${
-                    selectedTab === tab.id
-                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent dark-text-tertiary hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
-                  } flex items-center space-x-2 whitespace-nowrap py-4 px-6 border-b-2 font-medium transition-colors duration-200`}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Conteúdo das abas */}
-        <div className="dark-card rounded-lg shadow-md p-6">
-          {selectedTab === 'profile' && (
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold dark-text-primary">Dados Pessoais</h2>
-                <button
-                  onClick={() => setEditMode(!editMode)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-                >
-                  {editMode ? 'Cancelar' : 'Editar'}
-                </button>
+          {editMode ? (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Nome</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name || ''}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                />
               </div>
 
-              {editMode ? (
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium dark-text-tertiary mb-1">
-                      Nome
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      className="dark-input w-full"
-                      required
-                    />
-                  </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email || ''}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  disabled
+                />
+              </div>
 
-                  <div>
-                    <label className="block text-sm font-medium dark-text-tertiary mb-1">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="dark-input w-full"
-                      required
-                      disabled
-                    />
-                  </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Biografia</label>
+                <textarea
+                  name="bio"
+                  value={formData.bio || ''}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 h-24"
+                ></textarea>
+              </div>
 
-                  <div>
-                    <label className="block text-sm font-medium dark-text-tertiary mb-1">
-                      Biografia
-                    </label>
-                    <textarea
-                      name="bio"
-                      value={formData.bio}
-                      onChange={handleChange}
-                      className="dark-input w-full h-24"
-                    />
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Idade</label>
+                  <input
+                    type="number"
+                    name="age"
+                    value={formData.age || ''}
+                    onChange={handleChange}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  />
+                </div>
 
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium dark-text-tertiary mb-1">
-                        Idade
-                      </label>
-                      <input
-                        type="number"
-                        name="age"
-                        value={formData.age}
-                        onChange={handleChange}
-                        className="dark-input w-full"
-                      />
-                    </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Altura (cm)</label>
+                  <input
+                    type="number"
+                    name="height"
+                    value={formData.height || ''}
+                    onChange={handleChange}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  />
+                </div>
+              </div>
 
-                    <div>
-                      <label className="block text-sm font-medium dark-text-tertiary mb-1">
-                        Altura (cm)
-                      </label>
-                      <input
-                        type="number"
-                        name="height"
-                        value={formData.height}
-                        onChange={handleChange}
-                        className="dark-input w-full"
-                      />
-                    </div>
-                  </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Nível de Experiência</label>
+                <select
+                  name="experience_level"
+                  value={formData.experience_level || 'beginner'}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                >
+                  <option value="beginner">Iniciante</option>
+                  <option value="intermediate">Intermediário</option>
+                  <option value="advanced">Avançado</option>
+                </select>
+              </div>
 
-                  <div>
-                    <label className="block text-sm font-medium dark-text-tertiary mb-1">
-                      Nível de Experiência
-                    </label>
-                    <select
-                      name="experience_level"
-                      value={formData.experience_level}
-                      onChange={handleChange}
-                      className="dark-input w-full"
-                    >
-                      <option value="beginner">Iniciante</option>
-                      <option value="intermediate">Intermediário</option>
-                      <option value="advanced">Avançado</option>
-                    </select>
-                  </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+                >
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Nome</h3>
+                <p>{profileData?.name || 'Não informado'}</p>
+              </div>
 
-                  <div className="flex justify-end">
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-                    >
-                      Salvar Alterações
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium dark-text-tertiary">Nome</h3>
-                    <p className="dark-text-primary">{profileData?.name || 'Não informado'}</p>
-                  </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</h3>
+                <p>{profileData?.email || user?.email || 'Não informado'}</p>
+              </div>
 
-                  <div>
-                    <h3 className="text-sm font-medium dark-text-tertiary">Email</h3>
-                    <p className="dark-text-primary">{profileData?.email || user?.email || 'Não informado'}</p>
-                  </div>
-
-                  {profileData?.bio && (
-                    <div>
-                      <h3 className="text-sm font-medium dark-text-tertiary">Biografia</h3>
-                      <p className="dark-text-primary">{profileData.bio}</p>
-                    </div>
-                  )}
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {profileData?.age && (
-                      <div>
-                        <h3 className="text-sm font-medium dark-text-tertiary">Idade</h3>
-                        <p className="dark-text-primary">{profileData.age} anos</p>
-                      </div>
-                    )}
-
-                    {profileData?.height && (
-                      <div>
-                        <h3 className="text-sm font-medium dark-text-tertiary">Altura</h3>
-                        <p className="dark-text-primary">{profileData.height} cm</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-medium dark-text-tertiary">Nível de Experiência</h3>
-                    <p className="dark-text-primary">
-                      {profileData?.experience_level === 'beginner' && 'Iniciante'}
-                      {profileData?.experience_level === 'intermediate' && 'Intermediário'}
-                      {profileData?.experience_level === 'advanced' && 'Avançado'}
-                      {!profileData?.experience_level && 'Não informado'}
-                    </p>
-                  </div>
+              {profileData?.bio && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Biografia</h3>
+                  <p>{profileData.bio}</p>
                 </div>
               )}
-            </div>
-          )}
 
-          {selectedTab === 'goals' && (
-            <div className="text-center p-6">
-              <h2 className="text-xl font-semibold dark-text-primary mb-4">Objetivos</h2>
-              <p className="dark-text-secondary">Esta seção está em manutenção. Tente novamente mais tarde.</p>
-            </div>
-          )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {profileData?.age && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Idade</h3>
+                    <p>{profileData.age} anos</p>
+                  </div>
+                )}
 
-          {selectedTab === 'measurements' && (
-            <div className="text-center p-6">
-              <h2 className="text-xl font-semibold dark-text-primary mb-4">Medidas Corporais</h2>
-              <p className="dark-text-secondary">Esta seção está em manutenção. Tente novamente mais tarde.</p>
-            </div>
-          )}
+                {profileData?.height && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Altura</h3>
+                    <p>{profileData.height} cm</p>
+                  </div>
+                )}
+              </div>
 
-          {selectedTab === 'progress' && (
-            <div className="text-center p-6">
-              <h2 className="text-xl font-semibold dark-text-primary mb-4">Evolução Física</h2>
-              <p className="dark-text-secondary">Esta seção está em manutenção. Tente novamente mais tarde.</p>
-            </div>
-          )}
-
-          {selectedTab === 'reports' && (
-            <div className="text-center p-6">
-              <h2 className="text-xl font-semibold dark-text-primary mb-4">Relatórios</h2>
-              <p className="dark-text-secondary">Esta seção está em manutenção. Tente novamente mais tarde.</p>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Nível de Experiência</h3>
+                <p>
+                  {profileData?.experience_level === 'beginner' && 'Iniciante'}
+                  {profileData?.experience_level === 'intermediate' && 'Intermediário'}
+                  {profileData?.experience_level === 'advanced' && 'Avançado'}
+                  {!profileData?.experience_level && 'Não informado'}
+                </p>
+              </div>
             </div>
           )}
         </div>
