@@ -149,6 +149,15 @@ export default function Layout({ children, title = 'Treino na Mão', hideNavigat
                   Relatórios
                 </Link>
                 <Link
+                  href="/physical-progress"
+                  className={`${router.pathname === '/physical-progress'
+                    ? 'border-blue-500 text-gray-900 dark:text-gray-100'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-300'
+                    } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors`}
+                >
+                  Evolução Física
+                </Link>
+                <Link
                   href="/payment-history"
                   className={`${router.pathname === '/payment-history'
                     ? 'border-blue-500 text-gray-900 dark:text-gray-100'
@@ -280,6 +289,15 @@ export default function Layout({ children, title = 'Treino na Mão', hideNavigat
                   } block pl-3 pr-4 py-2 border-l-4 text-base font-medium transition-colors`}
               >
                 Relatórios
+              </Link>
+              <Link
+                href="/physical-progress"
+                className={`${router.pathname === '/physical-progress'
+                  ? 'bg-blue-50 dark:bg-blue-900 border-blue-500 text-blue-700 dark:text-blue-300'
+                  : 'border-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 hover:text-gray-800 dark:hover:text-gray-200'
+                  } block pl-3 pr-4 py-2 border-l-4 text-base font-medium transition-colors`}
+              >
+                Evolução Física
               </Link>
               <Link
                 href="/payment-history"
