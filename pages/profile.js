@@ -3,13 +3,33 @@ import { useRouter } from 'next/router';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { toast } from 'react-hot-toast';
 import Layout from '../components/Layout';
+import dynamic from 'next/dynamic';
 import { FiUser, FiTarget, FiRuler, FiActivity, FiFileText } from 'react-icons/fi';
 
-// Importação dos componentes de conteúdo
-import FitnessGoalsContent from '../components/profile/FitnessGoalsContent';
-import BodyMeasurementsContent from '../components/profile/BodyMeasurementsContent';
-import PhysicalProgressContent from '../components/profile/PhysicalProgressContent';
-import FitnessReportsContent from '../components/profile/FitnessReportsContent';
+// Importação dinâmica dos componentes
+const FitnessGoalsContent = dynamic(() => import('../components/profile/FitnessGoalsContent'), {
+  loading: () => <div className="flex justify-center items-center h-64">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+  </div>
+});
+
+const BodyMeasurementsContent = dynamic(() => import('../components/profile/BodyMeasurementsContent'), {
+  loading: () => <div className="flex justify-center items-center h-64">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+  </div>
+});
+
+const PhysicalProgressContent = dynamic(() => import('../components/profile/PhysicalProgressContent'), {
+  loading: () => <div className="flex justify-center items-center h-64">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+  </div>
+});
+
+const FitnessReportsContent = dynamic(() => import('../components/profile/FitnessReportsContent'), {
+  loading: () => <div className="flex justify-center items-center h-64">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+  </div>
+});
 
 export default function ProfilePage() {
   const router = useRouter();

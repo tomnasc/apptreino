@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { toast } from 'react-hot-toast';
-import { Line } from 'react-chartjs-2';
+import dynamic from 'next/dynamic';
+
+// Importação dinâmica do Chart.js para evitar problemas de renderização no servidor
+const Line = dynamic(
+  () => import('react-chartjs-2').then(mod => mod.Line),
+  { ssr: false }
+);
+
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -13,15 +20,18 @@ import {
   Legend
 } from 'chart.js';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-);
+// Registrar componentes do Chart.js
+if (typeof window !== 'undefined') {
+  ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend
+  );
+}
 
 export default function PhysicalProgressContent({ userId }) {
   const supabase = useSupabaseClient();
