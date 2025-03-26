@@ -1,37 +1,6 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { toast } from 'react-hot-toast';
-import dynamic from 'next/dynamic';
-
-// Importação dinâmica do Chart.js para evitar problemas de renderização no servidor
-const Line = dynamic(
-  () => import('react-chartjs-2').then(mod => mod.Line),
-  { ssr: false }
-);
-
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-} from 'chart.js';
-
-// Registrar componentes do Chart.js
-if (typeof window !== 'undefined') {
-  ChartJS.register(
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
-    Title,
-    Tooltip,
-    Legend
-  );
-}
 
 export default function PhysicalProgressContent({ userId }) {
   const supabase = useSupabaseClient();
@@ -51,6 +20,7 @@ export default function PhysicalProgressContent({ userId }) {
     { id: 'thighs', label: 'Coxas', unit: 'cm' }
   ];
 
+  // Carregamento inicial de dados
   useEffect(() => {
     loadMeasurements();
   }, [dateRange]);
@@ -101,45 +71,14 @@ export default function PhysicalProgressContent({ userId }) {
     }
   };
 
-  const chartData = {
-    labels: measurements.map(m => new Date(m.measurement_date).toLocaleDateString()),
-    datasets: [
-      {
-        label: metrics.find(m => m.id === selectedMetric)?.label || '',
-        data: measurements.map(m => m[selectedMetric]),
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.5)',
-        tension: 0.3
-      }
-    ]
-  };
-
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top',
-      },
-      title: {
-        display: true,
-        text: `Evolução - ${metrics.find(m => m.id === selectedMetric)?.label}`
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: false,
-        title: {
-          display: true,
-          text: metrics.find(m => m.id === selectedMetric)?.unit
-        }
-      }
-    }
-  };
-
   const calculateVariation = (metric) => {
     if (measurements.length < 2) return null;
     const oldest = measurements[0][metric];
     const newest = measurements[measurements.length - 1][metric];
+    
+    // Verificar se os valores são válidos antes de calcular
+    if (oldest === null || newest === null || isNaN(oldest) || isNaN(newest)) return null;
+    
     const diff = newest - oldest;
     const percentage = (diff / oldest) * 100;
     return {
@@ -202,7 +141,10 @@ export default function PhysicalProgressContent({ userId }) {
       ) : (
         <>
           <div className="mb-8 dark-card p-4 rounded-lg">
-            <Line data={chartData} options={chartOptions} />
+            <div className="text-center dark-text-secondary p-6">
+              <p>O gráfico de evolução será implementado em breve.</p>
+              <p>Por enquanto, você pode visualizar as variações abaixo.</p>
+            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
