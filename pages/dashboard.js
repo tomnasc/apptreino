@@ -16,6 +16,8 @@ export default function DashboardPage() {
   const [loadingData, setLoadingData] = useState(false);
   const [isConfiguring, setIsConfiguring] = useState(false);
   const [stripePriceId, setStripePriceId] = useState('');
+  const [selectedWorkouts, setSelectedWorkouts] = useState([]);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [userAccessInfo, setUserAccessInfo] = useState({
     hasAccess: true,
     message: '',
@@ -140,6 +142,45 @@ export default function DashboardPage() {
         alert('Ocorreu um erro ao limpar o histórico de treinos.');
       } finally {
         setLoading(false);
+      }
+    }
+  };
+
+  const toggleWorkoutSelection = (workoutId) => {
+    setSelectedWorkouts(prevSelected => {
+      if (prevSelected.includes(workoutId)) {
+        return prevSelected.filter(id => id !== workoutId);
+      } else {
+        return [...prevSelected, workoutId];
+      }
+    });
+  };
+
+  const deleteSelectedWorkouts = async () => {
+    if (!selectedWorkouts.length) {
+      toast.error('Selecione pelo menos um treino para excluir');
+      return;
+    }
+
+    if (confirm(`Tem certeza que deseja excluir ${selectedWorkouts.length} treino(s) selecionado(s)? Esta ação não pode ser desfeita.`)) {
+      setIsDeleting(true);
+      try {
+        const { error } = await supabase
+          .from('workout_sessions')
+          .delete()
+          .in('id', selectedWorkouts);
+        
+        if (error) throw error;
+        
+        // Atualizar a lista de treinos recentes após a exclusão
+        setRecentWorkouts(prev => prev.filter(workout => !selectedWorkouts.includes(workout.id)));
+        setSelectedWorkouts([]);
+        toast.success(`${selectedWorkouts.length} treino(s) excluído(s) com sucesso!`);
+      } catch (error) {
+        console.error('Erro ao excluir treinos:', error);
+        toast.error('Ocorreu um erro ao excluir os treinos selecionados.');
+      } finally {
+        setIsDeleting(false);
       }
     }
   };
@@ -425,13 +466,22 @@ export default function DashboardPage() {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold dark-text-primary">Treinos recentes</h2>
             {recentWorkouts.length > 0 && (
-              <button
-                onClick={clearWorkoutHistory}
-                className="px-3 py-1 text-xs font-medium rounded bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-800/50 transition-colors"
-                disabled={loading}
-              >
-                {loading ? 'Limpando...' : 'Limpar Histórico'}
-              </button>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {selectedWorkouts.length > 0 ? `${selectedWorkouts.length} selecionado(s)` : ''}
+                </span>
+                <button
+                  onClick={deleteSelectedWorkouts}
+                  className={`px-3 py-1 text-xs font-medium rounded ${
+                    selectedWorkouts.length > 0 
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-800/50'
+                  } transition-colors`}
+                  disabled={isDeleting || selectedWorkouts.length === 0}
+                >
+                  {isDeleting ? 'Excluindo...' : 'Excluir Selecionados'}
+                </button>
+              </div>
             )}
           </div>
           
@@ -443,9 +493,19 @@ export default function DashboardPage() {
                 {/* Versão em Cards para telas pequenas (mobile) */}
                 <div className="space-y-4">
                   {recentWorkouts.map((session) => (
-                    <div key={session.id} className="dark-card bg-gray-50/60 dark:bg-gray-800/60 rounded-lg p-4 shadow-sm">
-                      <div className="flex justify-between">
-                        <div className="text-sm font-medium dark-text-secondary">{formatDate(session.created_at)}</div>
+                    <div key={session.id} className={`dark-card bg-gray-50/60 dark:bg-gray-800/60 rounded-lg p-4 shadow-sm ${
+                      selectedWorkouts.includes(session.id) ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''
+                    }`}>
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedWorkouts.includes(session.id)}
+                            onChange={() => toggleWorkoutSelection(session.id)}
+                            className="h-4 w-4 text-blue-600 rounded border-gray-300 mr-2"
+                          />
+                          <div className="text-sm font-medium dark-text-secondary">{formatDate(session.created_at)}</div>
+                        </div>
                         <span
                           className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             session.completed
@@ -493,6 +553,22 @@ export default function DashboardPage() {
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-800/60">
                     <tr>
+                      <th scope="col" className="px-3 py-3">
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedWorkouts.length === recentWorkouts.length && recentWorkouts.length > 0}
+                            onChange={() => {
+                              if (selectedWorkouts.length === recentWorkouts.length) {
+                                setSelectedWorkouts([]);
+                              } else {
+                                setSelectedWorkouts(recentWorkouts.map(workout => workout.id));
+                              }
+                            }}
+                            className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                          />
+                        </div>
+                      </th>
                       <th
                         scope="col"
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
@@ -527,7 +603,18 @@ export default function DashboardPage() {
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800/30 divide-y divide-gray-200 dark:divide-gray-700">
                     {recentWorkouts.map((session) => (
-                      <tr key={session.id}>
+                      <tr key={session.id} className={selectedWorkouts.includes(session.id) ? 
+                        'bg-blue-50 dark:bg-blue-900/20' : ''}>
+                        <td className="px-3 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedWorkouts.includes(session.id)}
+                              onChange={() => toggleWorkoutSelection(session.id)}
+                              className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                            />
+                          </div>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm dark-text-tertiary">
                           {formatDate(session.created_at)}
                         </td>
