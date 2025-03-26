@@ -200,6 +200,36 @@ export default async function handler(req, res) {
 2. Exercícios específicos para cada dia (máximo de 7 exercícios por treino)
 3. Séries, repetições e descanso para cada exercício
 
+UTILIZE OS NOMES DOS EXERCÍCIOS EM PT-BR, NÃO USE NOMES INGLÊS.
+
+EXEMPLO DE TERMOS INGLÊS E SUAS EQUIVALENTES EM PT-BR:
+- "Bench Press" - "Supino"  
+- "Squat" - "Agachamento"  
+- "Deadlift" - "Levantamento Terra"  
+- "Pull-up" - "Barra Fixa"  
+- "Push-up" - "Flexão de Braço"  
+- "Lunges" - "Afundo"  
+- "Bicep Curl" - "Rosca Bíceps"  
+- "Triceps Dip" - "Mergulho Tríceps"  
+- "Shoulder Press" - "Desenvolvimento de Ombros"  
+- "Lat Pulldown" - "Pulldown na Polia"  
+- "Leg Press" - "Leg Press"  
+- "Calf Raise" - "Elevação de Panturrilha"  
+- "Chest Fly" - "Crucifixo"  
+- "Plank" - "Prancha"  
+- "Leg Curl" - "Mesa Flexora"  
+- "Leg Extension" - "Cadeira Extensora"  
+- "Seated Row" - "Remada Baixa"  
+- "Face Pull" - "Face Pull"  
+- "Hammer Curl" - "Rosca Martelo"  
+- "Romanian Deadlift" - "Levantamento Terra Romeno"  
+- "Hip Thrust" - "Elevação Pélvica"  
+- "Cable Crossover" - "Crossover na Polia"  
+- "Russian Twist" - "Torção Russa"  
+- "Hanging Leg Raise" - "Elevação de Pernas na Barra"  
+- "Side Lateral Raise" - "Elevação Lateral"  
+
+
 O programa deve ser estruturado e retornado em formato JSON com a seguinte estrutura simplificada:
 {
   "workouts": [
