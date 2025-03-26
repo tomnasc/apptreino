@@ -36,7 +36,7 @@ export default function ProfilePage() {
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .single();
 
       if (error) throw error;
@@ -64,7 +64,7 @@ export default function ProfilePage() {
     e.preventDefault();
     try {
       const { error } = await supabase.from('user_profiles').upsert({
-        user_id: user.id,
+        id: user.id,
         name: formData.name,
         email: formData.email,
         bio: formData.bio,
