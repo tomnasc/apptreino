@@ -131,6 +131,24 @@ export default function Layout({ children, title = 'Treino na Mão', hideNavigat
                   Perfil
                 </Link>
                 <Link
+                  href="/fitness-goals"
+                  className={`${router.pathname === '/fitness-goals'
+                    ? 'border-blue-500 text-gray-900 dark:text-gray-100'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-300'
+                    } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors`}
+                >
+                  Objetivos
+                </Link>
+                <Link
+                  href="/fitness-reports"
+                  className={`${router.pathname === '/fitness-reports'
+                    ? 'border-blue-500 text-gray-900 dark:text-gray-100'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-300'
+                    } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors`}
+                >
+                  Relatórios
+                </Link>
+                <Link
                   href="/payment-history"
                   className={`${router.pathname === '/payment-history'
                     ? 'border-blue-500 text-gray-900 dark:text-gray-100'
@@ -244,6 +262,24 @@ export default function Layout({ children, title = 'Treino na Mão', hideNavigat
                   } block pl-3 pr-4 py-2 border-l-4 text-base font-medium transition-colors`}
               >
                 Perfil
+              </Link>
+              <Link
+                href="/fitness-goals"
+                className={`${router.pathname === '/fitness-goals'
+                  ? 'bg-blue-50 dark:bg-blue-900 border-blue-500 text-blue-700 dark:text-blue-300'
+                  : 'border-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 hover:text-gray-800 dark:hover:text-gray-200'
+                  } block pl-3 pr-4 py-2 border-l-4 text-base font-medium transition-colors`}
+              >
+                Objetivos
+              </Link>
+              <Link
+                href="/fitness-reports"
+                className={`${router.pathname === '/fitness-reports'
+                  ? 'bg-blue-50 dark:bg-blue-900 border-blue-500 text-blue-700 dark:text-blue-300'
+                  : 'border-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 hover:text-gray-800 dark:hover:text-gray-200'
+                  } block pl-3 pr-4 py-2 border-l-4 text-base font-medium transition-colors`}
+              >
+                Relatórios
               </Link>
               <Link
                 href="/payment-history"
