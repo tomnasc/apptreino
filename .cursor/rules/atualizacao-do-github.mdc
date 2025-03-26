@@ -1,0 +1,7 @@
+---
+description: Atualiza o github com as alterações efetuadas.
+globs: 
+alwaysApply: false
+---
+
+# Sempre atualize o github com as alterações feitas.
