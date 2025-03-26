@@ -112,7 +112,7 @@ export default function WorkoutSuggestionsPage() {
       const data = await response.json();
       
       if (!data || !data.success) {
-        throw new Error(data?.error || 'Resposta inválida da API');
+        throw new Error(data?.message || data?.error || 'Resposta inválida da API');
       }
       
       // Verificar se temos os treinos sugeridos
@@ -120,23 +120,29 @@ export default function WorkoutSuggestionsPage() {
       
       if (data.workouts && Array.isArray(data.workouts)) {
         setSuggestedWorkouts(data.workouts);
-        
-        // Verificar se estamos usando o fallback e avisar o usuário
-        if (data.isFallback) {
-          toast.success('Sugestões de treino geradas! (usando modelo de reserva)', {
-            duration: 5000,
-            icon: '⚠️'
-          });
-        } else {
-          toast.success('Sugestões de treino geradas com sucesso!');
-        }
+        toast.success('Sugestões de treino geradas com sucesso!');
       } else {
         throw new Error('Formato de resposta inválido');
       }
       
     } catch (error) {
       console.error('Erro ao gerar sugestões:', error);
-      toast.error(`Erro ao gerar sugestões: ${error.message}`);
+      
+      // Verificar se é um erro específico do serviço de IA
+      if (error.message.includes('IA está') || 
+          error.message.includes('serviço de IA') || 
+          error.message.includes('modelo de IA')) {
+        toast.error(error.message, {
+          duration: 6000,
+          icon: '🤖'
+        });
+      } else if (error.message.includes('Timeout') || error.message.includes('timeout')) {
+        toast.error('O serviço está demorando muito para responder. Por favor, tente novamente mais tarde.', {
+          duration: 6000
+        });
+      } else {
+        toast.error(`Erro ao gerar sugestões: ${error.message}`);
+      }
     } finally {
       setGeneratingWorkouts(false);
     }
@@ -539,7 +545,18 @@ export default function WorkoutSuggestionsPage() {
         </div>
         
         {/* Lista de treinos sugeridos */}
-        {suggestedWorkouts.length === 0 ? (
+        {suggestedWorkouts.length === 0 && !generatingWorkouts ? (
+          <div className="dark-card rounded-lg shadow-md p-8 text-center">
+            <h3 className="text-xl font-medium dark-text-primary mb-2">Nenhuma sugestão de treino gerada</h3>
+            <p className="dark-text-secondary mb-4">Clique no botão acima para gerar sugestões de treino personalizadas com base na sua avaliação física.</p>
+            <button
+              onClick={generateWorkouts}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-md text-sm font-medium focus:outline-none"
+            >
+              Gerar Sugestões de Treino
+            </button>
+          </div>
+        ) : suggestedWorkouts.length === 0 ? (
           <div className="dark-card rounded-lg shadow-md p-8 text-center">
             <div className="animate-spin inline-block w-10 h-10 border-[3px] border-current border-t-transparent text-blue-600 dark:text-blue-400 rounded-full mb-4"></div>
             <h3 className="text-xl font-medium dark-text-primary mb-2">Gerando sugestões de treino</h3>

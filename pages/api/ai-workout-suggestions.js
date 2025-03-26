@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       return res.status(504).json({ 
         success: false,
         error: 'Timeout ao processar a requisição',
-        message: 'A requisição demorou muito para ser processada. Por favor, tente novamente mais tarde.'
+        message: 'O serviço de IA está demorando muito para responder. Por favor, tente novamente em alguns minutos.'
       });
     }
   }, 60000); // Aumentado para 60 segundos para dar mais tempo ao modelo
@@ -239,7 +239,7 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
     // Tentar chamar a API do Hugging Face com timeout e retry
     let response;
     let retries = 0;
-    const maxRetries = 2; // Aumentado para 2 retentativas
+    const maxRetries = 1; // Aumentado para 1 retentativas
     
     while (retries <= maxRetries) {
       try {
@@ -281,7 +281,7 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
               return res.status(503).json({
                 success: false,
                 error: 'Modelo de IA indisponível',
-                message: 'O modelo de IA está ocupado no momento. Por favor, tente novamente em alguns minutos.'
+                message: 'O modelo de IA está ocupado no momento. Por favor, tente novamente em alguns minutos. Nossa IA está processando muitas requisições simultâneas.'
               });
             }
           } else {
@@ -323,7 +323,7 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
             return res.status(504).json({ 
               success: false, 
               error: 'Timeout ao gerar sugestões de treino',
-              message: 'O serviço de IA está demorando muito para responder. Por favor, tente novamente mais tarde. Se o problema persistir, entre em contato com o suporte.'
+              message: 'O serviço de IA está demorando muito para responder. Por favor, tente novamente em alguns minutos.'
             });
           }
         } else {
@@ -462,42 +462,16 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
       console.error("Erro ao processar resposta da IA:", parseError.message);
       console.error("Resposta bruta:", responseContent.substring(0, 500) + "..."); // Mostra parte da resposta para debug
       
-      // Criar workouts de fallback
-      suggestedWorkouts = {
-        workouts: [
-          {
-            name: "Treino A - Superior",
-            description: "Treino para membros superiores com foco em hipertrofia",
-            exercises: [
-              { name: "Supino reto com barra", sets: 4, reps: "8-12", rest: "90 segundos", muscles: ["Peito", "Tríceps"], difficulty: "Intermediário", execution: "Mantenha os cotovelos em ângulo de 90º e controle o movimento." },
-              { name: "Puxada frontal", sets: 4, reps: "10-12", rest: "90 segundos", muscles: ["Costas"], difficulty: "Intermediário", execution: "Traga a barra até a clavícula e alongue bem na subida." },
-              { name: "Desenvolvimento com halteres", sets: 3, reps: "10-12", rest: "60 segundos", muscles: ["Ombros"], difficulty: "Intermediário", execution: "Mantenha os cotovelos alinhados durante o movimento." },
-              { name: "Rosca direta com barra", sets: 3, reps: "12-15", rest: "60 segundos", muscles: ["Bíceps"], difficulty: "Iniciante", execution: "Controle a descida e evite usar impulso." },
-              { name: "Tríceps corda", sets: 3, reps: "12-15", rest: "60 segundos", muscles: ["Tríceps"], difficulty: "Iniciante", execution: "Mantenha os cotovelos junto ao corpo." }
-            ]
-          },
-          {
-            name: "Treino B - Inferior",
-            description: "Treino para membros inferiores com foco em força e hipertrofia",
-            exercises: [
-              { name: "Agachamento livre", sets: 4, reps: "8-10", rest: "120 segundos", muscles: ["Quadríceps", "Glúteos"], difficulty: "Avançado", execution: "Desça até a posição paralela, mantendo a coluna neutra." },
-              { name: "Leg press", sets: 4, reps: "10-12", rest: "90 segundos", muscles: ["Quadríceps", "Glúteos"], difficulty: "Intermediário", execution: "Evite travar os joelhos no topo do movimento." },
-              { name: "Stiff", sets: 3, reps: "10-12", rest: "90 segundos", muscles: ["Posterior de coxa"], difficulty: "Intermediário", execution: "Mantenha leve flexão nos joelhos e desça até sentir estiramento." },
-              { name: "Elevação de panturrilha em pé", sets: 4, reps: "15-20", rest: "60 segundos", muscles: ["Panturrilhas"], difficulty: "Iniciante", execution: "Foque na amplitude total, esticando bem na subida." }
-            ]
-          }
-        ]
-      };
-      
-      // Não retornamos erro, mas usamos o fallback e registramos que houve problema
-      console.log("Usando treinos de fallback devido a erro na resposta da IA");
-      // Não lançamos o erro para continuar o fluxo
+      // Em vez de usar fallback, retornar erro para mostrar mensagem para o usuário tentar mais tarde
+      clearTimeout(apiTimeout);
+      return res.status(500).json({
+        success: false,
+        error: 'Erro ao processar resposta da IA',
+        message: 'O serviço de IA está indisponível no momento. Por favor, tente novamente mais tarde.'
+      });
     }
     
     console.log('Salvando sugestões no banco de dados...');
-    
-    // Indicar se estamos usando fallback
-    const isFallback = responseContent.indexOf('{') === -1 || responseContent.lastIndexOf('}') === -1;
     
     // Salvar sugestões no banco
     const workoutsToInsert = suggestedWorkouts.workouts.map(workout => ({
@@ -508,7 +482,6 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
       workout_metadata: {
         source: 'huggingface',
         model: modelToUse,
-        fallback: isFallback,
         generated_at: new Date().toISOString()
       }
     }));
@@ -533,8 +506,7 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
     clearTimeout(apiTimeout);
     return res.status(200).json({ 
       success: true, 
-      workouts: suggestedWorkouts.workouts,
-      isFallback: isFallback
+      workouts: suggestedWorkouts.workouts
     });
     
   } catch (error) {
