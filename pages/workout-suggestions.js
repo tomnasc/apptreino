@@ -14,157 +14,126 @@ export default function WorkoutSuggestionsPage() {
   const [loading, setLoading] = useState(true);
   const [generatingWorkouts, setGeneratingWorkouts] = useState(false);
   const [assessment, setAssessment] = useState(null);
+  const [measurements, setMeasurements] = useState(null);
   const [suggestedWorkouts, setSuggestedWorkouts] = useState([]);
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [expandedExercise, setExpandedExercise] = useState(null);
   
-  // Buscar avaliação e treinos sugeridos existentes
   useEffect(() => {
-    if (!assessmentId || !user) return;
-    
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Buscar avaliação
-        const { data: assessmentData, error: assessmentError } = await supabase
-          .from('user_assessments')
-          .select('*')
-          .eq('id', assessmentId)
-          .eq('user_id', user.id)
-          .single();
-        
-        if (assessmentError) throw assessmentError;
-        if (!assessmentData) {
-          toast.error('Avaliação não encontrada');
-          router.push('/dashboard');
-          return;
-        }
-        
-        setAssessment(assessmentData);
-        
-        // Buscar treinos sugeridos existentes
-        const { data: workoutsData, error: workoutsError } = await supabase
-          .from('ai_suggested_workouts')
-          .select('*')
-          .eq('assessment_id', assessmentId)
-          .order('created_at', { ascending: false });
-        
-        if (workoutsError) throw workoutsError;
-        
-        setSuggestedWorkouts(workoutsData || []);
-        
-        // Se não houver treinos, gerar automaticamente
-        if (!workoutsData || workoutsData.length === 0) {
-          generateWorkouts();
-        }
-        
-      } catch (error) {
-        console.error('Erro ao carregar dados:', error);
-        toast.error('Erro ao carregar dados');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, [assessmentId, user, supabase, router]);
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    if (assessmentId) {
+      loadData();
+    }
+  }, [user, assessmentId]);
   
-  // Função para gerar treinos usando a API route do Next.js
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Carregar avaliação
+      const { data: assessmentData, error: assessmentError } = await supabase
+        .from('user_assessments')
+        .select('*')
+        .eq('id', assessmentId)
+        .single();
+      
+      if (assessmentError) throw assessmentError;
+      setAssessment(assessmentData);
+      
+      // Carregar últimas medidas
+      const { data: measurementsData, error: measurementsError } = await supabase
+        .from('user_body_measurements')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (measurementsError && measurementsError.code !== 'PGRST116') {
+        throw measurementsError;
+      }
+      
+      if (measurementsData) {
+        setMeasurements(measurementsData);
+      }
+      
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      toast.error('Erro ao carregar dados da avaliação');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   const generateWorkouts = async () => {
-    if (!assessmentId || !user) return;
-    
     try {
       setGeneratingWorkouts(true);
-      toast.loading('Gerando sugestões de treino...', { id: 'generating' });
       
-      // Obter o token de autenticação
-      const { data: { session } } = await supabase.auth.getSession();
-      const authToken = session?.access_token;
+      // Preparar dados para a IA
+      const prompt = {
+        user: {
+          height: assessment.height,
+          weight: assessment.weight,
+          age: assessment.age,
+          experience_level: assessment.experience_level,
+          fitness_goal: assessment.fitness_goal,
+          health_limitations: assessment.health_limitations,
+          available_equipment: assessment.available_equipment,
+          workout_preferences: {
+            days_per_week: assessment.workout_days_per_week,
+            duration_minutes: assessment.workout_duration
+          }
+        }
+      };
       
-      if (!authToken) {
-        throw new Error('Falha ao obter token de autenticação');
-      }
-      
-      // Chamar a API route local com timeout maior
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 240000); // 4 minutos de timeout
-      
-      try {
-        // Chamada para a API de geração de treinos
-        const response = await fetch('/api/ai-workout-suggestions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
+      // Adicionar medidas corporais se disponíveis
+      if (measurements) {
+        prompt.user.body_measurements = {
+          body_fat_percentage: measurements.body_fat_percentage,
+          muscle_mass: measurements.muscle_mass,
+          chest: measurements.chest,
+          waist: measurements.waist,
+          hips: measurements.hips,
+          arms: {
+            right: measurements.right_arm,
+            left: measurements.left_arm
           },
-          body: JSON.stringify({ 
-            assessmentId,
-            level: assessment?.experience_level,
-            goals: assessment?.fitness_goals
-          }),
-          signal: controller.signal
-        });
-        
-        // Limpar o timeout quando a requisição for concluída
-        clearTimeout(timeoutId);
-        
-        // Obter o texto da resposta para analisar
-        const textResponse = await response.text();
-        
-        // Verificar se a resposta é JSON
-        let responseData;
-        try {
-          responseData = JSON.parse(textResponse);
-        } catch (e) {
-          console.error('Resposta não-JSON recebida:', textResponse);
-          throw new Error('O servidor retornou uma resposta inválida. O serviço de IA pode estar temporariamente indisponível.');
-        }
-        
-        if (!response.ok) {
-          // Extrair mensagem de erro mais detalhada
-          const errorMessage = 
-            responseData.message || 
-            responseData.error || 
-            responseData.details ||
-            'Falha ao gerar sugestões de treino';
-            
-          console.error('Erro detalhado:', responseData);
-          
-          throw new Error(errorMessage);
-        }
-        
-        toast.success('Sugestões de treino geradas!', { id: 'generating' });
-        
-        if (responseData?.workouts) {
-          setSuggestedWorkouts(responseData.workouts);
-        }
-      } catch (error) {
-        console.error('Erro ao gerar treinos:', error);
-        
-        // Mensagem de erro mais amigável para o usuário
-        let errorMessage = 'Erro ao gerar sugestões de treino';
-        
-        // Verificar se é um erro de timeout ou outro erro comum
-        if (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('timeout')) {
-          errorMessage = 'O tempo limite foi excedido. A IA está ocupada no momento, por favor tente novamente.';
-        } else if (error.message.includes('serviço de IA') || error.message.includes('indisponível')) {
-          errorMessage = error.message;
-        } else if (error.message.includes('inválida')) {
-          errorMessage = 'O servidor retornou uma resposta inválida. O serviço de IA pode estar temporariamente indisponível.';
-        } else if (typeof error.message === 'string') {
-          errorMessage = error.message;
-        }
-        
-        toast.dismiss('generating');
-        toast.error(errorMessage);
-      } finally {
-        setGeneratingWorkouts(false);
+          thighs: {
+            right: measurements.right_thigh,
+            left: measurements.left_thigh
+          },
+          calves: {
+            right: measurements.right_calf,
+            left: measurements.left_calf
+          },
+          neck: measurements.neck,
+          shoulders: measurements.shoulders
+        };
       }
+      
+      // Chamar API para gerar sugestões
+      const response = await fetch('/api/ai-workout-suggestions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(prompt)
+      });
+      
+      if (!response.ok) {
+        throw new Error('Erro ao gerar sugestões de treino');
+      }
+      
+      const data = await response.json();
+      setSuggestedWorkouts(data.suggestions);
+      
     } catch (error) {
-      console.error('Erro geral ao gerar treinos:', error);
-      toast.dismiss('generating');
+      console.error('Erro ao gerar sugestões:', error);
       toast.error('Erro ao gerar sugestões de treino');
+    } finally {
       setGeneratingWorkouts(false);
     }
   };
@@ -497,7 +466,7 @@ export default function WorkoutSuggestionsPage() {
           <div>
             <h1 className="text-2xl font-bold dark-text-primary">Sugestões de Treino</h1>
             <p className="dark-text-secondary">
-              Treinos personalizados baseados na sua avaliação
+              Com base na sua avaliação{measurements ? ' e medidas corporais' : ''}, vamos gerar um treino personalizado para você.
             </p>
           </div>
         </div>

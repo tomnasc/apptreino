@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { toast } from 'react-hot-toast';
@@ -21,6 +21,45 @@ export default function AssessmentPage() {
     workout_days_per_week: 3,
     workout_duration: 60
   });
+  
+  const [lastMeasurements, setLastMeasurements] = useState(null);
+  
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    loadLastMeasurements();
+  }, [user]);
+
+  const loadLastMeasurements = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_body_measurements')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      if (data) {
+        setLastMeasurements(data);
+        // Preencher altura e peso com as últimas medidas
+        setAssessment(prev => ({
+          ...prev,
+          height: data.height,
+          weight: data.weight
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar medidas:', error);
+      toast.error('Erro ao carregar suas últimas medidas');
+    }
+  };
   
   // Opções para dropdown
   const experienceLevels = [
@@ -148,6 +187,20 @@ export default function AssessmentPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold dark-text-primary mb-2">Avaliação Física</h1>
           <p className="dark-text-secondary">Preencha o formulário para receber sugestões de treino personalizadas.</p>
+          
+          {!lastMeasurements && (
+            <div className="mt-4 p-4 bg-yellow-100 dark:bg-yellow-900 rounded-md">
+              <p className="text-yellow-800 dark:text-yellow-200">
+                Recomendamos registrar suas medidas corporais antes de prosseguir com a avaliação.{' '}
+                <button
+                  onClick={() => router.push('/body-measurements')}
+                  className="text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Registrar medidas
+                </button>
+              </p>
+            </div>
+          )}
         </div>
         
         <form onSubmit={handleSubmit} className="dark-card rounded-lg shadow-md p-6">

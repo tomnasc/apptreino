@@ -132,102 +132,103 @@ export default async function handler(req, res) {
     
     console.log('Avaliação encontrada, criando prompt para o modelo...');
     
-    // Criar prompt para o modelo - Usando um prompt mais técnico e específico para PT-BR
-    const prompt = `
-    Você é um profesor de educação física e especialista em treinamento de força e condicionamento físico.
-    Crie 3 rotinas de treino diferentes, CONTENDO EXATAMENTE 8 EXERCÍCIOS EM PT-BR DE CADA ROTINA, para uma pessoa com as seguintes características:
-    - Altura: ${assessment.height} cm
-    - Peso: ${assessment.weight} kg
-    - Idade: ${assessment.age} anos
-    - Nível de experiência: ${assessment.experience_level}
-    - Objetivo fitness: ${assessment.fitness_goal}
-    - Limitações de saúde: ${assessment.health_limitations ? assessment.health_limitations.join(', ') : 'Nenhuma'}
-    - Equipamentos disponíveis: ${assessment.available_equipment ? assessment.available_equipment.join(', ') : 'Equipamentos básicos'}
-    - Dias de treino por semana: ${assessment.workout_days_per_week}
-    - Duração de treino: ${assessment.workout_duration} minutos
-    
-    Para cada rotina de treino, DEVE CONTER EXATAMENTE 8 EXERCÍCIOS EM PT-BR, inclua:
-    1. Nome da rotina EM PT-BR
-    2. Breve descrição e objetivo EM PT-BR
-    3. Lista de exercícios, cada um com:
-       - Nome do exercício EM PT-BR
-       - Séries e repetições
-       - Descanso entre séries
-       - Músculos trabalhados
-    
-    IMPORTANTE: Sua resposta deve ser TOTALMENTE em PT-BR, incluindo todos os nomes de exercícios, rotinas, descrições e demais textos.
-    
-    Formate sua resposta como um objeto JSON com a seguinte estrutura:
+    // Construir o prompt para a IA
+    let prompt = `Gere um programa de treino personalizado para um usuário com as seguintes características:
+
+- Altura: ${assessment.height}cm
+- Peso: ${assessment.weight}kg
+- Idade: ${assessment.age} anos
+- Nível de experiência: ${assessment.experience_level}
+- Objetivo: ${assessment.fitness_goal}
+- Limitações de saúde: ${assessment.health_limitations ? assessment.health_limitations.join(', ') : 'Nenhuma'}
+- Equipamentos disponíveis: ${assessment.available_equipment ? assessment.available_equipment.join(', ') : 'Equipamentos básicos'}
+- Preferências de treino:
+  - Dias por semana: ${assessment.workout_days_per_week}
+  - Duração por sessão: ${assessment.workout_duration} minutos\n`;
+
+    // Adicionar medidas corporais se disponíveis
+    if (assessment.body_measurements) {
+      const measurements = assessment.body_measurements;
+      prompt += `\nMedidas corporais atuais:`;
+      
+      if (measurements.body_fat_percentage) {
+        prompt += `\n- Percentual de gordura: ${measurements.body_fat_percentage}%`;
+      }
+      if (measurements.muscle_mass) {
+        prompt += `\n- Massa muscular: ${measurements.muscle_mass}kg`;
+      }
+      if (measurements.chest) {
+        prompt += `\n- Peitoral: ${measurements.chest}cm`;
+      }
+      if (measurements.waist) {
+        prompt += `\n- Cintura: ${measurements.waist}cm`;
+      }
+      if (measurements.hips) {
+        prompt += `\n- Quadril: ${measurements.hips}cm`;
+      }
+      if (measurements.arms.right || measurements.arms.left) {
+        prompt += `\n- Braços: ${measurements.arms.right}cm (D) / ${measurements.arms.left}cm (E)`;
+      }
+      if (measurements.thighs.right || measurements.thighs.left) {
+        prompt += `\n- Coxas: ${measurements.thighs.right}cm (D) / ${measurements.thighs.left}cm (E)`;
+      }
+      if (measurements.calves.right || measurements.calves.left) {
+        prompt += `\n- Panturrilhas: ${measurements.calves.right}cm (D) / ${measurements.calves.left}cm (E)`;
+      }
+      if (measurements.shoulders) {
+        prompt += `\n- Ombros: ${measurements.shoulders}cm`;
+      }
+      if (measurements.neck) {
+        prompt += `\n- Pescoço: ${measurements.neck}cm`;
+      }
+    }
+
+    prompt += `\n\nCom base nessas informações, gere um programa de treino completo que inclua:
+1. Divisão semanal dos treinos
+2. Exercícios específicos para cada dia
+3. Séries, repetições e carga sugerida para cada exercício
+4. Técnicas avançadas quando apropriado (superséries, drop sets, etc.)
+5. Recomendações de descanso entre séries
+6. Progressão sugerida
+7. Dicas de execução e segurança
+
+O programa deve ser estruturado e retornado em formato JSON com a seguinte estrutura:
+{
+  "program_overview": {
+    "name": string,
+    "description": string,
+    "duration_weeks": number,
+    "sessions_per_week": number
+  },
+  "workouts": [
     {
-      "workouts": [
+      "name": string,
+      "focus": string,
+      "exercises": [
         {
-          "name": "Nome da Rotina 1",
-          "description": "Descrição",
-          "exercises": [
-            {
-              "name": "Nome do Exercício",
-              "sets": 3,
-              "reps": "10-12",
-              "rest": "60 segundos",
-              
-            }
-          ]
+          "name": string,
+          "sets": number,
+          "reps": string,
+          "rest_seconds": number,
+          "notes": string,
+          "technique": string (opcional)
         }
       ]
     }
-    
-    Exemplos de termos EM PR-BR para usar:
-- "Barbell Squat" - "Agachamento Livre"  
-- "Leg Press" - "Leg Press"  
-- "Leg Extension" - "Cadeira Extensora"  
-- "Leg Curl" - "Cadeira Flexora"  
-- "Romanian Deadlift" - "Levantamento Terra Romeno"  
-- "Bulgarian Split Squat" - "Agachamento Búlgaro"  
-- "Walking Lunge" - "Avanço"  
-- "Hack Squat" - "Agachamento Hack"  
-- "Sissy Squat" - "Agachamento Sissy"  
-- "Calf Raise" - "Elevação de Panturrilha"  
-- "Bench Press" - "Supino Reto"  
-- "Incline Bench Press" - "Supino Inclinado"  
-- "Decline Bench Press" - "Supino Declinado"  
-- "Dumbbell Fly" - "Crucifixo com Halteres"  
-- "Cable Crossover" - "Crossover na Polia"  
-- "Dips" - "Paralelas"  
-- "Pull-up" - "Barra Fixa Pegada Pronada"  
-- "Chin-up" - "Barra Fixa Pegada Supinada"  
-- "Lat Pulldown" - "Puxador Frente"  
-- "Seated Row" - "Remada Baixa"  
-- "Bent-over Row" - "Remada Curvada"  
-- "T-bar Row" - "Remada Cavalo"  
-- "Deadlift" - "Levantamento Terra"  
-- "Shrug" - "Encolhimento de Ombros"  
-- "Shoulder Press" - "Desenvolvimento de Ombros"  
-- "Arnold Press" - "Desenvolvimento Arnold"  
-- "Lateral Raise" - "Elevação Lateral"  
-- "Front Raise" - "Elevação Frontal"  
-- "Rear Delt Fly" - "Crucifixo Inverso"  
-- "Bicep Curl" - "Rosca Direta"  
-- "Hammer Curl" - "Rosca Martelo"  
-- "Concentration Curl" - "Rosca Concentrada"  
-- "Preacher Curl" - "Rosca Scott"  
-- "Triceps Pushdown" - "Tríceps Corda"  
-- "Skull Crusher" - "Tríceps Francês"  
-- "Overhead Triceps Extension" - "Tríceps Testa"  
-- "Dips (Triceps)" - "Mergulho no Banco"  
-- "Hanging Leg Raise" - "Elevação de Pernas Suspenso"  
-- "Crunch" - "Abdominal Supra"  
-- "Reverse Crunch" - "Abdominal Infra"  
-- "Russian Twist" - "Abdominal Oblíquo"  
-- "Plank" - "Prancha"  
-- "Side Plank" - "Prancha Lateral"  
-    `;
+  ],
+  "recommendations": {
+    "progression": string,
+    "nutrition": string,
+    "recovery": string
+  }
+}`;
     
     // Configuração para o modelo instruído
     const payload = {
       inputs: `<s>[INST] ${prompt} [/INST]`,
       parameters: {
-        max_new_tokens: 3000,
-        temperature: 0.8,
+        max_new_tokens: 2048,
+        temperature: 0.7,
         top_p: 0.95,
         return_full_text: false
       }
