@@ -991,50 +991,19 @@ export default function WorkoutMode() {
   // Função para enviar notificação
   const sendRestFinishedNotification = () => {
     try {
-      const currentExercise = exercises[currentExerciseIndex];
-      const notificationTitle = 'Descanso finalizado!';
-      const notificationBody = `Hora de começar a próxima série de ${currentExercise.name}`;
-      
-      // Para iOS, usar apenas alerta visual
-      if (isIOS) {
-        console.log('Enviando notificação visual para iOS');
-        
-        // Mostrar alerta visual para iOS (overlay ou modal que chama atenção)
-        showIOSAlert();
-        
-        // Vibrar o dispositivo para aumentar a atenção (sem sons)
-        if ('vibrate' in navigator) {
-          navigator.vibrate([300, 100, 300]);
-        }
-      } else {
-        // Abordagem para outros navegadores - apenas visual e vibração
-        try {
-          const notification = new Notification(notificationTitle, {
-            body: notificationBody,
-            icon: '/icon-192x192.png',
-            vibrate: [200, 100, 200],
-            tag: 'rest-finished',
-            renotify: true,
-            requireInteraction: true // Requer interação do usuário para fechar
-          });
-          
-          // Quando o usuário clicar na notificação, trazer o app para o primeiro plano
-          notification.onclick = function() {
-            console.log('Notificação clicada, focando na janela');
-            window.focus();
-            notification.close();
-          };
-          
-          // Vibrar dispositivo (sem sons)
-          if ('vibrate' in navigator) {
-            navigator.vibrate([200, 100, 200]);
-          }
-        } catch (notificationError) {
-          console.error('Erro ao criar notificação:', notificationError);
-        }
+      // Mostrar notificação nativa se permitido
+      if (Notification.permission === 'granted') {
+        const currentEx = exercises[currentExerciseIndex];
+        new Notification('Tempo de descanso finalizado!', {
+          body: `Hora de iniciar a próxima série de ${currentEx?.name || 'exercício'}!`,
+          icon: '/favicon.ico'
+        });
       }
+      
+      // Mostrar alerta visual para todos os dispositivos (principalmente iOS)
+      showIOSAlert();
     } catch (error) {
-      console.error('Erro ao enviar notificação:', error);
+      console.error('Erro ao mostrar notificação de descanso:', error);
     }
   };
 
@@ -1237,11 +1206,21 @@ export default function WorkoutMode() {
           const now = Date.now();
           localStorage.setItem('treinoPro_backgroundTimestamp', now.toString());
           
+          // Salvando o índice atual do exercício para recuperação correta
+          localStorage.setItem('treinoPro_lastExerciseIndex', currentExerciseIndex.toString());
+          
           // Salvando estado dos timers
           saveTimersState();
         } else if (document.visibilityState === 'visible') {
           // Verificando e atualizando os temporizadores quando o app volta ao foco
           const backgroundTimestamp = localStorage.getItem('treinoPro_backgroundTimestamp');
+          const lastExerciseIndex = localStorage.getItem('treinoPro_lastExerciseIndex');
+          
+          // Se temos um índice de exercício salvo, usamos ele para manter o mesmo exercício
+          if (lastExerciseIndex && parseInt(lastExerciseIndex) !== currentExerciseIndex) {
+            setCurrentExerciseIndex(parseInt(lastExerciseIndex));
+          }
+          
           if (backgroundTimestamp) {
             const timeDiff = (Date.now() - parseInt(backgroundTimestamp)) / 1000;
             
@@ -1293,6 +1272,43 @@ export default function WorkoutMode() {
     }
   }, [id, exercises, loading]);
 
+  // Adicionar função para atualizar a carga durante o exercício
+  const updateExerciseWeight = async (newWeight) => {
+    if (!currentExercise || !isWorkoutActive) return;
+    
+    try {
+      // Copiar a lista de exercícios
+      const updatedExercises = [...exercises];
+      
+      // Atualizar o peso do exercício atual
+      updatedExercises[currentExerciseIndex] = {
+        ...updatedExercises[currentExerciseIndex],
+        weight: newWeight
+      };
+      
+      // Atualizar o estado com a nova lista de exercícios
+      setExercises(updatedExercises);
+      
+      // Atualizar no banco de dados se necessário
+      if (sessionId) {
+        const { error } = await supabase
+          .from('workout_session_details')
+          .update({
+            weight_used: newWeight
+          })
+          .eq('session_id', sessionId)
+          .eq('exercise_id', currentExercise.id)
+          .eq('set_index', currentSetIndex);
+          
+        if (error) {
+          console.error('Erro ao atualizar carga no banco de dados:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar carga:', error);
+    }
+  };
+
   if (loading) {
     return (
       <Layout title="Carregando...">
@@ -1321,17 +1337,17 @@ export default function WorkoutMode() {
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
       </Head>
       <div className="space-y-6">
-        <div className="flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-700 dark:to-blue-500 rounded-lg shadow-lg p-4 text-white">
-          <h1 className="text-2xl font-bold">
+        <div className="flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-700 dark:to-blue-500 rounded-lg shadow-lg p-3 text-white">
+          <h1 className="text-xl font-bold">
             {isWorkoutActive ? 'Treino em Andamento' : 'Iniciar Treino'}
           </h1>
           <div className="flex space-x-2">
             {isWorkoutActive ? (
               <button
                 onClick={finishWorkout}
-                className="bg-white text-red-500 hover:bg-red-50 dark:bg-white/90 dark:hover:bg-white/80 font-bold py-2 px-4 rounded-full shadow transition-all transform hover:scale-105"
+                className="bg-white text-red-500 hover:bg-red-50 dark:bg-white/90 dark:hover:bg-white/80 font-medium py-1.5 px-3 rounded-full shadow transition-all"
               >
-                Finalizar Treino
+                Finalizar
               </button>
             ) : (
               <>
@@ -1561,7 +1577,25 @@ export default function WorkoutMode() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
                       </svg>
                       <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Carga</span>
-                      <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{currentExercise.weight} kg</span>
+                      <div className="flex items-center mt-1">
+                        <button 
+                          onClick={() => updateExerciseWeight(Math.max(0, (currentExercise.weight || 0) - 2.5))}
+                          className="h-6 w-6 flex items-center justify-center bg-red-100 dark:bg-red-800/50 text-red-600 dark:text-red-300 rounded"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" />
+                          </svg>
+                        </button>
+                        <span className="font-bold text-gray-800 dark:text-gray-100 text-lg mx-2">{currentExercise.weight} kg</span>
+                        <button 
+                          onClick={() => updateExerciseWeight((currentExercise.weight || 0) + 2.5)}
+                          className="h-6 w-6 flex items-center justify-center bg-green-100 dark:bg-green-800/50 text-green-600 dark:text-green-300 rounded"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   )}
                   <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
