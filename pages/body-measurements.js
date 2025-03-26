@@ -46,7 +46,6 @@ export default function BodyMeasurementsPage() {
       const { data, error } = await supabase
         .from('user_body_measurements')
         .select('*')
-        .eq('user_id', user.id)
         .order('date', { ascending: false })
         .limit(1)
         .single();
@@ -92,12 +91,21 @@ export default function BodyMeasurementsPage() {
         return;
       }
       
+      // Preparar os dados para envio, convertendo strings vazias em null
+      const measurementsData = Object.entries(measurements).reduce((acc, [key, value]) => {
+        // Se for um campo numérico vazio, converte para null
+        acc[key] = value === '' ? null : value;
+        return acc;
+      }, {});
+      
+      console.log('Dados a serem enviados:', measurementsData);
+      
       // Inserir medidas no banco
       const { data, error } = await supabase
         .from('user_body_measurements')
         .insert({
-          user_id: user.id,
-          ...measurements
+          user_id: user.id,  // Ainda precisamos enviar o user_id para a inserção
+          ...measurementsData
         })
         .select()
         .single();

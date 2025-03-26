@@ -29,6 +29,12 @@ CREATE INDEX IF NOT EXISTS idx_user_body_measurements_user_date ON user_body_mea
 -- Habilitar RLS (Row Level Security)
 ALTER TABLE user_body_measurements ENABLE ROW LEVEL SECURITY;
 
+-- Remover políticas existentes (caso existam)
+DROP POLICY IF EXISTS "Usuários podem ver suas próprias medidas" ON user_body_measurements;
+DROP POLICY IF EXISTS "Usuários podem inserir suas próprias medidas" ON user_body_measurements;
+DROP POLICY IF EXISTS "Usuários podem atualizar suas próprias medidas" ON user_body_measurements;
+DROP POLICY IF EXISTS "Usuários podem excluir suas próprias medidas" ON user_body_measurements;
+
 -- Criar políticas de segurança
 -- Política de seleção: usuários podem ver apenas seus próprios registros
 CREATE POLICY "Usuários podem ver suas próprias medidas"
@@ -64,7 +70,12 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Criar trigger para atualizar o campo updated_at automaticamente
+DROP TRIGGER IF EXISTS update_user_body_measurements_updated_at ON user_body_measurements;
 CREATE TRIGGER update_user_body_measurements_updated_at
 BEFORE UPDATE ON user_body_measurements
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
+
+-- Garantir que anon tenha acesso à tabela através das políticas RLS
+GRANT SELECT, INSERT, UPDATE, DELETE ON user_body_measurements TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON user_body_measurements TO authenticated;

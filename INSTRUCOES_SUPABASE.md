@@ -1,38 +1,54 @@
-# Instruções para Criar a Tabela no Supabase
+# Instruções para Corrigir Erros na Tabela user_body_measurements
 
-Para resolver o erro de "404 (Not Found)" ao tentar usar a tabela `user_body_measurements`, você precisará criar esta tabela no banco de dados Supabase seguindo estas etapas:
+## Problemas identificados:
 
-## 1. Acesse o Painel do Supabase
+1. **Erro 404 (Not Found)**: A tabela `user_body_measurements` não existe no banco de dados.
+2. **Erro 406 (Not Acceptable)**: Problema com as permissões da tabela ou com a forma como estamos consultando os dados.
+3. **Erro 400 (Bad Request)**: Valores vazios estão sendo enviados como strings vazias (`""`), causando erro no PostgreSQL ao tentar converter para o tipo numérico.
+
+## Solução:
+
+Siga estas etapas para resolver todos os problemas:
+
+### 1. Acesse o Painel do Supabase
 
 - Faça login em [https://app.supabase.io/](https://app.supabase.io/)
 - Selecione seu projeto para o "Treino na Mão"
 
-## 2. Crie a Tabela Usando o Editor SQL
+### 2. Execute o Script SQL Atualizado
 
 1. No menu lateral esquerdo, clique em "SQL Editor"
 2. Clique em "Novo query" ou abra uma nova query
 3. Copie e cole todo o conteúdo do arquivo `setup-body-measurements.sql` no editor
-4. Clique no botão "Run" (Executar) para criar a tabela e suas políticas de segurança
+4. Clique no botão "Run" (Executar) para criar/atualizar a tabela e suas políticas de segurança
 
-O script SQL vai:
-- Criar a tabela `user_body_measurements` com todos os campos necessários
-- Configurar as políticas de segurança por linha (RLS)
-- Criar um trigger para atualizar o campo `updated_at` quando um registro for modificado
-- Adicionar um índice para melhorar a performance das consultas
+Este script SQL atualizado:
+- Cria a tabela (se não existir)
+- Remove políticas existentes antes de criá-las novamente (evita conflitos)
+- Configura corretamente as permissões para o acesso anônimo e autenticado
+- Adiciona DROP IF EXISTS para evitar erros em execuções repetidas
 
-## 3. Verifique a Criação da Tabela
+### 3. Verifique as Permissões
 
-Após executar o script, você pode verificar se a tabela foi criada acessando:
-1. No menu lateral, clique em "Table Editor"
-2. Você deverá ver a tabela `user_body_measurements` na lista
+Após executar o script, verifique se as permissões estão configuradas corretamente:
+1. No menu lateral, clique em "Authentication" > "Policies"
+2. Encontre a tabela `user_body_measurements` e confirme que existem políticas para SELECT, INSERT, UPDATE e DELETE
 
-## 4. Teste a Funcionalidade
+### 4. Reinicie a Aplicação
 
-Retorne ao aplicativo e tente novamente registrar medidas corporais. O erro 404 não deve mais ocorrer.
+Após fazer essas alterações:
+1. Atualize a página do navegador onde está executando o aplicativo
+2. Limpe o cache do navegador (Ctrl+F5 ou Cmd+Shift+R)
 
-## Conteúdo do Script SQL
+## O Que Foi Corrigido no Código da Aplicação:
 
-Para referência, aqui está o conteúdo do script que você deve executar:
+1. **Tratamento de Valores Vazios**: Agora todos os campos vazios são convertidos para `null` antes de serem enviados ao banco de dados, evitando o erro `invalid input syntax for type numeric`.
+
+2. **Consulta de Dados**: Removemos o filtro explícito por `user_id` na consulta, pois as políticas RLS (Row Level Security) já garantem que o usuário só verá seus próprios registros.
+
+3. **Permissões da Tabela**: Adicionamos concessões explícitas (`GRANT`) para os papéis `anon` e `authenticated` no script SQL.
+
+## Conteúdo do Script SQL Atualizado:
 
 ```sql
 -- Criação da tabela de medidas corporais
@@ -65,6 +81,12 @@ CREATE INDEX IF NOT EXISTS idx_user_body_measurements_user_date ON user_body_mea
 
 -- Habilitar RLS (Row Level Security)
 ALTER TABLE user_body_measurements ENABLE ROW LEVEL SECURITY;
+
+-- Remover políticas existentes (caso existam)
+DROP POLICY IF EXISTS "Usuários podem ver suas próprias medidas" ON user_body_measurements;
+DROP POLICY IF EXISTS "Usuários podem inserir suas próprias medidas" ON user_body_measurements;
+DROP POLICY IF EXISTS "Usuários podem atualizar suas próprias medidas" ON user_body_measurements;
+DROP POLICY IF EXISTS "Usuários podem excluir suas próprias medidas" ON user_body_measurements;
 
 -- Criar políticas de segurança
 -- Política de seleção: usuários podem ver apenas seus próprios registros
@@ -101,8 +123,13 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Criar trigger para atualizar o campo updated_at automaticamente
+DROP TRIGGER IF EXISTS update_user_body_measurements_updated_at ON user_body_measurements;
 CREATE TRIGGER update_user_body_measurements_updated_at
 BEFORE UPDATE ON user_body_measurements
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
+
+-- Garantir que anon tenha acesso à tabela através das políticas RLS
+GRANT SELECT, INSERT, UPDATE, DELETE ON user_body_measurements TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON user_body_measurements TO authenticated;
 ``` 

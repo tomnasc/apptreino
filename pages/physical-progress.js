@@ -83,11 +83,18 @@ export default function PhysicalProgressPage() {
       const { data, error } = await supabase
         .from('user_body_measurements')
         .select('*')
-        .eq('user_id', user.id)
         .gte('date', startDate.toISOString())
         .order('date', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Detalhes do erro ao carregar medidas:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error;
+      }
 
       setMeasurements(data || []);
       
@@ -101,7 +108,7 @@ export default function PhysicalProgressPage() {
       
     } catch (error) {
       console.error('Erro ao carregar medidas:', error);
-      toast.error('Erro ao carregar histórico de medidas');
+      toast.error(`Erro ao carregar histórico de medidas: ${error.message}`);
     } finally {
       setLoading(false);
     }
