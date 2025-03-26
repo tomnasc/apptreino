@@ -591,7 +591,16 @@ export default function WorkoutMode() {
 
   const handleSetCompleted = async () => {
     const currentExercise = exercises[currentExerciseIndex];
-    const exerciseKey = `${currentExerciseIndex}`;
+    // Garantir que temos o ID correto do exercício atual
+    const exerciseId = currentExercise?.id;
+    
+    if (!exerciseId) {
+      console.error('ID do exercício atual não encontrado.');
+      return;
+    }
+    
+    // Usar o ID real do exercício como chave para evitar problemas quando os exercícios mudam de ordem
+    const exerciseKey = `exercise_${exerciseId}`;
     let endTime = new Date();
     
     // Atualizar o histórico de repetições para o exercício atual
@@ -754,6 +763,18 @@ export default function WorkoutMode() {
         setRepsCompleted(0);
       }
     }
+    
+    // Salvar o estado atualizado dos exercícios no localStorage
+    try {
+      localStorage.setItem(`treinoPro_completedSets_${id}`, JSON.stringify(updatedCompletedSets));
+      localStorage.setItem(`treinoPro_lastExerciseIndex`, currentExerciseIndex.toString());
+      localStorage.setItem(`treinoPro_currentExerciseIdMap_${id}`, JSON.stringify({
+        currentIndex: currentExerciseIndex,
+        exerciseId: currentExercise.id
+      }));
+    } catch (error) {
+      console.error('Erro ao salvar estado de exercícios:', error);
+    }
   };
 
   // Atualizar o manipulador de repetições para trabalhar com entrada direta
@@ -802,8 +823,6 @@ export default function WorkoutMode() {
     // Atualizar o estado com a nova lista de exercícios
     setExercises(updatedExercises);
     
-    // Não alteramos o índice do exercício atual, pois agora o próximo exercício está nesta posição
-    
     // Resetar contadores relacionados ao exercício
     setCurrentSetIndex(0);
     setRepsCompleted(0);
@@ -816,6 +835,52 @@ export default function WorkoutMode() {
 
     // Atualizar o tempo inicial da série
     setCurrentSetStartTime(new Date());
+
+    // Atualizar no localStorage para manter consistência
+    localStorage.setItem(`treinoPro_currentExerciseIndexOrder_${id}`, JSON.stringify(
+      updatedExercises.map(ex => ex.id)
+    ));
+  };
+
+  // Adicionar função para pular para um exercício específico
+  const skipToExercise = (targetIndex) => {
+    // Confirmar com o usuário
+    if (!confirm(`Deseja pular para o exercício "${exercises[targetIndex].name}"?`)) {
+      return;
+    }
+
+    try {
+      // Criar uma cópia profunda da lista de exercícios
+      const currentExercises = JSON.parse(JSON.stringify(exercises));
+      const targetExercise = currentExercises[targetIndex];
+      
+      // Manter referência dos IDs originais para rastreamento
+      const originalExerciseId = currentExercises[currentExerciseIndex].id;
+      const targetExerciseId = targetExercise.id;
+      
+      // Atualizar o estado atual
+      setCurrentExerciseIndex(targetIndex);
+      setCurrentSetIndex(0);
+      setRepsCompleted(0);
+      
+      // Se o exercício de destino é baseado em tempo, configurar temporizador
+      if (targetExercise.time) {
+        setTimeRemaining(targetExercise.time);
+        setTimerActive(false);
+      }
+      
+      // Atualizar o tempo inicial da série
+      setCurrentSetStartTime(new Date());
+      
+      // Armazenar troca de exercícios no localStorage
+      localStorage.setItem(`treinoPro_lastExerciseIndex`, targetIndex.toString());
+      localStorage.setItem(`treinoPro_currentExerciseIdMap_${id}`, JSON.stringify({
+        currentIndex: targetIndex,
+        exerciseId: targetExerciseId
+      }));
+    } catch (error) {
+      console.error('Erro ao pular para exercício:', error);
+    }
   };
 
   const toggleVideo = () => {
@@ -839,8 +904,12 @@ export default function WorkoutMode() {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  // Função para verificar se uma série está completa, usando o ID do exercício como chave
   const isSetCompleted = (exerciseIndex, setIndex) => {
-    const exerciseKey = `${exerciseIndex}`;
+    const exercise = exercises[exerciseIndex];
+    if (!exercise) return false;
+    
+    const exerciseKey = `exercise_${exercise.id}`;
     return completedSets[exerciseKey]?.includes(setIndex) || false;
   };
 
@@ -1164,39 +1233,6 @@ export default function WorkoutMode() {
     console.log("Notificações sonoras desativadas");
   };
 
-  // Adicionar função para pular para um exercício específico
-  const skipToExercise = (targetIndex) => {
-    // Confirmar com o usuário
-    if (!confirm(`Deseja pular para o exercício "${exercises[targetIndex].name}"?`)) {
-      return;
-    }
-
-    // Copiar a lista de exercícios
-    const updatedExercises = [...exercises];
-    
-    // Remover o exercício selecionado da posição atual
-    const targetExercise = updatedExercises.splice(targetIndex, 1)[0];
-    
-    // Inserir o exercício selecionado na posição atual
-    updatedExercises.splice(currentExerciseIndex, 0, targetExercise);
-    
-    // Atualizar o estado com a nova lista de exercícios
-    setExercises(updatedExercises);
-    
-    // Resetar contadores relacionados ao exercício
-    setCurrentSetIndex(0);
-    setRepsCompleted(0);
-    
-    // Verificar se o exercício de destino é baseado em tempo
-    if (targetExercise.time) {
-      setTimeRemaining(targetExercise.time);
-      setTimerActive(false);
-    }
-
-    // Atualizar o tempo inicial da série
-    setCurrentSetStartTime(new Date());
-  };
-
   // Efeito para lidar com eventos de visibilidade (quando o app fica em segundo plano)
   useEffect(() => {
     if (isIOS && isWorkoutActive) {
@@ -1209,16 +1245,49 @@ export default function WorkoutMode() {
           // Salvando o índice atual do exercício para recuperação correta
           localStorage.setItem('treinoPro_lastExerciseIndex', currentExerciseIndex.toString());
           
+          // Salvando mapeamento de ID de exercício para rastreamento entre sessões
+          const currentExerciseId = exercises[currentExerciseIndex]?.id;
+          if (currentExerciseId) {
+            localStorage.setItem(`treinoPro_currentExerciseIdMap_${id}`, JSON.stringify({
+              currentIndex: currentExerciseIndex,
+              exerciseId: currentExerciseId
+            }));
+          }
+          
           // Salvando estado dos timers
           saveTimersState();
         } else if (document.visibilityState === 'visible') {
           // Verificando e atualizando os temporizadores quando o app volta ao foco
           const backgroundTimestamp = localStorage.getItem('treinoPro_backgroundTimestamp');
           const lastExerciseIndex = localStorage.getItem('treinoPro_lastExerciseIndex');
+          const exerciseIdMapStr = localStorage.getItem(`treinoPro_currentExerciseIdMap_${id}`);
           
-          // Se temos um índice de exercício salvo, usamos ele para manter o mesmo exercício
-          if (lastExerciseIndex && parseInt(lastExerciseIndex) !== currentExerciseIndex) {
-            setCurrentExerciseIndex(parseInt(lastExerciseIndex));
+          // Restaurar o exercício correto usando o mapeamento de ID
+          try {
+            if (exerciseIdMapStr) {
+              const exerciseIdMap = JSON.parse(exerciseIdMapStr);
+              const { currentIndex, exerciseId } = exerciseIdMap;
+              
+              // Verificar se o exercício armazenado ainda existe na mesma posição
+              const exerciseAtIndex = exercises[currentIndex];
+              if (exerciseAtIndex && exerciseAtIndex.id === exerciseId) {
+                // Se o exercício ainda estiver na mesma posição, use o índice
+                if (currentIndex !== currentExerciseIndex) {
+                  setCurrentExerciseIndex(currentIndex);
+                }
+              } else {
+                // Se o exercício foi movido, encontre-o pelo ID
+                const newIndex = exercises.findIndex(ex => ex.id === exerciseId);
+                if (newIndex !== -1 && newIndex !== currentExerciseIndex) {
+                  setCurrentExerciseIndex(newIndex);
+                }
+              }
+            } else if (lastExerciseIndex && parseInt(lastExerciseIndex) !== currentExerciseIndex) {
+              // Fallback para o método antigo
+              setCurrentExerciseIndex(parseInt(lastExerciseIndex));
+            }
+          } catch (error) {
+            console.error('Erro ao restaurar exercício atual:', error);
           }
           
           if (backgroundTimestamp) {
@@ -1263,7 +1332,7 @@ export default function WorkoutMode() {
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       };
     }
-  }, [isIOS, isWorkoutActive, timerActive, restTimerActive, timeRemaining, restTimeRemaining, currentExerciseIndex, currentSetIndex, completedSets]);
+  }, [isIOS, isWorkoutActive, timerActive, restTimerActive, timeRemaining, restTimeRemaining, currentExerciseIndex, currentSetIndex, completedSets, exercises, id]);
 
   // Efeito para carregar o estado do treino ao iniciar a página
   useEffect(() => {
