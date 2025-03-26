@@ -72,67 +72,62 @@ export default function WorkoutSuggestionsPage() {
     try {
       setGeneratingWorkouts(true);
       
-      // Preparar dados para a IA
-      const prompt = {
-        user: {
-          height: assessment.height,
-          weight: assessment.weight,
-          age: assessment.age,
-          experience_level: assessment.experience_level,
-          fitness_goal: assessment.fitness_goal,
-          health_limitations: assessment.health_limitations,
-          available_equipment: assessment.available_equipment,
-          workout_preferences: {
-            days_per_week: assessment.workout_days_per_week,
-            duration_minutes: assessment.workout_duration
-          }
-        }
-      };
+      // Obter o token de autenticação
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      // Adicionar medidas corporais se disponíveis
-      if (measurements) {
-        prompt.user.body_measurements = {
-          body_fat_percentage: measurements.body_fat_percentage,
-          muscle_mass: measurements.muscle_mass,
-          chest: measurements.chest,
-          waist: measurements.waist,
-          hips: measurements.hips,
-          arms: {
-            right: measurements.right_arm,
-            left: measurements.left_arm
-          },
-          thighs: {
-            right: measurements.right_thigh,
-            left: measurements.left_thigh
-          },
-          calves: {
-            right: measurements.right_calf,
-            left: measurements.left_calf
-          },
-          neck: measurements.neck,
-          shoulders: measurements.shoulders
-        };
+      if (sessionError) {
+        console.error('Erro ao obter sessão:', sessionError);
+        throw new Error('Erro ao verificar autenticação');
+      }
+      
+      if (!session) {
+        throw new Error('Usuário não autenticado');
       }
       
       // Chamar API para gerar sugestões
       const response = await fetch('/api/ai-workout-suggestions', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify(prompt)
+        body: JSON.stringify({ assessmentId }) // Enviar apenas o ID da avaliação
       });
       
       if (!response.ok) {
-        throw new Error('Erro ao gerar sugestões de treino');
+        // Tentar obter mensagem de erro detalhada
+        let errorDetail = 'Erro ao gerar sugestões de treino';
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.error) {
+            errorDetail = errorData.error;
+          }
+          console.error('Resposta de erro da API:', errorData);
+        } catch (e) {
+          console.error('Não foi possível analisar a resposta de erro:', e);
+        }
+        throw new Error(errorDetail);
       }
       
       const data = await response.json();
-      setSuggestedWorkouts(data.suggestions);
+      
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Resposta inválida da API');
+      }
+      
+      // Verificar se temos os treinos sugeridos
+      console.log('Resposta da API:', data);
+      
+      if (data.workouts && Array.isArray(data.workouts)) {
+        setSuggestedWorkouts(data.workouts);
+        toast.success('Sugestões de treino geradas com sucesso!');
+      } else {
+        throw new Error('Formato de resposta inválido');
+      }
       
     } catch (error) {
       console.error('Erro ao gerar sugestões:', error);
-      toast.error('Erro ao gerar sugestões de treino');
+      toast.error(`Erro ao gerar sugestões: ${error.message}`);
     } finally {
       setGeneratingWorkouts(false);
     }

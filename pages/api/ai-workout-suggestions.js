@@ -130,6 +130,19 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Avaliação não encontrada' });
     }
     
+    // Buscar medidas corporais mais recentes
+    const { data: latestMeasurements, error: measurementsError } = await supabaseAdmin
+      .from('user_body_measurements')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false })
+      .limit(1)
+      .single();
+      
+    if (measurementsError && !measurementsError.message.includes('No rows found')) {
+      console.error('Erro ao buscar medidas corporais:', measurementsError);
+    }
+    
     console.log('Avaliação encontrada, criando prompt para o modelo...');
     
     // Construir o prompt para a IA
@@ -147,39 +160,38 @@ export default async function handler(req, res) {
   - Duração por sessão: ${assessment.workout_duration} minutos\n`;
 
     // Adicionar medidas corporais se disponíveis
-    if (assessment.body_measurements) {
-      const measurements = assessment.body_measurements;
+    if (latestMeasurements) {
       prompt += `\nMedidas corporais atuais:`;
       
-      if (measurements.body_fat_percentage) {
-        prompt += `\n- Percentual de gordura: ${measurements.body_fat_percentage}%`;
+      if (latestMeasurements.body_fat_percentage) {
+        prompt += `\n- Percentual de gordura: ${latestMeasurements.body_fat_percentage}%`;
       }
-      if (measurements.muscle_mass) {
-        prompt += `\n- Massa muscular: ${measurements.muscle_mass}kg`;
+      if (latestMeasurements.muscle_mass) {
+        prompt += `\n- Massa muscular: ${latestMeasurements.muscle_mass}kg`;
       }
-      if (measurements.chest) {
-        prompt += `\n- Peitoral: ${measurements.chest}cm`;
+      if (latestMeasurements.chest) {
+        prompt += `\n- Peitoral: ${latestMeasurements.chest}cm`;
       }
-      if (measurements.waist) {
-        prompt += `\n- Cintura: ${measurements.waist}cm`;
+      if (latestMeasurements.waist) {
+        prompt += `\n- Cintura: ${latestMeasurements.waist}cm`;
       }
-      if (measurements.hips) {
-        prompt += `\n- Quadril: ${measurements.hips}cm`;
+      if (latestMeasurements.hips) {
+        prompt += `\n- Quadril: ${latestMeasurements.hips}cm`;
       }
-      if (measurements.arms.right || measurements.arms.left) {
-        prompt += `\n- Braços: ${measurements.arms.right}cm (D) / ${measurements.arms.left}cm (E)`;
+      if (latestMeasurements.right_arm || latestMeasurements.left_arm) {
+        prompt += `\n- Braços: ${latestMeasurements.right_arm || 0}cm (D) / ${latestMeasurements.left_arm || 0}cm (E)`;
       }
-      if (measurements.thighs.right || measurements.thighs.left) {
-        prompt += `\n- Coxas: ${measurements.thighs.right}cm (D) / ${measurements.thighs.left}cm (E)`;
+      if (latestMeasurements.right_thigh || latestMeasurements.left_thigh) {
+        prompt += `\n- Coxas: ${latestMeasurements.right_thigh || 0}cm (D) / ${latestMeasurements.left_thigh || 0}cm (E)`;
       }
-      if (measurements.calves.right || measurements.calves.left) {
-        prompt += `\n- Panturrilhas: ${measurements.calves.right}cm (D) / ${measurements.calves.left}cm (E)`;
+      if (latestMeasurements.right_calf || latestMeasurements.left_calf) {
+        prompt += `\n- Panturrilhas: ${latestMeasurements.right_calf || 0}cm (D) / ${latestMeasurements.left_calf || 0}cm (E)`;
       }
-      if (measurements.shoulders) {
-        prompt += `\n- Ombros: ${measurements.shoulders}cm`;
+      if (latestMeasurements.shoulders) {
+        prompt += `\n- Ombros: ${latestMeasurements.shoulders}cm`;
       }
-      if (measurements.neck) {
-        prompt += `\n- Pescoço: ${measurements.neck}cm`;
+      if (latestMeasurements.neck) {
+        prompt += `\n- Pescoço: ${latestMeasurements.neck}cm`;
       }
     }
 
@@ -412,11 +424,19 @@ O programa deve ser estruturado e retornado em formato JSON com a seguinte estru
     console.log(`${insertedWorkouts?.length || 0} treinos salvos com sucesso`);
     
     clearTimeout(apiTimeout);
-    return res.status(200).json({ success: true, workouts: insertedWorkouts });
+    return res.status(200).json({ 
+      success: true, 
+      workouts: suggestedWorkouts.workouts // Retornar os treinos do formato original, não os inseridos
+    });
     
   } catch (error) {
     console.error("Erro interno:", error);
     clearTimeout(apiTimeout);
-    return res.status(500).json({ error: 'Erro interno', details: error.message, stack: error.stack });
+    return res.status(500).json({ 
+      success: false,
+      error: 'Erro interno', 
+      details: error.message, 
+      stack: error.stack 
+    });
   }
 } 
