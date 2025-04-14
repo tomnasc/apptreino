@@ -693,23 +693,38 @@ export default function WorkoutMode() {
   };
 
   const finishWorkout = async () => {
-    if (!isWorkoutActive || !sessionId) return;
+    console.log('Função finishWorkout chamada');
+    console.log('isWorkoutActive:', isWorkoutActive);
+    console.log('sessionId:', sessionId);
+    
+    if (!isWorkoutActive || !sessionId) {
+      console.error('Não é possível finalizar: treino não está ativo ou sessionId não existe');
+      alert('Erro: Não foi possível finalizar o treino. Tente recarregar a página.');
+      return;
+    }
 
     try {
+      console.log('Tentando finalizar o treino. ID da sessão:', sessionId);
       const endTime = new Date();
       const durationInSeconds = Math.floor((endTime - workoutStartTime) / 1000);
       
       // Atualizar a sessão de treino
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('workout_sessions')
         .update({
           completed: true,
           ended_at: endTime.toISOString(),
           duration: durationInSeconds
         })
-        .eq('id', sessionId);
+        .eq('id', sessionId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao atualizar sessão no Supabase:', error);
+        throw error;
+      }
+      
+      console.log('Sessão finalizada com sucesso no banco de dados:', data);
       
       // Liberar o Wake Lock quando o treino terminar
       releaseWakeLock();
@@ -730,6 +745,7 @@ export default function WorkoutMode() {
         localStorage.removeItem('treinoPro_exerciseTimerStart');
         localStorage.removeItem('treinoPro_exerciseTimerDuration');
         localStorage.removeItem('treinoPro_exerciseTimerEnd');
+        localStorage.removeItem('treinoPro_backgroundTimestamp');
         
         // Limpar mapeamento de exercícios
         localStorage.removeItem(`treinoPro_currentExerciseIdMap_${id}`);
@@ -740,6 +756,9 @@ export default function WorkoutMode() {
       } catch (e) {
         console.error('Erro ao limpar localStorage:', e);
       }
+      
+      // Alertar o usuário sobre o sucesso antes de redirecionar
+      alert('Treino finalizado com sucesso!');
       
       // Resetar o estado do treino
       setIsWorkoutActive(false);
@@ -756,9 +775,11 @@ export default function WorkoutMode() {
       setSetRepsHistory({});
       
       // Redirecionar para o dashboard
+      console.log('Redirecionando para o dashboard...');
       router.push('/dashboard');
     } catch (error) {
       console.error('Erro ao finalizar treino:', error);
+      alert('Ocorreu um erro ao finalizar o treino. Por favor, tente novamente.');
       setError('Ocorreu um erro ao finalizar o treino. Por favor, tente novamente.');
     }
   };
@@ -1785,12 +1806,9 @@ export default function WorkoutMode() {
           </h1>
           <div className="flex space-x-2">
             {isWorkoutActive ? (
-              <button
-                onClick={finishWorkout}
-                className="bg-white text-red-500 hover:bg-red-50 dark:bg-white/90 dark:hover:bg-white/80 font-medium py-1.5 px-3 rounded-full shadow transition-all"
-              >
-                Finalizar
-              </button>
+              <div className="bg-white/20 backdrop-blur-sm text-white px-3 py-1.5 rounded-full">
+                Treino ativo
+              </div>
             ) : (
               <>
                 <Link
@@ -2403,7 +2421,10 @@ export default function WorkoutMode() {
       {isWorkoutActive && (
         <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg p-4 flex justify-center z-50">
           <button 
-            onClick={finishWorkout}
+            onClick={() => {
+              console.log('Botão finalizar treino clicado');
+              finishWorkout();
+            }}
             className="bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-colors w-full max-w-md"
           >
             <div className="flex items-center justify-center">
