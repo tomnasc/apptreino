@@ -22,7 +22,7 @@ export default function WorkoutMode() {
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [currentSetIndex, setCurrentSetIndex] = useState(0);
   const [completedSets, setCompletedSets] = useState({});
-  const [repsCompleted, setRepsCompleted] = useState(0);
+  const [repsCompleted, setRepsCompleted] = useState(''); // Alterado de 0 para string vazia
   const [timerActive, setTimerActive] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [workoutStartTime, setWorkoutStartTime] = useState(null);
@@ -668,7 +668,7 @@ export default function WorkoutMode() {
       setRestTimeRemaining(0);
       setWorkoutStartTime(null);
       setSessionId(null);
-      setRepsCompleted(0);
+      setRepsCompleted(''); // Alterado para string vazia
       setSetRepsHistory({});
       
       // Redirecionar para o dashboard
@@ -685,6 +685,11 @@ export default function WorkoutMode() {
       return;
     }
     
+    // Garantir que temos um valor numérico para repsCompleted
+    const reps = typeof repsCompleted === 'string' ? 
+      (repsCompleted === '' ? 0 : parseInt(repsCompleted)) : 
+      repsCompleted;
+      
     const exerciseId = currentExercise?.id;
     
     if (!exerciseId) {
@@ -701,7 +706,7 @@ export default function WorkoutMode() {
     if (!updatedSetRepsHistory[exerciseKey]) {
       updatedSetRepsHistory[exerciseKey] = [];
     }
-    updatedSetRepsHistory[exerciseKey][currentSetIndex] = repsCompleted;
+    updatedSetRepsHistory[exerciseKey][currentSetIndex] = reps;
     setSetRepsHistory(updatedSetRepsHistory);
     
     // Salvar histórico no localStorage para persistir após recarregar a página
@@ -761,7 +766,7 @@ export default function WorkoutMode() {
         const { error: updateError } = await supabase
           .from('workout_session_details')
           .update({
-            reps_completed: repsCompleted,
+            reps_completed: reps,
             weight_used: currentExercise.weight,
             execution_time: executionTime > 0 ? executionTime : 1,
             rest_time: restTime >= 0 ? restTime : 0,
@@ -782,7 +787,7 @@ export default function WorkoutMode() {
             exercise_id: currentExercise.id,
             exercise_index: currentExerciseIndex,
             set_index: currentSetIndex,
-            reps_completed: repsCompleted,
+            reps_completed: reps,
             weight_used: currentExercise.weight,
             execution_time: executionTime > 0 ? executionTime : 1,
             rest_time: restTime >= 0 ? restTime : 0,
@@ -829,7 +834,7 @@ export default function WorkoutMode() {
           setTimeRemaining(nextExercise.time);
           setTimerActive(false); // Não inicia automaticamente, espera o usuário clicar
         } else {
-          setRepsCompleted(0);
+          setRepsCompleted(''); // Alterado para string vazia
         }
       } else {
         // Todos os exercícios foram completados
@@ -853,7 +858,7 @@ export default function WorkoutMode() {
         setTimeRemaining(currentExercise.time);
         setTimerActive(false); // Não inicia automaticamente, espera o usuário clicar
       } else {
-        setRepsCompleted(0);
+        setRepsCompleted(''); // Alterado para string vazia
       }
     }
     
@@ -872,25 +877,40 @@ export default function WorkoutMode() {
 
   // Atualizar o manipulador de repetições para trabalhar com entrada direta
   const handleRepsChange = (e) => {
+    // Permitir campo vazio ou valor numérico
+    const inputValue = e.target.value;
+    
+    if (inputValue === '') {
+      setRepsCompleted('');
+      return;
+    }
+    
     // Converter para número inteiro e garantir que seja um valor válido
-    const value = parseInt(e.target.value) || 0;
+    const value = parseInt(inputValue) || 0;
     // Garantir que o valor esteja entre 0 e o máximo de repetições do exercício
     setRepsCompleted(Math.min(Math.max(0, value), currentExercise?.reps || 0));
   };
 
   const handleRepsCompleted = () => {
-    const currentExercise = exercises[currentExerciseIndex];
+    // Verificar se foi digitado algum valor
+    if (repsCompleted === '') {
+      alert('Por favor, informe o número de repetições realizadas.');
+      return;
+    }
+    
+    // Converter para número se for string
+    const reps = typeof repsCompleted === 'string' ? parseInt(repsCompleted) || 0 : repsCompleted;
     
     // Verificar se deve mostrar o alerta para diminuir carga
-    if (repsCompleted < 6) {
+    if (reps < 6) {
       setShowWeightDecreaseAlert(true);
       // Resetar a série em vez de concluir quando não atingir o mínimo de repetições
-      setRepsCompleted(0);
+      setRepsCompleted('');
       return;
     }
     
     // Sempre permitir concluir se o número mínimo de repetições for atingido
-      handleSetCompleted();
+    handleSetCompleted();
   };
 
   // Função para pular o exercício atual e movê-lo para o final da ficha
@@ -918,7 +938,7 @@ export default function WorkoutMode() {
     
     // Resetar contadores relacionados ao exercício
     setCurrentSetIndex(0);
-    setRepsCompleted(0);
+    setRepsCompleted(''); // Alterado para string vazia
     
     // Verificar se o "novo" exercício atual (que era o próximo) é baseado em tempo
     if (updatedExercises[currentExerciseIndex].time) {
@@ -954,7 +974,7 @@ export default function WorkoutMode() {
       // Atualizar o estado atual
       setCurrentExerciseIndex(targetIndex);
       setCurrentSetIndex(0);
-      setRepsCompleted(0);
+      setRepsCompleted(''); // Alterado para string vazia
       
       // Se o exercício de destino é baseado em tempo, configurar temporizador
       if (targetExercise.time) {
@@ -1119,7 +1139,7 @@ export default function WorkoutMode() {
       setSessionId(sessionToResumeId);
       setWorkoutStartTime(startTime);
       setIsWorkoutActive(true);
-      setRepsCompleted(0);
+      setRepsCompleted(''); // Alterado para string vazia
       
       // Notificar o usuário
       alert('Treino retomado com sucesso!');
@@ -1818,7 +1838,9 @@ export default function WorkoutMode() {
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
                           </svg>
                           <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Repetições</span>
-                          <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{repsCompleted} / {currentExercise.reps}</span>
+                          <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">
+                            {repsCompleted === '' ? '0' : repsCompleted} / {currentExercise.reps}
+                          </span>
                         </div>
                       )}
                       {currentExercise.time && timerActive && (
@@ -1861,6 +1883,7 @@ export default function WorkoutMode() {
                             max={currentExercise?.reps || 0}
                             value={repsCompleted}
                             onChange={handleRepsChange}
+                            placeholder="0"
                             className="w-16 h-10 px-2 rounded-md border border-gray-300 dark:border-gray-600 text-center font-bold text-blue-700 dark:text-blue-400 text-xl bg-white dark:bg-gray-700"
                           />
                           <span className="ml-2 text-gray-500 dark:text-gray-400">/ {currentExercise?.reps || 0}</span>
@@ -1870,9 +1893,9 @@ export default function WorkoutMode() {
                     <button
                         onClick={handleRepsCompleted}
                         className={`px-6 py-3 rounded-full font-bold shadow transition-all w-full md:w-auto
-                          ${repsCompleted >= (currentExercise?.reps || 0) ? 'bg-green-500 dark:bg-green-600 hover:bg-green-600 dark:hover:bg-green-700 text-white' : 'bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white'}`}
+                          ${parseInt(repsCompleted || 0) >= (currentExercise?.reps || 0) ? 'bg-green-500 dark:bg-green-600 hover:bg-green-600 dark:hover:bg-green-700 text-white' : 'bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white'}`}
                       >
-                        {repsCompleted >= (currentExercise?.reps || 0) ? 'Série Completa' : 'Confirmar'}
+                        {parseInt(repsCompleted || 0) >= (currentExercise?.reps || 0) ? 'Série Completa' : 'Confirmar'}
                       </button>
                     </div>
                   </div>
