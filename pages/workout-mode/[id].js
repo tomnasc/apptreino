@@ -564,6 +564,63 @@ export default function WorkoutMode() {
 
   const startWorkout = async () => {
     try {
+      // Verificar primeiro se já existe uma sessão não concluída
+      const { data: existingSessions, error: sessionError } = await supabase
+        .from('workout_sessions')
+        .select('id, completed')
+        .eq('workout_list_id', id)
+        .eq('user_id', user.id)
+        .eq('completed', false)
+        .order('started_at', { ascending: false })
+        .limit(1);
+        
+      if (sessionError) {
+        console.error('Erro ao verificar sessões existentes:', sessionError);
+      }
+      
+      // Se encontrarmos uma sessão não concluída, perguntar ao usuário o que fazer
+      if (existingSessions && existingSessions.length > 0) {
+        const shouldResume = confirm(
+          'Existe um treino não finalizado para esta lista. Deseja retomá-lo? ' +
+          'Clique em "OK" para retomar ou "Cancelar" para iniciar um novo treino.'
+        );
+        
+        if (shouldResume) {
+          // Retomar a sessão existente
+          resumeWorkout(existingSessions[0].id);
+          return;
+        } else {
+          // Marcar a sessão antiga como concluída antes de criar uma nova
+          const { error: updateError } = await supabase
+            .from('workout_sessions')
+            .update({
+              completed: true,
+              ended_at: new Date().toISOString()
+            })
+            .eq('id', existingSessions[0].id);
+            
+          if (updateError) {
+            console.error('Erro ao atualizar sessão antiga:', updateError);
+          }
+          
+          // Limpar dados do localStorage relacionados à sessão antiga
+          try {
+            localStorage.removeItem(`treinoPro_isWorkoutActive_${id}`);
+            localStorage.removeItem(`treinoPro_currentExerciseIndex_${id}`);
+            localStorage.removeItem(`treinoPro_currentSetIndex_${id}`);
+            localStorage.removeItem(`treinoPro_completedSets_${id}`);
+            localStorage.removeItem(`treinoPro_setRepsHistory_${id}`);
+            localStorage.removeItem(`treinoPro_sessionId_${id}`);
+            localStorage.removeItem(`treinoPro_workoutStartTime_${id}`);
+            localStorage.removeItem('treinoPro_timerState');
+            localStorage.removeItem(`treinoPro_currentExerciseIdMap_${id}`);
+            localStorage.removeItem(`treinoPro_lastExerciseIndex`);
+          } catch (e) {
+            console.error('Erro ao limpar localStorage:', e);
+          }
+        }
+      }
+
       // Inicializar o estado do treino
       setIsWorkoutActive(true);
       setCurrentExerciseIndex(0);
@@ -588,19 +645,19 @@ export default function WorkoutMode() {
       // Se o primeiro exercício for baseado em tempo, configurar o timer
       if (exercises.length > 0 && exercises[0].time) {
         setTimeRemaining(exercises[0].time);
-    }
+      }
 
-    try {
-      // Criar uma nova sessão de treino
-      const { data, error } = await supabase
-        .from('workout_sessions')
-          .insert({
-            user_id: user.id,
-            workout_list_id: id,
-            started_at: startTime.toISOString()
-          })
-          .select('id')
-          .single();
+      try {
+        // Criar uma nova sessão de treino
+        const { data, error } = await supabase
+          .from('workout_sessions')
+            .insert({
+              user_id: user.id,
+              workout_list_id: id,
+              started_at: startTime.toISOString()
+            })
+            .select('id')
+            .single();
 
         if (error) {
           setError(`Erro ao iniciar treino: ${error.message}`);
@@ -657,6 +714,33 @@ export default function WorkoutMode() {
       // Liberar o Wake Lock quando o treino terminar
       releaseWakeLock();
       
+      // Limpar TODOS os dados do localStorage relacionados ao treino
+      try {
+        // Limpar estado geral do treino
+        localStorage.removeItem(`treinoPro_isWorkoutActive_${id}`);
+        localStorage.removeItem(`treinoPro_currentExerciseIndex_${id}`);
+        localStorage.removeItem(`treinoPro_currentSetIndex_${id}`);
+        localStorage.removeItem(`treinoPro_completedSets_${id}`);
+        localStorage.removeItem(`treinoPro_setRepsHistory_${id}`);
+        localStorage.removeItem(`treinoPro_sessionId_${id}`);
+        localStorage.removeItem(`treinoPro_workoutStartTime_${id}`);
+        
+        // Limpar timers
+        localStorage.removeItem('treinoPro_timerState');
+        localStorage.removeItem('treinoPro_exerciseTimerStart');
+        localStorage.removeItem('treinoPro_exerciseTimerDuration');
+        localStorage.removeItem('treinoPro_exerciseTimerEnd');
+        
+        // Limpar mapeamento de exercícios
+        localStorage.removeItem(`treinoPro_currentExerciseIdMap_${id}`);
+        localStorage.removeItem(`treinoPro_lastExerciseIndex`);
+        localStorage.removeItem(`treinoPro_currentExerciseIndexOrder_${id}`);
+        
+        console.log('Todos os dados do treino foram limpos do localStorage');
+      } catch (e) {
+        console.error('Erro ao limpar localStorage:', e);
+      }
+      
       // Resetar o estado do treino
       setIsWorkoutActive(false);
       setCurrentExerciseIndex(0);
@@ -668,7 +752,7 @@ export default function WorkoutMode() {
       setRestTimeRemaining(0);
       setWorkoutStartTime(null);
       setSessionId(null);
-      setRepsCompleted(''); // Alterado para string vazia
+      setRepsCompleted('');
       setSetRepsHistory({});
       
       // Redirecionar para o dashboard
@@ -678,6 +762,135 @@ export default function WorkoutMode() {
       setError('Ocorreu um erro ao finalizar o treino. Por favor, tente novamente.');
     }
   };
+
+  // Nova função para verificar se uma sessão já foi concluída
+  const checkSessionStatus = async (sessionId) => {
+    if (!sessionId) return false;
+    
+    try {
+      const { data, error } = await supabase
+        .from('workout_sessions')
+        .select('completed')
+        .eq('id', sessionId)
+        .single();
+        
+      if (error) {
+        console.error('Erro ao verificar status da sessão:', error);
+        return false;
+      }
+      
+      return data?.completed === true;
+    } catch (error) {
+      console.error('Erro ao verificar status da sessão:', error);
+      return false;
+    }
+  };
+
+  // Efeito para carregar estado do treino com verificação adicional de sessão concluída
+  useEffect(() => {
+    // Verificar se há um treino ativo
+    if (typeof window !== 'undefined' && id) {
+      try {
+        const storedWorkoutActive = localStorage.getItem(`treinoPro_isWorkoutActive_${id}`);
+        const storedSessionId = localStorage.getItem(`treinoPro_sessionId_${id}`);
+        
+        if (storedWorkoutActive === 'true' && storedSessionId) {
+          // Verificar primeiro se a sessão já foi concluída
+          checkSessionStatus(storedSessionId).then(isCompleted => {
+            if (isCompleted) {
+              console.log('Sessão já concluída, limpando estado do localStorage');
+              // Se a sessão já foi concluída, limpar o localStorage e não restaurar o estado
+              try {
+                localStorage.removeItem(`treinoPro_isWorkoutActive_${id}`);
+                localStorage.removeItem(`treinoPro_currentExerciseIndex_${id}`);
+                localStorage.removeItem(`treinoPro_currentSetIndex_${id}`);
+                localStorage.removeItem(`treinoPro_completedSets_${id}`);
+                localStorage.removeItem(`treinoPro_setRepsHistory_${id}`);
+                localStorage.removeItem(`treinoPro_sessionId_${id}`);
+                localStorage.removeItem(`treinoPro_workoutStartTime_${id}`);
+                localStorage.removeItem('treinoPro_timerState');
+                localStorage.removeItem(`treinoPro_currentExerciseIdMap_${id}`);
+                localStorage.removeItem(`treinoPro_lastExerciseIndex`);
+              } catch (e) {
+                console.error('Erro ao limpar localStorage:', e);
+              }
+              return;
+            }
+            
+            // Se a sessão não foi concluída, continuar com a restauração do estado
+            // Carregar estado do treino do localStorage
+            const storedExerciseIndex = localStorage.getItem(`treinoPro_currentExerciseIndex_${id}`);
+            const storedSetIndex = localStorage.getItem(`treinoPro_currentSetIndex_${id}`);
+            const storedCompletedSets = localStorage.getItem(`treinoPro_completedSets_${id}`);
+            const storedRepsHistory = localStorage.getItem(`treinoPro_setRepsHistory_${id}`);
+            const storedStartTime = localStorage.getItem(`treinoPro_workoutStartTime_${id}`);
+            
+            if (storedExerciseIndex) setCurrentExerciseIndex(parseInt(storedExerciseIndex) || 0);
+            if (storedSetIndex) setCurrentSetIndex(parseInt(storedSetIndex) || 0);
+            if (storedCompletedSets) {
+              try {
+                const parsedSets = JSON.parse(storedCompletedSets);
+                if (parsedSets && typeof parsedSets === 'object') {
+                  setCompletedSets(parsedSets);
+                } else {
+                  setCompletedSets({});
+                }
+              } catch (e) {
+                console.error('Erro ao fazer parse de completedSets:', e);
+                setCompletedSets({});
+              }
+            }
+            if (storedRepsHistory) {
+              try {
+                const parsedHistory = JSON.parse(storedRepsHistory);
+                if (parsedHistory && typeof parsedHistory === 'object') {
+                  setSetRepsHistory(parsedHistory);
+                } else {
+                  setSetRepsHistory({});
+                }
+              } catch (e) {
+                console.error('Erro ao fazer parse de setRepsHistory:', e);
+                setSetRepsHistory({});
+              }
+            }
+            if (storedSessionId) setSessionId(storedSessionId);
+            if (storedStartTime) {
+              try {
+                setWorkoutStartTime(new Date(storedStartTime));
+              } catch (e) {
+                console.error('Erro ao fazer parse de workoutStartTime:', e);
+                setWorkoutStartTime(new Date());
+              }
+            }
+            
+            setIsWorkoutActive(true);
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao restaurar estado do treino:', error);
+        // Em caso de erro, reiniciar o estado do treino
+        setIsWorkoutActive(false);
+        setCurrentExerciseIndex(0);
+        setCurrentSetIndex(0);
+        setCompletedSets({});
+        setSetRepsHistory({});
+        
+        // Limpar o localStorage para evitar problemas futuros
+        try {
+          localStorage.removeItem(`treinoPro_isWorkoutActive_${id}`);
+          localStorage.removeItem(`treinoPro_currentExerciseIndex_${id}`);
+          localStorage.removeItem(`treinoPro_currentSetIndex_${id}`);
+          localStorage.removeItem(`treinoPro_completedSets_${id}`);
+          localStorage.removeItem(`treinoPro_setRepsHistory_${id}`);
+          localStorage.removeItem(`treinoPro_sessionId_${id}`);
+          localStorage.removeItem(`treinoPro_workoutStartTime_${id}`);
+          localStorage.removeItem('treinoPro_timerState');
+        } catch (e) {
+          console.error('Erro ao limpar localStorage:', e);
+        }
+      }
+    }
+  }, [id]);
 
   const handleSetCompleted = async () => {
     if (!isWorkoutActive || !currentExercise) {
@@ -2185,6 +2398,26 @@ export default function WorkoutMode() {
           </div>
         )}
       </div>
+      
+      {/* Botão flutuante para finalizar treino */}
+      {isWorkoutActive && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg p-4 flex justify-center z-50">
+          <button 
+            onClick={finishWorkout}
+            className="bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-colors w-full max-w-md"
+          >
+            <div className="flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+              Finalizar Treino
+            </div>
+          </button>
+        </div>
+      )}
+      
+      {/* Espaçamento adicional para compensar o botão flutuante */}
+      {isWorkoutActive && <div className="h-20"></div>}
     </Layout>
   );
 } 
