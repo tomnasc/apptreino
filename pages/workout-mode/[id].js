@@ -48,6 +48,7 @@ export default function WorkoutMode() {
   const restTimerEndRef = useRef(null);
   const lastUpdatedTimeRef = useRef(null);
   const backgroundTimeRef = useRef(null);
+  const wakeLockRef = useRef(null); // Referência para o Wake Lock
 
   // Adicionar timerRef para controlar o timer
   const timerRef = useRef(null);
@@ -478,6 +479,75 @@ export default function WorkoutMode() {
     }
   };
 
+  // Função para adquirir o Wake Lock (manter a tela acesa)
+  const acquireWakeLock = async () => {
+    // Verificar se a API Wake Lock é suportada
+    if ('wakeLock' in navigator) {
+      try {
+        // Solicitar o Wake Lock
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        
+        console.log('Wake Lock adquirido. A tela permanecerá acesa durante o treino.');
+        
+        // Adicionar listener para reativar o Wake Lock quando a visibilidade da página mudar
+        wakeLockRef.current.addEventListener('release', () => {
+          console.log('Wake Lock foi liberado');
+          // Tentar reativar quando o usuário voltar para a página
+          if (document.visibilityState === 'visible' && isWorkoutActive) {
+            acquireWakeLock();
+          }
+        });
+      } catch (err) {
+        console.error('Não foi possível adquirir o Wake Lock:', err);
+      }
+    } else {
+      console.log('Wake Lock API não é suportada neste navegador.');
+    }
+  };
+  
+  // Função para liberar o Wake Lock
+  const releaseWakeLock = async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        console.log('Wake Lock liberado');
+      } catch (err) {
+        console.error('Erro ao liberar o Wake Lock:', err);
+      }
+    }
+  };
+
+  // Efeito para lidar com mudanças de visibilidade da página
+  useEffect(() => {
+    // Função para lidar com mudanças de visibilidade
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && isWorkoutActive && !wakeLockRef.current) {
+        // Reativar o Wake Lock quando o usuário voltar para a página e o treino estiver ativo
+        await acquireWakeLock();
+      }
+    };
+
+    // Adicionar listener para mudanças de visibilidade
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isWorkoutActive]);
+
+  // Efeito para lidar com o Wake Lock quando o treino começa ou termina
+  useEffect(() => {
+    if (isWorkoutActive) {
+      // Ativar o Wake Lock quando o treino começar
+      acquireWakeLock();
+    } else {
+      // Liberar o Wake Lock quando o treino terminar
+      releaseWakeLock();
+    }
+  }, [isWorkoutActive]);
+
   const startWorkout = async () => {
     try {
       // Inicializar o estado do treino
@@ -497,6 +567,9 @@ export default function WorkoutMode() {
       
       // Iniciar o cronômetro de tempo total
       setTotalWorkoutTime(0);
+      
+      // Adquirir o Wake Lock para manter a tela acesa
+      acquireWakeLock();
       
       // Se o primeiro exercício for baseado em tempo, configurar o timer
       if (exercises.length > 0 && exercises[0].time) {
@@ -566,6 +639,9 @@ export default function WorkoutMode() {
         .eq('id', sessionId);
 
       if (error) throw error;
+      
+      // Liberar o Wake Lock quando o treino terminar
+      releaseWakeLock();
       
       // Resetar o estado do treino
       setIsWorkoutActive(false);
@@ -1672,23 +1748,19 @@ export default function WorkoutMode() {
                       </svg>
                       <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Carga</span>
                       <div className="flex items-center mt-1">
-                        <button 
-                          onClick={() => updateExerciseWeight(Math.max(0, (currentExercise.weight || 0) - 2.5))}
-                          className="h-6 w-6 flex items-center justify-center bg-red-100 dark:bg-red-800/50 text-red-600 dark:text-red-300 rounded"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" />
-                          </svg>
-                        </button>
-                        <span className="font-bold text-gray-800 dark:text-gray-100 text-lg mx-2">{currentExercise.weight} kg</span>
-                        <button 
-                          onClick={() => updateExerciseWeight((currentExercise.weight || 0) + 2.5)}
-                          className="h-6 w-6 flex items-center justify-center bg-green-100 dark:bg-green-800/50 text-green-600 dark:text-green-300 rounded"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                          </svg>
-                        </button>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={currentExercise.weight || 0}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            updateExerciseWeight(Math.max(0, value));
+                          }}
+                          className="w-20 h-9 px-2 rounded-md border border-gray-300 dark:border-gray-600 text-center font-bold text-gray-800 dark:text-gray-100 text-lg bg-white dark:bg-gray-700"
+                          aria-label="Carga em kg"
+                        />
+                        <span className="ml-2 font-bold text-gray-800 dark:text-gray-100 text-lg">kg</span>
                       </div>
                     </div>
                   )}
