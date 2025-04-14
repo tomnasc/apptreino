@@ -49,6 +49,7 @@ export default function WorkoutMode() {
   const lastUpdatedTimeRef = useRef(null);
   const backgroundTimeRef = useRef(null);
   const wakeLockRef = useRef(null); // Referência para o Wake Lock
+  const isSubmittingRef = useRef(false); // Referência para controle de submissão múltipla
 
   // Adicionar timerRef para controlar o timer
   const timerRef = useRef(null);
@@ -693,20 +694,120 @@ export default function WorkoutMode() {
   };
 
   const finishWorkout = async () => {
+    // Evitar múltiplos cliques/submissões
+    if (isSubmittingRef.current) {
+      console.log('Já existe uma requisição em andamento para finalizar o treino');
+      return;
+    }
+    
     console.log('Função finishWorkout chamada');
     console.log('isWorkoutActive:', isWorkoutActive);
     console.log('sessionId:', sessionId);
     
-    if (!isWorkoutActive || !sessionId) {
-      console.error('Não é possível finalizar: treino não está ativo ou sessionId não existe');
-      alert('Erro: Não foi possível finalizar o treino. Tente recarregar a página.');
-      return;
-    }
-
+    // Função auxiliar para restaurar o estado do botão em caso de erro
+    const restoreButtonState = () => {
+      try {
+        const finishBtn = document.getElementById('finishButton');
+        if (finishBtn) {
+          finishBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+          const btnText = finishBtn.querySelector('.btn-text');
+          if (btnText) {
+            btnText.innerHTML = `
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" class="w-5 h-5 mr-2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+              Finalizar Treino
+            `;
+          } else {
+            finishBtn.innerHTML = `
+              <div class="flex items-center justify-center btn-text">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" class="w-5 h-5 mr-2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+                Finalizar Treino
+              </div>
+            `;
+          }
+        }
+      } catch (e) {
+        console.error('Erro ao restaurar estado do botão:', e);
+      }
+    };
+    
+    // Configurar estado de submissão
+    isSubmittingRef.current = true;
+    
     try {
-      console.log('Tentando finalizar o treino. ID da sessão:', sessionId);
+      // Verificar se temos dados válidos para finalizar o treino
+      if (!isWorkoutActive) {
+        console.error('Não é possível finalizar: treino não está ativo');
+        alert('Erro: O treino não está ativo. Tente recarregar a página.');
+        isSubmittingRef.current = false;
+        restoreButtonState();
+        return;
+      }
+      
+      // Verificar se existe um sessionId
+      if (!sessionId) {
+        // Tentar recuperar o sessionId do localStorage como último recurso
+        const storedSessionId = localStorage.getItem(`treinoPro_sessionId_${id}`);
+        
+        if (storedSessionId) {
+          console.log('Recuperando sessionId do localStorage:', storedSessionId);
+          setSessionId(storedSessionId);
+        } else {
+          console.error('Não é possível finalizar: sessionId não existe');
+          alert('Erro: ID da sessão de treino não encontrado. Tente recarregar a página.');
+          isSubmittingRef.current = false;
+          restoreButtonState();
+          return;
+        }
+      }
+
+      const finalSessionId = sessionId || localStorage.getItem(`treinoPro_sessionId_${id}`);
+      
+      if (!finalSessionId) {
+        console.error('Não foi possível obter um ID de sessão válido para finalizar o treino');
+        alert('Erro: Não foi possível finalizar o treino. ID da sessão não encontrado.');
+        isSubmittingRef.current = false;
+        restoreButtonState();
+        return;
+      }
+      
+      console.log('Tentando finalizar o treino. ID da sessão:', finalSessionId);
+      
+      // Verificar primeiro se a sessão existe
+      const { data: sessionData, error: sessionCheckError } = await supabase
+        .from('workout_sessions')
+        .select('id, completed')
+        .eq('id', finalSessionId)
+        .single();
+      
+      if (sessionCheckError) {
+        console.error('Erro ao verificar sessão no Supabase:', sessionCheckError);
+        throw new Error('Sessão não encontrada no banco de dados');
+      }
+      
+      if (!sessionData) {
+        console.error('Sessão não encontrada no banco de dados');
+        alert('Erro: Sessão de treino não encontrada no banco de dados.');
+        isSubmittingRef.current = false;
+        restoreButtonState();
+        return;
+      }
+      
+      if (sessionData.completed) {
+        console.log('Esta sessão já está marcada como concluída no banco de dados');
+        // Limpar tudo e redirecionar
+        cleanupWorkoutState();
+        alert('Esta sessão de treino já estava finalizada. Redirecionando para o dashboard.');
+        router.push('/dashboard');
+        return;
+      }
+      
       const endTime = new Date();
-      const durationInSeconds = Math.floor((endTime - workoutStartTime) / 1000);
+      const startTime = workoutStartTime || new Date(endTime.getTime() - 60000); // Fallback para 1 minuto atrás
+      const durationInSeconds = Math.floor((endTime - startTime) / 1000);
       
       // Atualizar a sessão de treino
       const { data, error } = await supabase
@@ -716,7 +817,7 @@ export default function WorkoutMode() {
           ended_at: endTime.toISOString(),
           duration: durationInSeconds
         })
-        .eq('id', sessionId)
+        .eq('id', finalSessionId)
         .select();
 
       if (error) {
@@ -726,53 +827,11 @@ export default function WorkoutMode() {
       
       console.log('Sessão finalizada com sucesso no banco de dados:', data);
       
-      // Liberar o Wake Lock quando o treino terminar
-      releaseWakeLock();
-      
-      // Limpar TODOS os dados do localStorage relacionados ao treino
-      try {
-        // Limpar estado geral do treino
-        localStorage.removeItem(`treinoPro_isWorkoutActive_${id}`);
-        localStorage.removeItem(`treinoPro_currentExerciseIndex_${id}`);
-        localStorage.removeItem(`treinoPro_currentSetIndex_${id}`);
-        localStorage.removeItem(`treinoPro_completedSets_${id}`);
-        localStorage.removeItem(`treinoPro_setRepsHistory_${id}`);
-        localStorage.removeItem(`treinoPro_sessionId_${id}`);
-        localStorage.removeItem(`treinoPro_workoutStartTime_${id}`);
-        
-        // Limpar timers
-        localStorage.removeItem('treinoPro_timerState');
-        localStorage.removeItem('treinoPro_exerciseTimerStart');
-        localStorage.removeItem('treinoPro_exerciseTimerDuration');
-        localStorage.removeItem('treinoPro_exerciseTimerEnd');
-        localStorage.removeItem('treinoPro_backgroundTimestamp');
-        
-        // Limpar mapeamento de exercícios
-        localStorage.removeItem(`treinoPro_currentExerciseIdMap_${id}`);
-        localStorage.removeItem(`treinoPro_lastExerciseIndex`);
-        localStorage.removeItem(`treinoPro_currentExerciseIndexOrder_${id}`);
-        
-        console.log('Todos os dados do treino foram limpos do localStorage');
-      } catch (e) {
-        console.error('Erro ao limpar localStorage:', e);
-      }
+      // Limpar o estado e dados
+      cleanupWorkoutState();
       
       // Alertar o usuário sobre o sucesso antes de redirecionar
       alert('Treino finalizado com sucesso!');
-      
-      // Resetar o estado do treino
-      setIsWorkoutActive(false);
-      setCurrentExerciseIndex(0);
-      setCurrentSetIndex(0);
-      setCompletedSets({});
-      setTimerActive(false);
-      setTimeRemaining(0);
-      setRestTimerActive(false);
-      setRestTimeRemaining(0);
-      setWorkoutStartTime(null);
-      setSessionId(null);
-      setRepsCompleted('');
-      setSetRepsHistory({});
       
       // Redirecionar para o dashboard
       console.log('Redirecionando para o dashboard...');
@@ -781,7 +840,60 @@ export default function WorkoutMode() {
       console.error('Erro ao finalizar treino:', error);
       alert('Ocorreu um erro ao finalizar o treino. Por favor, tente novamente.');
       setError('Ocorreu um erro ao finalizar o treino. Por favor, tente novamente.');
+      // Restaurar o estado do botão em caso de erro
+      restoreButtonState();
+    } finally {
+      // Resetar estado de submissão
+      isSubmittingRef.current = false;
     }
+  };
+  
+  // Função para limpar o estado e localStorage ao finalizar o treino
+  const cleanupWorkoutState = () => {
+    // Liberar o Wake Lock quando o treino terminar
+    releaseWakeLock();
+    
+    // Limpar TODOS os dados do localStorage relacionados ao treino
+    try {
+      // Limpar estado geral do treino
+      localStorage.removeItem(`treinoPro_isWorkoutActive_${id}`);
+      localStorage.removeItem(`treinoPro_currentExerciseIndex_${id}`);
+      localStorage.removeItem(`treinoPro_currentSetIndex_${id}`);
+      localStorage.removeItem(`treinoPro_completedSets_${id}`);
+      localStorage.removeItem(`treinoPro_setRepsHistory_${id}`);
+      localStorage.removeItem(`treinoPro_sessionId_${id}`);
+      localStorage.removeItem(`treinoPro_workoutStartTime_${id}`);
+      
+      // Limpar timers
+      localStorage.removeItem('treinoPro_timerState');
+      localStorage.removeItem('treinoPro_exerciseTimerStart');
+      localStorage.removeItem('treinoPro_exerciseTimerDuration');
+      localStorage.removeItem('treinoPro_exerciseTimerEnd');
+      localStorage.removeItem('treinoPro_backgroundTimestamp');
+      
+      // Limpar mapeamento de exercícios
+      localStorage.removeItem(`treinoPro_currentExerciseIdMap_${id}`);
+      localStorage.removeItem(`treinoPro_lastExerciseIndex`);
+      localStorage.removeItem(`treinoPro_currentExerciseIndexOrder_${id}`);
+      
+      console.log('Todos os dados do treino foram limpos do localStorage');
+    } catch (e) {
+      console.error('Erro ao limpar localStorage:', e);
+    }
+    
+    // Resetar o estado do treino
+    setIsWorkoutActive(false);
+    setCurrentExerciseIndex(0);
+    setCurrentSetIndex(0);
+    setCompletedSets({});
+    setTimerActive(false);
+    setTimeRemaining(0);
+    setRestTimerActive(false);
+    setRestTimeRemaining(0);
+    setWorkoutStartTime(null);
+    setSessionId(null);
+    setRepsCompleted('');
+    setSetRepsHistory({});
   };
 
   // Nova função para verificar se uma sessão já foi concluída
@@ -2422,12 +2534,38 @@ export default function WorkoutMode() {
         <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg p-4 flex justify-center z-50">
           <button 
             onClick={() => {
-              console.log('Botão finalizar treino clicado');
+              // Verificar se já está enviando antes de qualquer ação
+              if (isSubmittingRef.current) {
+                console.log('Já existe uma requisição em andamento');
+                return;
+              }
+              
+              // Desabilitar o botão visualmente
+              const finishBtn = document.getElementById('finishButton');
+              if (finishBtn) {
+                finishBtn.classList.add('opacity-70', 'cursor-not-allowed');
+                const btnText = finishBtn.querySelector('.btn-text');
+                if (btnText) {
+                  btnText.innerText = 'Finalizando...';
+                } else {
+                  finishBtn.innerHTML = `
+                    <div class="flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" class="w-5 h-5 mr-2 animate-spin">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                      </svg>
+                      Finalizando...
+                    </div>
+                  `;
+                }
+              }
+              
+              // Chamar a função de finalização
               finishWorkout();
             }}
+            id="finishButton"
             className="bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-colors w-full max-w-md"
           >
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center btn-text">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>
