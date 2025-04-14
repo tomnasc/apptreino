@@ -55,6 +55,20 @@ export default function WorkoutMode() {
   // Referência para o timer de exercício
   const exerciseTimerRef = useRef(null);
 
+  // Calculamos o objeto de exercício atual com base no índice
+  const currentExercise = exercises[currentExerciseIndex] || null;
+  
+  // Efeito para atualizar o título e garantir que temos um exercício válido
+  useEffect(() => {
+    if (isWorkoutActive && exercises.length > 0) {
+      // Se o currentExerciseIndex for maior que o número de exercícios,
+      // ajustar para evitar tentar acessar um exercício que não existe
+      if (currentExerciseIndex >= exercises.length) {
+        setCurrentExerciseIndex(exercises.length - 1);
+      }
+    }
+  }, [isWorkoutActive, exercises, currentExerciseIndex]);
+  
   // Detectar se é um dispositivo iOS
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -666,8 +680,11 @@ export default function WorkoutMode() {
   };
 
   const handleSetCompleted = async () => {
-    const currentExercise = exercises[currentExerciseIndex];
-    // Garantir que temos o ID correto do exercício atual
+    if (!isWorkoutActive || !currentExercise) {
+      console.error('Não é possível completar a série: treino não ativo ou exercício atual não definido');
+      return;
+    }
+    
     const exerciseId = currentExercise?.id;
     
     if (!exerciseId) {
@@ -699,13 +716,13 @@ export default function WorkoutMode() {
     // 1. Estamos na última série do exercício
     // 2. O usuário atingiu o número alvo de repetições em TODAS as séries deste exercício
     if (
-      currentExercise.reps && 
-      currentSetIndex === currentExercise.sets - 1
+      currentExercise?.reps && 
+      currentSetIndex === (currentExercise?.sets || 1) - 1
     ) {
       // Verificar se todas as séries atingiram o número alvo de repetições
-      const allSeriesCompleted = updatedSetRepsHistory[exerciseKey].length === currentExercise.sets;
+      const allSeriesCompleted = updatedSetRepsHistory[exerciseKey].length === currentExercise?.sets;
       const allSeriesReachedTarget = allSeriesCompleted && 
-        updatedSetRepsHistory[exerciseKey].every(reps => reps >= currentExercise.reps);
+        updatedSetRepsHistory[exerciseKey].every(reps => reps >= currentExercise?.reps);
       
       if (allSeriesReachedTarget) {
         setShowWeightIncreaseAlert(true);
@@ -1011,6 +1028,13 @@ export default function WorkoutMode() {
         return;
       }
       
+      // Verificar se temos exercícios carregados
+      if (!exercises || exercises.length === 0) {
+        console.error('Erro ao retomar treino: lista de exercícios vazia.');
+        setError('Não foi possível retomar o treino porque a lista de exercícios não foi carregada. Tente recarregar a página.');
+        return;
+      }
+      
       // Calcular tempo decorrido desde o início da sessão
       const startTime = new Date(sessionData.started_at);
       
@@ -1029,11 +1053,11 @@ export default function WorkoutMode() {
         const newCompletedSets = {};
         const newSetRepsHistory = {};
         
+        let lastExerciseIndex = 0;
+        let lastSetIndex = 0;
+        
         if (sessionDetails && sessionDetails.length > 0) {
           // Identificar o último exercício e série concluídos
-          let lastExerciseIndex = 0;
-          let lastSetIndex = 0;
-          
           sessionDetails.forEach(detail => {
             const exerciseKey = `${detail.exercise_index}`;
             
@@ -1058,11 +1082,15 @@ export default function WorkoutMode() {
             }
           });
           
+          // Garantir que estamos dentro dos limites válidos de exercícios
+          lastExerciseIndex = Math.min(lastExerciseIndex, exercises.length - 1);
+          const exerciseObj = exercises[lastExerciseIndex];
+          
           // Configurar para o próximo exercício/série não concluído
-          const currentExerciseObj = exercises[lastExerciseIndex];
-          if (currentExerciseObj && lastSetIndex + 1 >= currentExerciseObj.sets) {
+          if (exerciseObj && lastSetIndex + 1 >= (exerciseObj.sets || 1)) {
             // Se todas as séries do último exercício foram concluídas, passar para o próximo
-            setCurrentExerciseIndex(lastExerciseIndex + 1);
+            const nextExerciseIndex = Math.min(lastExerciseIndex + 1, exercises.length - 1);
+            setCurrentExerciseIndex(nextExerciseIndex);
             setCurrentSetIndex(0);
           } else {
             // Senão, continuar no mesmo exercício, próxima série
@@ -1092,13 +1120,6 @@ export default function WorkoutMode() {
       setWorkoutStartTime(startTime);
       setIsWorkoutActive(true);
       setRepsCompleted(0);
-      
-      // Configurar o exercício atual
-      const currentExercise = exercises[currentExerciseIndex];
-      if (currentExercise && currentExercise.time) {
-        setTimeRemaining(currentExercise.time);
-        setTimerActive(false); // Não inicia o timer automaticamente ao retomar
-      }
       
       // Notificar o usuário
       alert('Treino retomado com sucesso!');
@@ -1479,6 +1500,27 @@ export default function WorkoutMode() {
     }
   };
 
+  // Efeito para garantir que temos um currentExercise válido sempre que exercícios são carregados
+  useEffect(() => {
+    // Se os exercícios acabaram de ser carregados e o treino está ativo
+    if (exercises.length > 0 && isWorkoutActive) {
+      // Verificar se o currentExerciseIndex está dentro dos limites
+      if (currentExerciseIndex >= exercises.length) {
+        // Se não, ajustar para o último exercício válido
+        setCurrentExerciseIndex(exercises.length - 1);
+        console.log('Ajustando currentExerciseIndex para um valor válido:', exercises.length - 1);
+      }
+      
+      // Verificar se temos valores inválidos no currentSetIndex
+      const currentEx = exercises[currentExerciseIndex];
+      if (currentEx && currentSetIndex >= currentEx.sets) {
+        // Se o índice da série for maior que o número de séries, ajustar
+        setCurrentSetIndex(Math.max(0, currentEx.sets - 1));
+        console.log('Ajustando currentSetIndex para um valor válido:', Math.max(0, currentEx.sets - 1));
+      }
+    }
+  }, [exercises, isWorkoutActive, currentExerciseIndex, currentSetIndex]);
+
   if (loading) {
     return (
       <Layout title="Carregando...">
@@ -1489,9 +1531,6 @@ export default function WorkoutMode() {
     );
   }
 
-  const currentExercise = isWorkoutActive && exercises.length > 0 && currentExerciseIndex < exercises.length 
-    ? exercises[currentExerciseIndex] 
-    : null;
   const videoId = currentExercise ? getYoutubeVideoId(currentExercise?.video_url) : null;
 
   return (
@@ -1696,7 +1735,7 @@ export default function WorkoutMode() {
                 <div
                     className="bg-gradient-to-r from-blue-500 to-indigo-500 h-3 rounded-full transition-all duration-300 ease-in-out"
                   style={{
-                    width: `${((currentExerciseIndex + (currentSetIndex / currentExercise.sets)) / exercises.length) * 100}%`
+                    width: `${((currentExerciseIndex + (currentSetIndex / (currentExercise?.sets || 1))) / exercises.length) * 100}%`
                   }}
                 ></div>
               </div>
@@ -1731,67 +1770,86 @@ export default function WorkoutMode() {
               </div>
               
               <div className="p-6">
-                <div className="flex items-center mb-6">
-                  <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 flex items-center justify-center font-bold mr-3">
-                    {currentExerciseIndex + 1}
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">
-                  {currentExercise.name}
-                </h3>
-                </div>
-                
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-                  {currentExercise.weight && (
-                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
-                      </svg>
-                      <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Carga</span>
-                      <div className="flex items-center mt-1">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.5"
-                          value={currentExercise.weight || 0}
-                          onChange={(e) => {
-                            const value = parseFloat(e.target.value) || 0;
-                            updateExerciseWeight(Math.max(0, value));
-                          }}
-                          className="w-20 h-9 px-2 rounded-md border border-gray-300 dark:border-gray-600 text-center font-bold text-gray-800 dark:text-gray-100 text-lg bg-white dark:bg-gray-700"
-                          aria-label="Carga em kg"
-                        />
-                        <span className="ml-2 font-bold text-gray-800 dark:text-gray-100 text-lg">kg</span>
+                {currentExercise ? (
+                  <>
+                    <div className="flex items-center mb-6">
+                      <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 flex items-center justify-center font-bold mr-3">
+                        {currentExerciseIndex + 1}
                       </div>
+                      <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                        {currentExercise.name}
+                      </h3>
                     </div>
-                  )}
-                  <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                    </svg>
-                    <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Séries</span>
-                    <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{currentSetIndex + 1} / {currentExercise.sets}</span>
+                    
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                      {currentExercise.weight && (
+                        <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                          </svg>
+                          <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Carga</span>
+                          <div className="flex items-center mt-1">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              value={currentExercise.weight || 0}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value) || 0;
+                                updateExerciseWeight(Math.max(0, value));
+                              }}
+                              className="w-20 h-9 px-2 rounded-md border border-gray-300 dark:border-gray-600 text-center font-bold text-gray-800 dark:text-gray-100 text-lg bg-white dark:bg-gray-700"
+                              aria-label="Carga em kg"
+                            />
+                            <span className="ml-2 font-bold text-gray-800 dark:text-gray-100 text-lg">kg</span>
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                        </svg>
+                        <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Séries</span>
+                        <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{currentSetIndex + 1} / {currentExercise?.sets || 0}</span>
+                      </div>
+                      {currentExercise.reps && (
+                        <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                          </svg>
+                          <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Repetições</span>
+                          <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{repsCompleted} / {currentExercise.reps}</span>
+                        </div>
+                      )}
+                      {currentExercise.time && timerActive && (
+                        <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                          </svg>
+                          <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Tempo Restante</span>
+                          <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{formatTime(timeRemaining)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500 dark:text-gray-400">
+                      Nenhum exercício disponível. Por favor, verifique se os exercícios foram carregados corretamente ou tente reiniciar o treino.
+                    </p>
+                    <button
+                      onClick={() => {
+                        // Tentar recarregar a página para resolver o problema
+                        window.location.reload();
+                      }}
+                      className="mt-4 px-6 py-2 bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                    >
+                      Recarregar página
+                    </button>
                   </div>
-                  {currentExercise.reps && (
-                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-                      </svg>
-                      <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Repetições</span>
-                      <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{repsCompleted} / {currentExercise.reps}</span>
-                    </div>
-                  )}
-                  {currentExercise.time && timerActive && (
-                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                      </svg>
-                      <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Tempo Restante</span>
-                      <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{formatTime(timeRemaining)}</span>
-                    </div>
-                  )}
-                </div>
+                )}
                 
-                {currentExercise.reps && !timerActive && (
+                {currentExercise?.reps && !timerActive && (
                   <div className="mb-6">
                     <div className="flex flex-col md:flex-row items-center justify-center gap-4 mb-4">
                       <div className="flex items-center justify-center p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-center w-full md:w-auto">
@@ -1800,31 +1858,31 @@ export default function WorkoutMode() {
                           <input
                             type="number"
                             min="0"
-                            max={currentExercise.reps}
+                            max={currentExercise?.reps || 0}
                             value={repsCompleted}
                             onChange={handleRepsChange}
                             className="w-16 h-10 px-2 rounded-md border border-gray-300 dark:border-gray-600 text-center font-bold text-blue-700 dark:text-blue-400 text-xl bg-white dark:bg-gray-700"
                           />
-                          <span className="ml-2 text-gray-500 dark:text-gray-400">/ {currentExercise.reps}</span>
+                          <span className="ml-2 text-gray-500 dark:text-gray-400">/ {currentExercise?.reps || 0}</span>
                         </div>
                       </div>
                       
                     <button
                         onClick={handleRepsCompleted}
                         className={`px-6 py-3 rounded-full font-bold shadow transition-all w-full md:w-auto
-                          ${repsCompleted >= currentExercise.reps ? 'bg-green-500 dark:bg-green-600 hover:bg-green-600 dark:hover:bg-green-700 text-white' : 'bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white'}`}
+                          ${repsCompleted >= (currentExercise?.reps || 0) ? 'bg-green-500 dark:bg-green-600 hover:bg-green-600 dark:hover:bg-green-700 text-white' : 'bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white'}`}
                       >
-                        {repsCompleted >= currentExercise.reps ? 'Série Completa' : 'Confirmar'}
+                        {repsCompleted >= (currentExercise?.reps || 0) ? 'Série Completa' : 'Confirmar'}
                       </button>
                     </div>
                   </div>
                 )}
                 
-                {currentExercise.time && !timerActive && (
+                {currentExercise?.time && !timerActive && (
                   <div className="flex justify-center mb-6">
                     <button
                       onClick={() => {
-                        setTimeRemaining(currentExercise.time);
+                        setTimeRemaining(currentExercise?.time || 0);
                         setTimerActive(true);
                         
                         // Inicializar o timer para iOS
@@ -1835,11 +1893,11 @@ export default function WorkoutMode() {
                           }
                           
                           const now = Date.now();
-                          exerciseTimerEndRef.current = now + (currentExercise.time * 1000);
+                          exerciseTimerEndRef.current = now + ((currentExercise?.time || 0) * 1000);
                           
                           // Salvar no localStorage para persistência
                           localStorage.setItem('treinoPro_exerciseTimerStart', now.toString());
-                          localStorage.setItem('treinoPro_exerciseTimerDuration', currentExercise.time.toString());
+                          localStorage.setItem('treinoPro_exerciseTimerDuration', (currentExercise?.time || 0).toString());
                           localStorage.setItem('treinoPro_exerciseTimerEnd', exerciseTimerEndRef.current.toString());
                         }
                         
@@ -1848,7 +1906,7 @@ export default function WorkoutMode() {
                       }}
                       className="px-6 py-3 bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-full font-bold shadow transition-all"
                     >
-                      Iniciar Temporizador ({currentExercise.time}s)
+                      Iniciar Temporizador ({currentExercise?.time || 0}s)
                     </button>
                   </div>
                 )}
@@ -1874,7 +1932,7 @@ export default function WorkoutMode() {
                           stroke="#3b82f6"
                           strokeWidth="5"
                           strokeDasharray="283"
-                          strokeDashoffset={283 - ((timeRemaining / currentExercise.time) * 283)}
+                          strokeDashoffset={283 - ((timeRemaining / (currentExercise?.time || 1)) * 283)}
                           transform="rotate(-90 50 50)"
                           className="dark:stroke-blue-500"
                         />
