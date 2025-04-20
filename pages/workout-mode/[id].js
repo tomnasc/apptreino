@@ -59,6 +59,52 @@ export default function WorkoutMode() {
   // Calculamos o objeto de exercício atual com base no índice
   const currentExercise = exercises[currentExerciseIndex] || null;
   
+  // Efeito para lidar com sessão da URL
+  useEffect(() => {
+    if (router.isReady && router.query.session && !isWorkoutActive) {
+      console.log('Detectada sessão na URL:', router.query.session);
+      
+      // Se existir um ID de sessão na URL mas o treino não estiver ativo,
+      // verificar se a sessão existe e não está finalizada
+      const checkAndResumeSession = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('workout_sessions')
+            .select('id, completed')
+            .eq('id', router.query.session)
+            .single();
+            
+          if (error) {
+            console.error('Erro ao verificar sessão da URL:', error);
+            return;
+          }
+          
+          if (data && !data.completed) {
+            console.log('Encontrada sessão válida não finalizada, resumindo automaticamente');
+            resumeWorkout(data.id);
+          }
+        } catch (error) {
+          console.error('Erro ao verificar sessão da URL:', error);
+        }
+      };
+      
+      checkAndResumeSession();
+    }
+  }, [router.isReady, router.query.session, isWorkoutActive]);
+
+  // Efeito para recuperar o sessionId da URL quando a página é carregada
+  useEffect(() => {
+    if (router.isReady && router.query.session) {
+      console.log('Sessão recuperada da URL:', router.query.session);
+      setSessionId(router.query.session);
+      
+      // Salvar no localStorage para persistência
+      if (id && router.query.session) {
+        localStorage.setItem(`treinoPro_sessionId_${id}`, router.query.session);
+      }
+    }
+  }, [router.isReady, router.query.session, id]);
+
   // Efeito para atualizar o título e garantir que temos um exercício válido
   useEffect(() => {
     if (isWorkoutActive && exercises.length > 0) {
@@ -69,7 +115,7 @@ export default function WorkoutMode() {
       }
     }
   }, [isWorkoutActive, exercises, currentExerciseIndex]);
-  
+
   // Detectar se é um dispositivo iOS
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -646,19 +692,19 @@ export default function WorkoutMode() {
       // Se o primeiro exercício for baseado em tempo, configurar o timer
       if (exercises.length > 0 && exercises[0].time) {
         setTimeRemaining(exercises[0].time);
-      }
+    }
 
-      try {
-        // Criar uma nova sessão de treino
-        const { data, error } = await supabase
-          .from('workout_sessions')
-            .insert({
-              user_id: user.id,
-              workout_list_id: id,
-              started_at: startTime.toISOString()
-            })
-            .select('id')
-            .single();
+    try {
+      // Criar uma nova sessão de treino
+      const { data, error } = await supabase
+        .from('workout_sessions')
+          .insert({
+            user_id: user.id,
+            workout_list_id: id,
+            started_at: startTime.toISOString()
+          })
+          .select('id')
+          .single();
 
         if (error) {
           setError(`Erro ao iniciar treino: ${error.message}`);
@@ -668,7 +714,17 @@ export default function WorkoutMode() {
           return;
         }
         
+        // Persistir o sessionId no state e no localStorage
         setSessionId(data.id);
+        
+        // Salvar sessionId no localStorage para persistência
+        try {
+          localStorage.setItem(`treinoPro_sessionId_${id}`, data.id);
+          localStorage.setItem(`treinoPro_isWorkoutActive_${id}`, 'true');
+          localStorage.setItem(`treinoPro_workoutStartTime_${id}`, startTime.toISOString());
+        } catch (storageError) {
+          console.error('Erro ao salvar sessionId no localStorage:', storageError);
+        }
         
         // Atualizar a URL com o ID da sessão para possibilitar a retomada
         router.replace(`/workout-mode/${id}?session=${data.id}`, undefined, { 
@@ -747,28 +803,89 @@ export default function WorkoutMode() {
         return;
       }
       
-      // Verificar se existe um sessionId
-      if (!sessionId) {
-        // Tentar recuperar o sessionId do localStorage como último recurso
+      // Tentar obter o sessionId de várias fontes
+      let finalSessionId = sessionId;
+      
+      // Se não há sessionId no estado, tentar obter do localStorage
+      if (!finalSessionId) {
         const storedSessionId = localStorage.getItem(`treinoPro_sessionId_${id}`);
-        
         if (storedSessionId) {
           console.log('Recuperando sessionId do localStorage:', storedSessionId);
-          setSessionId(storedSessionId);
-        } else {
-          console.error('Não é possível finalizar: sessionId não existe');
-          alert('Erro: ID da sessão de treino não encontrado. Tente recarregar a página.');
-          isSubmittingRef.current = false;
-          restoreButtonState();
-          return;
+          finalSessionId = storedSessionId;
+          setSessionId(storedSessionId); // Atualizar o estado
         }
       }
-
-      const finalSessionId = sessionId || localStorage.getItem(`treinoPro_sessionId_${id}`);
+      
+      // Se ainda não há sessionId, tentar obter dos parâmetros de URL
+      if (!finalSessionId && router.query.session) {
+        console.log('Recuperando sessionId da URL:', router.query.session);
+        finalSessionId = router.query.session;
+        setSessionId(router.query.session); // Atualizar o estado
+      }
+      
+      // Se ainda não há sessionId, procurar uma sessão ativa no banco de dados
+      if (!finalSessionId) {
+        console.log('Tentando encontrar sessão ativa no banco de dados');
+        try {
+          const { data: activeSessions, error: activeSessionError } = await supabase
+            .from('workout_sessions')
+            .select('id')
+            .eq('workout_list_id', id)
+            .eq('user_id', user.id)
+            .eq('completed', false)
+            .order('started_at', { ascending: false })
+            .limit(1);
+            
+          if (activeSessionError) {
+            console.error('Erro ao buscar sessões ativas:', activeSessionError);
+          } else if (activeSessions && activeSessions.length > 0) {
+            console.log('Sessão ativa encontrada no banco de dados:', activeSessions[0].id);
+            finalSessionId = activeSessions[0].id;
+            setSessionId(activeSessions[0].id); // Atualizar o estado
+            
+            // Salvar no localStorage para futuras referências
+            localStorage.setItem(`treinoPro_sessionId_${id}`, finalSessionId);
+          }
+        } catch (dbError) {
+          console.error('Erro ao buscar sessões ativas:', dbError);
+        }
+      }
+      
+      // Se ainda não há sessionId, criar uma nova sessão
+      if (!finalSessionId) {
+        console.log('Criando uma nova sessão como último recurso');
+        try {
+          const startTime = workoutStartTime || new Date(Date.now() - 60000); // Fallback para 1 minuto atrás
+          
+          const { data: newSession, error: newSessionError } = await supabase
+            .from('workout_sessions')
+            .insert({
+              user_id: user.id,
+              workout_list_id: id,
+              started_at: startTime.toISOString()
+            })
+            .select('id')
+            .single();
+            
+          if (newSessionError) {
+            console.error('Erro ao criar nova sessão:', newSessionError);
+            throw new Error('Não foi possível criar uma nova sessão');
+          }
+          
+          console.log('Nova sessão criada:', newSession.id);
+          finalSessionId = newSession.id;
+          setSessionId(newSession.id); // Atualizar o estado
+          
+          // Salvar no localStorage para futuras referências
+          localStorage.setItem(`treinoPro_sessionId_${id}`, finalSessionId);
+        } catch (createError) {
+          console.error('Erro ao criar nova sessão:', createError);
+        }
+      }
       
       if (!finalSessionId) {
         console.error('Não foi possível obter um ID de sessão válido para finalizar o treino');
-        alert('Erro: Não foi possível finalizar o treino. ID da sessão não encontrado.');
+        showErrorMessageModal('Não foi possível encontrar o ID da sessão de treino. Você pode tentar corrigir automaticamente ou recarregar a página manualmente.');
         isSubmittingRef.current = false;
         restoreButtonState();
         return;
@@ -785,18 +902,45 @@ export default function WorkoutMode() {
       
       if (sessionCheckError) {
         console.error('Erro ao verificar sessão no Supabase:', sessionCheckError);
-        throw new Error('Sessão não encontrada no banco de dados');
+        
+        // Se o erro for "não encontrado", criar uma nova sessão como último recurso
+        if (sessionCheckError.code === 'PGRST116') {
+          console.log('Sessão não encontrada, criando uma nova');
+          
+          try {
+            const startTime = workoutStartTime || new Date(Date.now() - 60000); // Fallback para 1 minuto atrás
+            
+            const { data: newSession, error: newSessionError } = await supabase
+              .from('workout_sessions')
+              .insert({
+                user_id: user.id,
+                workout_list_id: id,
+                started_at: startTime.toISOString()
+              })
+              .select('id')
+              .single();
+              
+            if (newSessionError) {
+              console.error('Erro ao criar nova sessão:', newSessionError);
+              throw new Error('Não foi possível criar uma nova sessão');
+            }
+            
+            console.log('Nova sessão criada:', newSession.id);
+            finalSessionId = newSession.id;
+            setSessionId(newSession.id); // Atualizar o estado
+            
+            // Salvar no localStorage para futuras referências
+            localStorage.setItem(`treinoPro_sessionId_${id}`, finalSessionId);
+          } catch (createError) {
+            console.error('Erro ao criar nova sessão:', createError);
+            throw new Error('Não foi possível criar uma nova sessão');
+          }
+        } else {
+          throw new Error('Sessão não encontrada no banco de dados');
+        }
       }
       
-      if (!sessionData) {
-        console.error('Sessão não encontrada no banco de dados');
-        alert('Erro: Sessão de treino não encontrada no banco de dados.');
-        isSubmittingRef.current = false;
-        restoreButtonState();
-        return;
-      }
-      
-      if (sessionData.completed) {
+      if (sessionData && sessionData.completed) {
         console.log('Esta sessão já está marcada como concluída no banco de dados');
         // Limpar tudo e redirecionar
         cleanupWorkoutState();
@@ -880,20 +1024,20 @@ export default function WorkoutMode() {
     } catch (e) {
       console.error('Erro ao limpar localStorage:', e);
     }
-    
-    // Resetar o estado do treino
-    setIsWorkoutActive(false);
-    setCurrentExerciseIndex(0);
-    setCurrentSetIndex(0);
-    setCompletedSets({});
-    setTimerActive(false);
-    setTimeRemaining(0);
-    setRestTimerActive(false);
-    setRestTimeRemaining(0);
-    setWorkoutStartTime(null);
-    setSessionId(null);
+      
+      // Resetar o estado do treino
+      setIsWorkoutActive(false);
+      setCurrentExerciseIndex(0);
+      setCurrentSetIndex(0);
+      setCompletedSets({});
+      setTimerActive(false);
+      setTimeRemaining(0);
+      setRestTimerActive(false);
+      setRestTimeRemaining(0);
+      setWorkoutStartTime(null);
+      setSessionId(null);
     setRepsCompleted('');
-    setSetRepsHistory({});
+      setSetRepsHistory({});
   };
 
   // Nova função para verificar se uma sessão já foi concluída
@@ -1256,7 +1400,7 @@ export default function WorkoutMode() {
     }
     
     // Sempre permitir concluir se o número mínimo de repetições for atingido
-    handleSetCompleted();
+      handleSetCompleted();
   };
 
   // Função para pular o exercício atual e movê-lo para o final da ficha
@@ -1419,9 +1563,9 @@ export default function WorkoutMode() {
         const newCompletedSets = {};
         const newSetRepsHistory = {};
         
-        let lastExerciseIndex = 0;
-        let lastSetIndex = 0;
-        
+          let lastExerciseIndex = 0;
+          let lastSetIndex = 0;
+          
         if (sessionDetails && sessionDetails.length > 0) {
           // Identificar o último exercício e série concluídos
           sessionDetails.forEach(detail => {
@@ -1887,6 +2031,104 @@ export default function WorkoutMode() {
     }
   }, [exercises, isWorkoutActive, currentExerciseIndex, currentSetIndex]);
 
+  // Adicionar estado para o modal de erro
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isRecovering, setIsRecovering] = useState(false);
+
+  // Função para mostrar modal de erro personalizado
+  const showErrorMessageModal = (message) => {
+    setErrorMessage(message);
+    setShowErrorModal(true);
+    setIsRecovering(false);
+  };
+
+  // Função para tentar recuperar a sessão
+  const recoverSession = async () => {
+    setIsRecovering(true);
+    
+    try {
+      // Buscar a sessão ativa mais recente
+      const { data: activeSessions, error: activeSessionError } = await supabase
+        .from('workout_sessions')
+        .select('id')
+        .eq('workout_list_id', id)
+        .eq('user_id', user.id)
+        .eq('completed', false)
+        .order('started_at', { ascending: false })
+        .limit(1);
+        
+      if (activeSessionError) {
+        console.error('Erro ao buscar sessões ativas:', activeSessionError);
+        setTimeout(() => location.reload(), 1000);
+        return;
+      }
+      
+      if (activeSessions && activeSessions.length > 0) {
+        // Sessão ativa encontrada, atualizar a URL e recarregar
+        const newUrl = `/workout-mode/${id}?session=${activeSessions[0].id}`;
+        console.log('Redirecionando para:', newUrl);
+        router.push(newUrl);
+      } else {
+        // Nenhuma sessão ativa encontrada, apenas recarregar
+        setTimeout(() => location.reload(), 1000);
+      }
+    } catch (error) {
+      console.error('Erro ao recuperar sessão:', error);
+      setTimeout(() => location.reload(), 1000);
+    }
+  };
+  
+  // Modal de erro personalizado
+  const SessionErrorModal = () => {
+    if (!showErrorModal) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+        <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full">
+          <div className="flex flex-col items-center text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} 
+              stroke="currentColor" className="w-16 h-16 text-red-500 mb-4">
+              <path strokeLinecap="round" strokeLinejoin="round" 
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            
+            <h2 className="text-xl font-bold mb-2">Erro na Sessão de Treino</h2>
+            <p className="mb-6">{errorMessage}</p>
+            
+            <div className="flex flex-col sm:flex-row gap-3 w-full">
+              <button
+                onClick={recoverSession}
+                disabled={isRecovering}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex-1 flex items-center justify-center"
+              >
+                {isRecovering ? (
+                  <svg className="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} 
+                    stroke="currentColor" className="w-5 h-5 mr-2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                )}
+                {isRecovering ? 'Tentando recuperar...' : 'Corrigir automaticamente'}
+              </button>
+              
+              <button
+                onClick={() => setShowErrorModal(false)}
+                className="border border-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg flex-1"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <Layout title="Carregando...">
@@ -2135,23 +2377,23 @@ export default function WorkoutMode() {
               <div className="p-6">
                 {currentExercise ? (
                   <>
-                    <div className="flex items-center mb-6">
-                      <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 flex items-center justify-center font-bold mr-3">
-                        {currentExerciseIndex + 1}
-                      </div>
-                      <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">
-                        {currentExercise.name}
-                      </h3>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-                      {currentExercise.weight && (
-                        <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
-                          </svg>
-                          <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Carga</span>
-                          <div className="flex items-center mt-1">
+                <div className="flex items-center mb-6">
+                  <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 flex items-center justify-center font-bold mr-3">
+                    {currentExerciseIndex + 1}
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                  {currentExercise.name}
+                </h3>
+                </div>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                  {currentExercise.weight && (
+                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                      </svg>
+                      <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Carga</span>
+                      <div className="flex items-center mt-1">
                             <input
                               type="number"
                               min="0"
@@ -2165,37 +2407,37 @@ export default function WorkoutMode() {
                               aria-label="Carga em kg"
                             />
                             <span className="ml-2 font-bold text-gray-800 dark:text-gray-100 text-lg">kg</span>
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                        </svg>
-                        <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Séries</span>
-                        <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{currentSetIndex + 1} / {currentExercise?.sets || 0}</span>
                       </div>
-                      {currentExercise.reps && (
-                        <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-                          </svg>
-                          <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Repetições</span>
+                    </div>
+                  )}
+                  <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                    </svg>
+                    <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Séries</span>
+                        <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{currentSetIndex + 1} / {currentExercise?.sets || 0}</span>
+                  </div>
+                  {currentExercise.reps && (
+                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                      </svg>
+                      <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Repetições</span>
                           <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">
                             {repsCompleted === '' ? '0' : repsCompleted} / {currentExercise.reps}
                           </span>
-                        </div>
-                      )}
-                      {currentExercise.time && timerActive && (
-                        <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                          </svg>
-                          <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Tempo Restante</span>
-                          <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{formatTime(timeRemaining)}</span>
-                        </div>
-                      )}
                     </div>
+                  )}
+                  {currentExercise.time && timerActive && (
+                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                      <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Tempo Restante</span>
+                      <span className="font-bold text-gray-800 dark:text-gray-100 text-lg">{formatTime(timeRemaining)}</span>
+                    </div>
+                  )}
+                </div>
                   </>
                 ) : (
                   <div className="text-center py-8">
@@ -2577,6 +2819,9 @@ export default function WorkoutMode() {
       
       {/* Espaçamento adicional para compensar o botão flutuante */}
       {isWorkoutActive && <div className="h-20"></div>}
+      
+      {/* Modal de erro da sessão */}
+      <SessionErrorModal />
     </Layout>
   );
 } 
