@@ -12,7 +12,7 @@ export default function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settings, setSettings] = useState({
-    free_trial_days: '14',
+    free_trial_days: '30',
   });
   const [originalSettings, setOriginalSettings] = useState({});
   

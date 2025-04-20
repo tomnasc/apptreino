@@ -108,7 +108,7 @@ export async function checkUserAccess(user, supabaseClient = null) {
 
           const freeDays = settings?.setting_value 
             ? parseInt(settings.setting_value) 
-            : 14; // 14 dias por padrão
+            : 30; // 30 dias por padrão
           
           const createdAt = new Date(profile.created_at);
           const expiryDate = new Date(createdAt);

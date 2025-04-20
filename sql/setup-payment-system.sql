@@ -97,7 +97,7 @@ EXECUTE FUNCTION public.update_timestamp();
 -- Definir configurações padrão
 INSERT INTO public.app_settings (setting_key, setting_value, description)
 VALUES 
-  ('free_trial_days', '14', 'Número de dias para período de teste de usuários gratuitos')
+  ('free_trial_days', '30', 'Número de dias para período de teste de usuários gratuitos')
 ON CONFLICT (setting_key) 
 DO UPDATE SET 
   setting_value = EXCLUDED.setting_value,

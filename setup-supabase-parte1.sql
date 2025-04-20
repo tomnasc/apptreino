@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
 
 -- Inserir configuração padrão para tempo de teste dos usuários gratuitos (em dias)
 INSERT INTO app_settings (setting_key, setting_value, description)
-VALUES ('free_trial_days', '14', 'Número de dias para período de teste de usuários gratuitos')
+VALUES ('free_trial_days', '30', 'Número de dias para período de teste de usuários gratuitos')
 ON CONFLICT (setting_key) DO NOTHING;
 
 -- Criar tabela separada para indicar usuários admin (para evitar recursão)
@@ -121,7 +121,7 @@ CREATE POLICY "Todos os usuários podem ver configurações"
 
 -- Popular perfis para usuários existentes
 INSERT INTO user_profiles (id, email, plan_type, start_date, expiry_date)
-SELECT id, email, 'free', NOW(), NOW() + INTERVAL '14 days'
+SELECT id, email, 'free', NOW(), NOW() + INTERVAL '30 days'
 FROM auth.users
 WHERE id NOT IN (SELECT id FROM user_profiles)
 ON CONFLICT (id) DO NOTHING;

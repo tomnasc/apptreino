@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
 
 -- Inserir configuração padrão para tempo de teste dos usuários gratuitos (em dias)
 INSERT INTO app_settings (setting_key, setting_value, description)
-VALUES ('free_trial_days', '14', 'Número de dias para período de teste de usuários gratuitos')
+VALUES ('free_trial_days', '30', 'Número de dias para período de teste de usuários gratuitos')
 ON CONFLICT (setting_key) DO NOTHING;
 
 -- Criar tabela separada para indicar usuários admin (para evitar recursão)
@@ -81,7 +81,7 @@ CREATE POLICY "Usuários podem atualizar seu próprio perfil"
 
 -- Popular perfis para usuários existentes
 INSERT INTO user_profiles (id, email, plan_type, start_date, expiry_date)
-SELECT id, email, 'free', NOW(), NOW() + INTERVAL '14 days'
+SELECT id, email, 'free', NOW(), NOW() + INTERVAL '30 days'
 FROM auth.users
 WHERE id NOT IN (SELECT id FROM user_profiles)
 ON CONFLICT (id) DO NOTHING;
@@ -211,7 +211,7 @@ BEGIN
       RETURN NOW() < user_expiry;
     ELSE
       -- Se não tiver data, verificar a configuração global e calcular
-      SELECT COALESCE((SELECT setting_value::INTEGER FROM app_settings WHERE setting_key = 'free_trial_days'), 14)
+      SELECT COALESCE((SELECT setting_value::INTEGER FROM app_settings WHERE setting_key = 'free_trial_days'), 30)
       INTO free_days;
       
       RETURN (SELECT created_at + (free_days || ' days')::INTERVAL > NOW() FROM user_profiles WHERE id = auth.uid());
@@ -246,7 +246,7 @@ DECLARE
   expiry_date TIMESTAMP WITH TIME ZONE;
 BEGIN
   -- Obter a configuração de dias de teste
-  SELECT COALESCE((SELECT setting_value::INTEGER FROM app_settings WHERE setting_key = 'free_trial_days'), 14)
+  SELECT COALESCE((SELECT setting_value::INTEGER FROM app_settings WHERE setting_key = 'free_trial_days'), 30)
   INTO free_days;
   
   -- Calcular data de expiração para usuários gratuitos

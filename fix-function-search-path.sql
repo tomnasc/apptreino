@@ -73,7 +73,7 @@ BEGIN
       RETURN NOW() < user_expiry;
     ELSE
       -- Se não tiver data, verificar a configuração global e calcular
-      SELECT COALESCE((SELECT setting_value::INTEGER FROM app_settings WHERE setting_key = 'free_trial_days'), 14)
+      SELECT COALESCE((SELECT setting_value::INTEGER FROM app_settings WHERE setting_key = 'free_trial_days'), 30)
       INTO free_days;
       
       RETURN (SELECT created_at + (free_days || ' days')::INTERVAL > NOW() FROM user_profiles WHERE id = auth.uid());
@@ -110,7 +110,7 @@ DECLARE
   expiry_date TIMESTAMP WITH TIME ZONE;
 BEGIN
   -- Obter a configuração de dias de teste
-  SELECT COALESCE((SELECT setting_value::INTEGER FROM app_settings WHERE setting_key = 'free_trial_days'), 14)
+  SELECT COALESCE((SELECT setting_value::INTEGER FROM app_settings WHERE setting_key = 'free_trial_days'), 30)
   INTO free_days;
   
   -- Calcular data de expiração para usuários gratuitos
