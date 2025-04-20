@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { toast } from 'react-hot-toast';
 import Layout from '../components/Layout';
-import { FiArrowLeft, FiStar, FiThumbsUp, FiThumbsDown, FiCheck } from 'react-icons/fi';
+import { FiArrowLeft, FiStar, FiThumbsUp, FiThumbsDown, FiCheck, FiMessageCircle } from 'react-icons/fi';
+import WorkoutChat from '../components/WorkoutChat';
 
 export default function WorkoutSuggestionsPage() {
   const router = useRouter();
@@ -18,6 +19,7 @@ export default function WorkoutSuggestionsPage() {
   const [suggestedWorkouts, setSuggestedWorkouts] = useState([]);
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [expandedExercise, setExpandedExercise] = useState(null);
+  const [chatWorkout, setChatWorkout] = useState(null);
   
   useEffect(() => {
     if (!user) {
@@ -350,6 +352,11 @@ export default function WorkoutSuggestionsPage() {
     }
   };
   
+  // Função para selecionar um treino para o chat
+  const selectWorkoutForChat = (workout) => {
+    setChatWorkout(workout);
+  };
+  
   // Mapear tradução para possíveis termos em inglês
   const translateMuscle = (muscle) => {
     const translations = {
@@ -464,21 +471,16 @@ export default function WorkoutSuggestionsPage() {
   }
   
   return (
-    <Layout>
+    <Layout title="Sugestões de Treino">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-6 flex items-center">
           <button
             onClick={() => router.push('/dashboard')}
-            className="mr-4 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+            className="mr-2 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
           >
             <FiArrowLeft size={20} />
           </button>
-          <div>
-            <h1 className="text-2xl font-bold dark-text-primary">Sugestões de Treino</h1>
-            <p className="dark-text-secondary">
-              Com base na sua avaliação{measurements ? ' e medidas corporais' : ''}, vamos gerar um treino personalizado para você.
-            </p>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Sugestões de Treino</h1>
         </div>
         
         {/* Resumo da avaliação */}
@@ -615,6 +617,14 @@ export default function WorkoutSuggestionsPage() {
                       >
                         <FiThumbsDown size={16} />
                       </button>
+                      {/* Botão para tirar dúvidas sobre este treino */}
+                      <button
+                        onClick={() => selectWorkoutForChat(workout)}
+                        className="p-2 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                        title="Tirar dúvidas sobre este treino"
+                      >
+                        <FiMessageCircle size={16} />
+                      </button>
                     </div>
                     
                     <button
@@ -632,6 +642,15 @@ export default function WorkoutSuggestionsPage() {
               </div>
             ))}
           </div>
+        )}
+        
+        {/* Adicionar componente de chat */}
+        {user && chatWorkout && (
+          <WorkoutChat 
+            workout={chatWorkout} 
+            assessmentId={assessmentId} 
+            userId={user.id}
+          />
         )}
         
         {/* Navegação para Dashboard ou Treinos */}
