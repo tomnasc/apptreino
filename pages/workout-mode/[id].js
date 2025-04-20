@@ -1953,6 +1953,10 @@ export default function WorkoutMode() {
     if (!currentExercise || !isWorkoutActive) return;
     
     try {
+      // Garantir que newWeight seja um número, mesmo que seja 0
+      const weightValue = parseFloat(newWeight);
+      const validWeight = isNaN(weightValue) ? 0 : Math.max(0, weightValue);
+      
       // Obter o ID do exercício atual para garantir que estamos atualizando o exercício certo
       const exerciseId = currentExercise.id;
       
@@ -1970,7 +1974,7 @@ export default function WorkoutMode() {
       // Atualizar o peso do exercício encontrado
       updatedExercises[exerciseIndex] = {
         ...updatedExercises[exerciseIndex],
-        weight: newWeight
+        weight: validWeight // Usar o peso validado
       };
       
       // Atualizar o estado com a nova lista de exercícios
@@ -1981,7 +1985,7 @@ export default function WorkoutMode() {
         const { error: sessionDetailError } = await supabase
           .from('workout_session_details')
           .update({
-            weight_used: newWeight
+            weight_used: validWeight // Usar o peso validado
           })
           .eq('session_id', sessionId)
           .eq('exercise_id', exerciseId)
@@ -1996,14 +2000,14 @@ export default function WorkoutMode() {
       const { error: exerciseUpdateError } = await supabase
         .from('workout_exercises')
         .update({
-          weight: newWeight
+          weight: validWeight // Usar o peso validado
         })
         .eq('id', exerciseId);
         
       if (exerciseUpdateError) {
         console.error('Erro ao atualizar carga permanente:', exerciseUpdateError);
       } else {
-        console.log(`Carga atualizada com sucesso para ${newWeight}kg no exercício ${currentExercise.name}`);
+        console.log(`Carga atualizada com sucesso para ${validWeight}kg no exercício ${currentExercise.name}`);
       }
     } catch (error) {
       console.error('Erro ao atualizar carga:', error);
@@ -2387,29 +2391,28 @@ export default function WorkoutMode() {
                 </div>
                 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-                  {currentExercise.weight && (
-                    <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
-                      </svg>
-                      <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Carga</span>
-                      <div className="flex items-center mt-1">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.5"
-                              value={currentExercise.weight || 0}
-                              onChange={(e) => {
-                                const value = parseFloat(e.target.value) || 0;
-                                updateExerciseWeight(Math.max(0, value));
-                              }}
-                              className="w-20 h-9 px-2 rounded-md border border-gray-300 dark:border-gray-600 text-center font-bold text-gray-800 dark:text-gray-100 text-lg bg-white dark:bg-gray-700"
-                              aria-label="Carga em kg"
-                            />
-                            <span className="ml-2 font-bold text-gray-800 dark:text-gray-100 text-lg">kg</span>
-                      </div>
+                  {/* Sempre exibir o campo de carga, independentemente do valor */}
+                  <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                    </svg>
+                    <span className="font-medium text-gray-500 dark:text-gray-400 text-xs">Carga</span>
+                    <div className="flex items-center mt-1">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={currentExercise.weight !== undefined && currentExercise.weight !== null ? currentExercise.weight : 0}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) || 0;
+                          updateExerciseWeight(Math.max(0, value));
+                        }}
+                        className="w-20 h-9 px-2 rounded-md border border-gray-300 dark:border-gray-600 text-center font-bold text-gray-800 dark:text-gray-100 text-lg bg-white dark:bg-gray-700"
+                        aria-label="Carga em kg"
+                      />
+                      <span className="ml-2 font-bold text-gray-800 dark:text-gray-100 text-lg">kg</span>
                     </div>
-                  )}
+                  </div>
                   <div className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500 dark:text-gray-400 mb-1">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
