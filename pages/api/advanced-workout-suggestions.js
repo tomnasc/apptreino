@@ -207,7 +207,7 @@ export default async function handler(req, res) {
       * Coxas: ${metrics.thighs || 'Não informado'} cm
       * Panturrilhas: ${metrics.calves || 'Não informado'} cm
     
-    Crie ${fitnessProfile.weekly_workout_target || 3} rotinas de treino diferentes, CONTENDO EXATAMENTE 8 EXERCÍCIOS EM PT-BR PARA CADA ROTINA, baseadas no perfil detalhado acima.
+    Crie ${fitnessProfile.workout_lists_count || fitnessProfile.weekly_workout_target || 3} rotinas de treino diferentes, CONTENDO EXATAMENTE 8 EXERCÍCIOS EM PT-BR PARA CADA ROTINA, baseadas no perfil detalhado acima.
     
     Para cada rotina de treino, DEVE CONTER EXATAMENTE 8 EXERCÍCIOS EM PT-BR, inclua:
     1. Nome da rotina em português e fácil de lembrar (A, B, C ou Dia 1, Dia 2, etc)

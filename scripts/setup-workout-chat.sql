@@ -39,23 +39,15 @@ CREATE POLICY "Usuários atualizam apenas feedback do seu próprio histórico"
   ON workout_chat_history
   FOR UPDATE
   USING (auth.uid() = user_id)
-  WITH CHECK (
-    -- Permitir atualizar apenas os campos de feedback
-    (OLD.user_id = NEW.user_id) AND
-    (OLD.assessment_id = NEW.assessment_id) AND
-    (OLD.workout_details = NEW.workout_details) AND
-    (OLD.user_message = NEW.user_message) AND
-    (OLD.ai_response = NEW.ai_response) AND
-    (OLD.timestamp = NEW.timestamp)
-  );
+  WITH CHECK (auth.uid() = user_id);
 
 -- Configurar permissões para administradores
--- Isso assume que você já tem uma função 'is_admin' configurada
+-- Isso verifica se o usuário está no grupo 'admin'
 CREATE POLICY "Administradores têm acesso completo ao histórico de chat"
   ON workout_chat_history
   FOR ALL
   USING (
-    (SELECT is_admin FROM public.users WHERE id = auth.uid())
+    auth.jwt() -> 'role' ? 'admin'
   );
 
 -- Comentário explicativo para ajudar administradores

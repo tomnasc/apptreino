@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
     
     // Criar prompt para o modelo
     const prompt = `
-    Por favor, crie 3 rotinas de treino diferentes para uma pessoa com as seguintes características:
+    Por favor, crie ${assessment.workout_lists_count} rotina${assessment.workout_lists_count > 1 ? 's' : ''} de treino diferentes para uma pessoa com as seguintes características:
     - Altura: ${assessment.height} cm
     - Peso: ${assessment.weight} kg
     - Idade: ${assessment.age} anos

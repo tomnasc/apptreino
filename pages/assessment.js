@@ -19,7 +19,8 @@ export default function AssessmentPage() {
     health_limitations: [],
     available_equipment: [],
     workout_days_per_week: 3,
-    workout_duration: 60
+    workout_duration: 60,
+    workout_lists_count: 3
   });
   
   const [lastMeasurements, setLastMeasurements] = useState(null);
@@ -142,7 +143,8 @@ export default function AssessmentPage() {
           health_limitations: assessment.health_limitations,
           available_equipment: assessment.available_equipment,
           workout_days_per_week: parseInt(assessment.workout_days_per_week),
-          workout_duration: parseInt(assessment.workout_duration)
+          workout_duration: parseInt(assessment.workout_duration),
+          workout_lists_count: parseInt(assessment.workout_lists_count)
         })
         .select()
         .single();
@@ -379,6 +381,25 @@ export default function AssessmentPage() {
                   {[30, 45, 60, 75, 90, 120].map(num => (
                     <option key={num} value={num}>
                       {num} minutos
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mb-4">
+                <label htmlFor="workout_lists_count" className="block text-sm font-medium dark-text-tertiary mb-1">
+                  Quantidade de Listas de Treino
+                </label>
+                <select
+                  id="workout_lists_count"
+                  name="workout_lists_count"
+                  value={assessment.workout_lists_count}
+                  onChange={handleChange}
+                  className="dark-input w-full"
+                >
+                  {[1, 2, 3, 4, 5, 6].map(num => (
+                    <option key={num} value={num}>
+                      {num} {num === 1 ? 'lista' : 'listas'} de treino
                     </option>
                   ))}
                 </select>

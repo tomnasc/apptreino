@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS user_assessments (
   available_equipment TEXT[], -- equipamentos disponíveis
   workout_days_per_week INT, -- dias por semana
   workout_duration INT,  -- duração média de treino em minutos
+  workout_lists_count INT DEFAULT 3, -- quantidade de listas de treino a serem geradas
   assessment_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   anonymized_id TEXT,    -- ID anonimizado para uso com serviços externos
   UNIQUE (user_id, assessment_date)
