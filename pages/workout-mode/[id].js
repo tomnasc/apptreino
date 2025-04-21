@@ -71,6 +71,9 @@ function WorkoutMode() {
   // Referência para o WakeLock
   const wakeLockRef = useRef(null);
   
+  // Referência para o áudio de alerta
+  const alertAudioRef = useRef(null);
+  
   // Calculamos o objeto de exercício atual com base no índice
   const currentExercise = exercises[currentExerciseIndex] || null;
 
@@ -378,8 +381,11 @@ function WorkoutMode() {
   // Função para tocar um som de alerta quando o timer terminar
   const playAlertSound = () => {
     try {
-      const audio = new Audio('/beep.mp3');
-      audio.play();
+      if (alertAudioRef && alertAudioRef.current) {
+        alertAudioRef.current.currentTime = 0;
+        alertAudioRef.current.play()
+          .catch(error => console.error('Erro ao tocar som:', error));
+      }
     } catch (error) {
       console.error('Erro ao tocar som:', error);
     }
