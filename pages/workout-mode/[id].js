@@ -59,6 +59,372 @@ export default function WorkoutMode() {
   // Calculamos o objeto de exercício atual com base no índice
   const currentExercise = exercises[currentExerciseIndex] || null;
   
+  // Adicionar estado para o modal de erro
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isRecovering, setIsRecovering] = useState(false);
+  
+  // Definir todas as funções antes de serem usadas por outras funções
+
+  // Formatação de tempo para exibição
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+  
+  // Função para mostrar modal de erro personalizado
+  const showErrorMessageModal = (message) => {
+    setErrorMessage(message);
+    setShowErrorModal(true);
+    setIsRecovering(false);
+  };
+  
+  // Extração de ID de vídeo do YouTube
+  const getYoutubeVideoId = (url) => {
+    if (!url) return null;
+    
+    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = url.match(regex);
+    
+    return match ? match[1] : null;
+  };
+
+  // Função para limpar o estado do treino
+  const cleanupWorkoutState = () => {
+    // Limpar timers e referencias
+    if (mainIntervalRef.current) {
+      clearInterval(mainIntervalRef.current);
+      mainIntervalRef.current = null;
+    }
+    
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
+    if (exerciseTimerRef.current) {
+      clearInterval(exerciseTimerRef.current);
+      exerciseTimerRef.current = null;
+    }
+    
+    // Limpar o localStorage
+    try {
+      localStorage.removeItem(`treinoPro_isWorkoutActive_${id}`);
+      localStorage.removeItem(`treinoPro_currentExerciseIndex_${id}`);
+      localStorage.removeItem(`treinoPro_currentSetIndex_${id}`);
+      localStorage.removeItem(`treinoPro_completedSets_${id}`);
+      localStorage.removeItem(`treinoPro_setRepsHistory_${id}`);
+      localStorage.removeItem(`treinoPro_sessionId_${id}`);
+      localStorage.removeItem(`treinoPro_workoutStartTime_${id}`);
+      localStorage.removeItem('treinoPro_timerState');
+    } catch (error) {
+      console.error('Erro ao limpar estado do treino:', error);
+    }
+  };
+  
+  // Função para finalizar o treino
+  const finishWorkout = async () => {
+    try {
+      if (sessionId) {
+        await supabase
+          .from('workout_sessions')
+          .update({
+            completed: true,
+            ended_at: new Date().toISOString()
+          })
+          .eq('id', sessionId);
+      }
+      
+      setIsWorkoutActive(false);
+      
+      cleanupWorkoutState();
+      
+      alert('Parabéns! Você concluiu o treino.');
+      
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Erro ao finalizar treino:', error);
+    }
+  };
+
+  // Função para retomar um treino existente
+  const resumeWorkout = useCallback(async (sessionToResumeId) => {
+    try {
+      console.log('Retomando sessão:', sessionToResumeId);
+      setLoading(true);
+      
+      // Obter detalhes da sessão
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('workout_sessions')
+        .select('*')
+        .eq('id', sessionToResumeId)
+        .single();
+        
+      if (sessionError) {
+        throw sessionError;
+      }
+      
+      if (!sessionData) {
+        throw new Error('Sessão não encontrada');
+      }
+      
+      // Se a sessão já estiver marcada como concluída, não permitir retomar
+      if (sessionData.completed) {
+        alert('Esta sessão de treino já foi concluída.');
+        return;
+      }
+      
+      // Definir a sessão atual
+      setSessionId(sessionToResumeId);
+      
+      // Carregar a lista de treino associada à sessão
+      await fetchWorkoutList();
+      await fetchExercises();
+      
+      // Buscar o último estado salvo na tabela workout_session_details
+      const { data: sessionDetails, error: detailsError } = await supabase
+        .from('workout_session_details')
+        .select('*')
+        .eq('session_id', sessionToResumeId)
+        .order('exercise_index', { ascending: true })
+        .order('set_index', { ascending: true });
+        
+      if (detailsError) {
+        throw detailsError;
+      }
+      
+      // Reinicializar o estado do treino
+      setIsWorkoutActive(true);
+      
+      // Se temos dados detalhados da sessão, usá-los para restaurar o estado
+      if (sessionDetails && sessionDetails.length > 0) {
+        // Criar um mapa de IDs de exercício para índices para facilitar a navegação
+        let exerciseIdToIndexMap = {};
+        exercises.forEach((exercise, index) => {
+          exerciseIdToIndexMap[exercise.id] = index;
+        });
+        
+        // Mapear sets completos
+        let completedSetsMap = {};
+        let repsHistoryMap = {};
+        
+        sessionDetails.forEach(detail => {
+          const exerciseKey = `exercise_${detail.exercise_id}`;
+          
+          // Inicializar array se não existir
+          if (!completedSetsMap[exerciseKey]) {
+            completedSetsMap[exerciseKey] = [];
+          }
+          
+          // Adicionar o set como completado
+          if (!completedSetsMap[exerciseKey].includes(detail.set_index)) {
+            completedSetsMap[exerciseKey].push(detail.set_index);
+          }
+          
+          // Rastrear histórico de repetições
+          if (!repsHistoryMap[exerciseKey]) {
+            repsHistoryMap[exerciseKey] = [];
+          }
+          repsHistoryMap[exerciseKey][detail.set_index] = detail.reps_completed;
+        });
+        
+        // Encontrar o último detalhe registrado para determinar onde o usuário parou
+        const lastDetail = sessionDetails[sessionDetails.length - 1];
+        let lastExerciseIndex = exerciseIdToIndexMap[lastDetail.exercise_id] || 0;
+        let lastSetIndex = lastDetail.set_index;
+        
+        // Se o último set do último exercício foi completado, avançar para o próximo
+        const exerciseKey = `exercise_${lastDetail.exercise_id}`;
+        const currentEx = exercises.find(ex => ex.id === lastDetail.exercise_id);
+        
+        // Verificar se todos os sets do último exercício foram completados
+        if (currentEx && currentEx.sets && completedSetsMap[exerciseKey]?.length >= currentEx.sets) {
+          // Se foi o último exercício, mantemos nele
+          if (lastExerciseIndex < exercises.length - 1) {
+            lastExerciseIndex += 1;
+            lastSetIndex = 0;
+          }
+        } else if (lastSetIndex < (currentEx?.sets || 0) - 1) {
+          // Se não completou todos os sets do exercício, avançar para o próximo set
+          lastSetIndex += 1;
+        }
+        
+        // Atualizar o estado
+        setCurrentExerciseIndex(lastExerciseIndex);
+        setCurrentSetIndex(lastSetIndex);
+        setCompletedSets(completedSetsMap);
+        setSetRepsHistory(repsHistoryMap);
+        
+        // Salvar no localStorage
+        try {
+          localStorage.setItem(`treinoPro_isWorkoutActive_${id}`, 'true');
+          localStorage.setItem(`treinoPro_currentExerciseIndex_${id}`, lastExerciseIndex.toString());
+          localStorage.setItem(`treinoPro_currentSetIndex_${id}`, lastSetIndex.toString());
+          localStorage.setItem(`treinoPro_completedSets_${id}`, JSON.stringify(completedSetsMap));
+          localStorage.setItem(`treinoPro_setRepsHistory_${id}`, JSON.stringify(repsHistoryMap));
+          localStorage.setItem(`treinoPro_sessionId_${id}`, sessionToResumeId);
+          localStorage.setItem(`treinoPro_workoutStartTime_${id}`, sessionData.started_at);
+          
+          // Salvar mapeamento de exercícios para facilitar restauração futura
+          localStorage.setItem(`treinoPro_currentExerciseIdMap_${id}`, JSON.stringify(exerciseIdToIndexMap));
+          localStorage.setItem(`treinoPro_lastExerciseIndex`, lastExerciseIndex.toString());
+        } catch (e) {
+          console.error('Erro ao salvar estado do treino no localStorage:', e);
+        }
+        
+        // Iniciar o cronômetro
+        const startTime = new Date(sessionData.started_at);
+        setWorkoutStartTime(startTime);
+        workoutStartRef.current = startTime.getTime();
+      } else {
+        // Caso não tenha detalhes, iniciar do zero
+        setCurrentExerciseIndex(0);
+        setCurrentSetIndex(0);
+        setCompletedSets({});
+        setSetRepsHistory({});
+        
+        // Iniciar o tempo de treino
+        const startTime = new Date();
+        setWorkoutStartTime(startTime);
+        workoutStartRef.current = startTime.getTime();
+        
+        // Salvar no localStorage
+        try {
+          localStorage.setItem(`treinoPro_isWorkoutActive_${id}`, 'true');
+          localStorage.setItem(`treinoPro_currentExerciseIndex_${id}`, '0');
+          localStorage.setItem(`treinoPro_currentSetIndex_${id}`, '0');
+          localStorage.setItem(`treinoPro_completedSets_${id}`, '{}');
+          localStorage.setItem(`treinoPro_setRepsHistory_${id}`, '{}');
+          localStorage.setItem(`treinoPro_sessionId_${id}`, sessionToResumeId);
+          localStorage.setItem(`treinoPro_workoutStartTime_${id}`, startTime.toISOString());
+        } catch (e) {
+          console.error('Erro ao salvar estado do treino no localStorage:', e);
+        }
+      }
+      
+      // Adquirir o Wake Lock para manter a tela acesa
+      acquireWakeLock();
+      
+    } catch (error) {
+      console.error('Erro ao retomar sessão:', error);
+      alert('Não foi possível retomar a sessão de treino. ' + error.message);
+      cleanupWorkoutState();
+    } finally {
+      setLoading(false);
+    }
+  }, [id, supabase, exercises, fetchWorkoutList, fetchExercises]);
+
+  // Funções para buscar dados do banco de dados com useCallback
+  const fetchWorkoutList = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('workout_lists')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      
+      if (data) {
+        setWorkoutList(data);
+      } else {
+        router.push('/workout-lists');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar lista de treinos:', error);
+      setError('Não foi possível carregar a lista de treinos.');
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase, id, router]);
+
+  const fetchExercises = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('workout_exercises')
+        .select('*')
+        .eq('workout_list_id', id)
+        .order('order_position', { ascending: true });
+
+      if (error) throw error;
+      setExercises(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar exercícios:', error);
+    }
+  }, [supabase, id]);
+  
+  // Função para inicializar comportamento de áudio no iOS (permite que os timers funcionem)
+  const initializeAudioForIOS = useCallback(() => {
+    try {
+      // Cria um contexto de áudio para "desbloquear" timers no iOS
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const silentBuffer = audioContext.createBuffer(1, 1, 22050);
+      const source = audioContext.createBufferSource();
+      source.buffer = silentBuffer;
+      source.connect(audioContext.destination);
+      source.start(0);
+      
+      // Cria um oscilador silencioso para manter o contexto de áudio ativo
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 0; // Volume zero (silencioso)
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      oscillator.start();
+      
+      console.log('Contexto de áudio inicializado para iOS');
+      document.removeEventListener('click', initializeAudioForIOS);
+      
+      // Salva referências ao contexto de áudio para evitar coleta de lixo
+      window.audioContext = audioContext;
+      window.oscillator = oscillator;
+      window.gainNode = gainNode;
+    } catch (e) {
+      console.error('Erro ao inicializar áudio para iOS:', e);
+    }
+  }, []);
+
+  // Função para adquirir o Wake Lock (manter a tela acesa)
+  const acquireWakeLock = useCallback(async () => {
+    // Verificar se a API Wake Lock é suportada
+    if ('wakeLock' in navigator) {
+      try {
+        // Solicitar o Wake Lock
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        
+        console.log('Wake Lock adquirido. A tela permanecerá acesa durante o treino.');
+        
+        // Adicionar listener para reativar o Wake Lock quando a visibilidade da página mudar
+        wakeLockRef.current.addEventListener('release', () => {
+          console.log('Wake Lock foi liberado');
+          // Tentar reativar quando o usuário voltar para a página
+          if (document.visibilityState === 'visible' && isWorkoutActive) {
+            acquireWakeLock();
+          }
+        });
+      } catch (err) {
+        console.error('Não foi possível adquirir o Wake Lock:', err);
+      }
+    } else {
+      console.log('Wake Lock API não é suportada neste navegador.');
+    }
+  }, [isWorkoutActive]);
+  
+  // Função para liberar o Wake Lock
+  const releaseWakeLock = useCallback(async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        console.log('Wake Lock liberado');
+      } catch (err) {
+        console.error('Erro ao liberar o Wake Lock:', err);
+      }
+    }
+  }, []);
+  
   // Efeito para lidar com sessão da URL
   useEffect(() => {
     if (router.isReady && router.query.session && !isWorkoutActive) {
@@ -90,20 +456,7 @@ export default function WorkoutMode() {
       
       checkAndResumeSession();
     }
-  }, [router.isReady, router.query.session, isWorkoutActive]);
-
-  // Efeito para recuperar o sessionId da URL quando a página é carregada
-  useEffect(() => {
-    if (router.isReady && router.query.session) {
-      console.log('Sessão recuperada da URL:', router.query.session);
-      setSessionId(router.query.session);
-      
-      // Salvar no localStorage para persistência
-      if (id && router.query.session) {
-        localStorage.setItem(`treinoPro_sessionId_${id}`, router.query.session);
-      }
-    }
-  }, [router.isReady, router.query.session, id]);
+  }, [router.isReady, router.query.session, isWorkoutActive, supabase, resumeWorkout]);
 
   // Efeito para atualizar o título e garantir que temos um exercício válido
   useEffect(() => {
@@ -138,151 +491,6 @@ export default function WorkoutMode() {
     };
   }, []);
   
-  // Função para inicializar comportamento de áudio no iOS (permite que os timers funcionem)
-  const initializeAudioForIOS = () => {
-    try {
-      // Cria um contexto de áudio para "desbloquear" timers no iOS
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const silentBuffer = audioContext.createBuffer(1, 1, 22050);
-      const source = audioContext.createBufferSource();
-      source.buffer = silentBuffer;
-      source.connect(audioContext.destination);
-      source.start(0);
-      
-      // Cria um oscilador silencioso para manter o contexto de áudio ativo
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      gainNode.gain.value = 0; // Volume zero (silencioso)
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      oscillator.start();
-      
-      console.log('Contexto de áudio inicializado para iOS');
-      document.removeEventListener('click', initializeAudioForIOS);
-      
-      // Salva referências ao contexto de áudio para evitar coleta de lixo
-      window.audioContext = audioContext;
-      window.oscillator = oscillator;
-      window.gainNode = gainNode;
-    } catch (e) {
-      console.error('Erro ao inicializar áudio para iOS:', e);
-    }
-  };
-
-  // Função para salvar estado dos timers no localStorage
-  const saveTimersState = () => {
-    if (typeof window !== 'undefined') {
-      try {
-        const now = Date.now();
-        lastUpdatedTimeRef.current = now;
-        
-        // Calcular os tempos absolutos de término para cada timer
-        let exerciseEndTime = null;
-        if (timerActive && timeRemaining > 0) {
-          exerciseEndTime = now + (timeRemaining * 1000);
-          exerciseTimerEndRef.current = exerciseEndTime;
-        }
-        
-        let restEndTime = null;
-        if (restTimerActive && restTimeRemaining > 0) {
-          restEndTime = now + (restTimeRemaining * 1000);
-          restTimerEndRef.current = restEndTime;
-        }
-        
-        const timerState = {
-          workoutStartTime: workoutStartTime ? workoutStartTime.getTime() : null,
-          exerciseEndTime: exerciseEndTime,
-          restEndTime: restEndTime,
-          lastUpdate: now,
-          isWorkoutActive,
-          currentExerciseIndex,
-          currentSetIndex,
-          timerActive,
-          restTimerActive,
-          sessionId,
-          workoutId: id,
-          backgroundTime: backgroundTimeRef.current
-        };
-        
-        // Salvar estado para persistência (caso o usuário saia e volte)
-        localStorage.setItem('treinoPro_timerState', JSON.stringify(timerState));
-        console.log('Estado dos timers salvo no localStorage');
-      } catch (error) {
-        console.error('Erro ao salvar o estado dos timers:', error);
-      }
-    }
-  };
-
-  // Função para carregar estado dos timers do localStorage
-  const loadTimersState = () => {
-    if (typeof window !== 'undefined' && id) {
-      try {
-        const savedState = localStorage.getItem('treinoPro_timerState');
-        if (savedState) {
-          const state = JSON.parse(savedState);
-          const now = Date.now();
-          
-          // Verificar se o estado é válido e corresponde à sessão atual
-          if (state && state.workoutId === id && state.isWorkoutActive) {
-            console.log('Carregando estado dos timers do localStorage');
-            
-            // Restaurar estado do treino
-            setIsWorkoutActive(true);
-            setSessionId(state.sessionId);
-            
-            // Restaurar índices
-            if (state.currentExerciseIndex !== undefined) {
-              setCurrentExerciseIndex(state.currentExerciseIndex);
-            }
-            if (state.currentSetIndex !== undefined) {
-              setCurrentSetIndex(state.currentSetIndex);
-            }
-            
-            // Restaurar tempo de treino total
-            if (state.workoutStartTime) {
-              const elapsed = Math.floor((now - state.workoutStartTime) / 1000);
-              setTotalWorkoutTime(elapsed);
-              setWorkoutStartTime(new Date(state.workoutStartTime));
-              workoutStartRef.current = state.workoutStartTime;
-            }
-            
-            // Restaurar timers
-            if (state.exerciseEndTime && state.timerActive) {
-              const remaining = Math.max(0, (state.exerciseEndTime - now) / 1000);
-              if (remaining > 0) {
-                setTimeRemaining(remaining);
-                setTimerActive(true);
-                exerciseTimerEndRef.current = state.exerciseEndTime;
-              } else {
-                setTimeRemaining(0);
-                setTimerActive(false);
-              }
-            }
-            
-            if (state.restEndTime && state.restTimerActive) {
-              const remaining = Math.max(0, (state.restEndTime - now) / 1000);
-              if (remaining > 0) {
-                setRestTimeRemaining(remaining);
-                setRestTimerActive(true);
-                restTimerEndRef.current = state.restEndTime;
-              } else {
-                setRestTimeRemaining(0);
-                setRestTimerActive(false);
-                restTimerEndRef.current = null;
-              }
-            }
-          } else {
-            // Se o estado não corresponder, limpar
-            localStorage.removeItem('treinoPro_timerState');
-          }
-        }
-      } catch (error) {
-        console.error('Erro ao carregar o estado dos timers:', error);
-        localStorage.removeItem('treinoPro_timerState');
-      }
-    }
-  };
-
   // Temporizador absoluto para iOS - usado para verificar o tempo quando o app volta ao foco
   useEffect(() => {
     // Configurar o timer principal que atualiza ambos os cronômetros
@@ -505,115 +713,6 @@ export default function WorkoutMode() {
     }
   }, [isWorkoutActive, currentExerciseIndex, currentSetIndex, completedSets, sessionId, workoutStartTime, id]);
 
-  // Funções para buscar dados do banco de dados com useCallback
-  const fetchWorkoutList = useCallback(async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('workout_lists')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-      
-      if (data) {
-        setWorkoutList(data);
-      } else {
-        router.push('/workout-lists');
-      }
-    } catch (error) {
-      console.error('Erro ao buscar lista de treinos:', error);
-      setError('Não foi possível carregar a lista de treinos.');
-    } finally {
-      setLoading(false);
-    }
-  }, [supabase, id, router]);
-
-  const fetchExercises = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('workout_exercises')
-        .select('*')
-        .eq('workout_list_id', id)
-        .order('order_position', { ascending: true });
-
-      if (error) throw error;
-      setExercises(data || []);
-    } catch (error) {
-      console.error('Erro ao buscar exercícios:', error);
-    }
-  }, [supabase, id]);
-
-  // Função para adquirir o Wake Lock (manter a tela acesa)
-  const acquireWakeLock = async () => {
-    // Verificar se a API Wake Lock é suportada
-    if ('wakeLock' in navigator) {
-      try {
-        // Solicitar o Wake Lock
-        wakeLockRef.current = await navigator.wakeLock.request('screen');
-        
-        console.log('Wake Lock adquirido. A tela permanecerá acesa durante o treino.');
-        
-        // Adicionar listener para reativar o Wake Lock quando a visibilidade da página mudar
-        wakeLockRef.current.addEventListener('release', () => {
-          console.log('Wake Lock foi liberado');
-          // Tentar reativar quando o usuário voltar para a página
-          if (document.visibilityState === 'visible' && isWorkoutActive) {
-            acquireWakeLock();
-          }
-        });
-      } catch (err) {
-        console.error('Não foi possível adquirir o Wake Lock:', err);
-      }
-    } else {
-      console.log('Wake Lock API não é suportada neste navegador.');
-    }
-  };
-  
-  // Função para liberar o Wake Lock
-  const releaseWakeLock = async () => {
-    if (wakeLockRef.current) {
-      try {
-        await wakeLockRef.current.release();
-        wakeLockRef.current = null;
-        console.log('Wake Lock liberado');
-      } catch (err) {
-        console.error('Erro ao liberar o Wake Lock:', err);
-      }
-    }
-  };
-
-  // Efeito para lidar com mudanças de visibilidade da página
-  useEffect(() => {
-    // Função para lidar com mudanças de visibilidade
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && isWorkoutActive && !wakeLockRef.current) {
-        // Reativar o Wake Lock quando o usuário voltar para a página e o treino estiver ativo
-        await acquireWakeLock();
-      }
-    };
-
-    // Adicionar listener para mudanças de visibilidade
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isWorkoutActive]);
-
-  // Efeito para lidar com o Wake Lock quando o treino começa ou termina
-  useEffect(() => {
-    if (isWorkoutActive) {
-      // Ativar o Wake Lock quando o treino começar
-      acquireWakeLock();
-    } else {
-      // Liberar o Wake Lock quando o treino terminar
-      releaseWakeLock();
-    }
-  }, [isWorkoutActive]);
-
   // Função para verificar se todos os exercícios têm os campos necessários
   const validateExercises = () => {
     if (!exercises || exercises.length === 0) {
@@ -789,426 +888,6 @@ export default function WorkoutMode() {
       setIsWorkoutActive(false);
     }
   };
-
-  const finishWorkout = async () => {
-    // Evitar múltiplos cliques/submissões
-    if (isSubmittingRef.current) {
-      console.log('Já existe uma requisição em andamento para finalizar o treino');
-      return;
-    }
-    
-    console.log('Função finishWorkout chamada');
-    console.log('isWorkoutActive:', isWorkoutActive);
-    console.log('sessionId:', sessionId);
-    
-    // Função auxiliar para restaurar o estado do botão em caso de erro
-    const restoreButtonState = () => {
-      try {
-        const finishBtn = document.getElementById('finishButton');
-        if (finishBtn) {
-          finishBtn.classList.remove('opacity-70', 'cursor-not-allowed');
-          const btnText = finishBtn.querySelector('.btn-text');
-          if (btnText) {
-            btnText.innerHTML = `
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" class="w-5 h-5 mr-2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-              </svg>
-              Finalizar Treino
-            `;
-          } else {
-            finishBtn.innerHTML = `
-              <div class="flex items-center justify-center btn-text">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" class="w-5 h-5 mr-2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                </svg>
-                Finalizar Treino
-              </div>
-            `;
-          }
-        }
-      } catch (e) {
-        console.error('Erro ao restaurar estado do botão:', e);
-      }
-    };
-    
-    // Configurar estado de submissão
-    isSubmittingRef.current = true;
-    
-    try {
-      // Verificar se temos dados válidos para finalizar o treino
-      if (!isWorkoutActive) {
-        console.error('Não é possível finalizar: treino não está ativo');
-        alert('Erro: O treino não está ativo. Tente recarregar a página.');
-        isSubmittingRef.current = false;
-        restoreButtonState();
-        return;
-      }
-      
-      // Tentar obter o sessionId de várias fontes
-      let finalSessionId = sessionId;
-      
-      // Se não há sessionId no estado, tentar obter do localStorage
-      if (!finalSessionId) {
-        const storedSessionId = localStorage.getItem(`treinoPro_sessionId_${id}`);
-        if (storedSessionId) {
-          console.log('Recuperando sessionId do localStorage:', storedSessionId);
-          finalSessionId = storedSessionId;
-          setSessionId(storedSessionId); // Atualizar o estado
-        }
-      }
-      
-      // Se ainda não há sessionId, tentar obter dos parâmetros de URL
-      if (!finalSessionId && router.query.session) {
-        console.log('Recuperando sessionId da URL:', router.query.session);
-        finalSessionId = router.query.session;
-        setSessionId(router.query.session); // Atualizar o estado
-      }
-      
-      // Se ainda não há sessionId, procurar uma sessão ativa no banco de dados
-      if (!finalSessionId) {
-        console.log('Tentando encontrar sessão ativa no banco de dados');
-        try {
-          const { data: activeSessions, error: activeSessionError } = await supabase
-            .from('workout_sessions')
-            .select('id')
-            .eq('workout_list_id', id)
-            .eq('user_id', user.id)
-            .eq('completed', false)
-            .order('started_at', { ascending: false })
-            .limit(1);
-            
-          if (activeSessionError) {
-            console.error('Erro ao buscar sessões ativas:', activeSessionError);
-          } else if (activeSessions && activeSessions.length > 0) {
-            console.log('Sessão ativa encontrada no banco de dados:', activeSessions[0].id);
-            finalSessionId = activeSessions[0].id;
-            setSessionId(activeSessions[0].id); // Atualizar o estado
-            
-            // Salvar no localStorage para futuras referências
-            localStorage.setItem(`treinoPro_sessionId_${id}`, finalSessionId);
-          }
-        } catch (dbError) {
-          console.error('Erro ao buscar sessões ativas:', dbError);
-        }
-      }
-      
-      // Se ainda não há sessionId, criar uma nova sessão
-      if (!finalSessionId) {
-        console.log('Criando uma nova sessão como último recurso');
-        try {
-          const startTime = workoutStartTime || new Date(Date.now() - 60000); // Fallback para 1 minuto atrás
-          
-          const { data: newSession, error: newSessionError } = await supabase
-            .from('workout_sessions')
-            .insert({
-              user_id: user.id,
-              workout_list_id: id,
-              started_at: startTime.toISOString()
-            })
-            .select('id')
-            .single();
-            
-          if (newSessionError) {
-            console.error('Erro ao criar nova sessão:', newSessionError);
-            throw new Error('Não foi possível criar uma nova sessão');
-          }
-          
-          console.log('Nova sessão criada:', newSession.id);
-          finalSessionId = newSession.id;
-          setSessionId(newSession.id); // Atualizar o estado
-          
-          // Salvar no localStorage para futuras referências
-          localStorage.setItem(`treinoPro_sessionId_${id}`, finalSessionId);
-        } catch (createError) {
-          console.error('Erro ao criar nova sessão:', createError);
-        }
-      }
-      
-      if (!finalSessionId) {
-        console.error('Não foi possível obter um ID de sessão válido para finalizar o treino');
-        showErrorMessageModal('Não foi possível encontrar o ID da sessão de treino. Você pode tentar corrigir automaticamente ou recarregar a página manualmente.');
-        isSubmittingRef.current = false;
-        restoreButtonState();
-        return;
-      }
-      
-      console.log('Tentando finalizar o treino. ID da sessão:', finalSessionId);
-      
-      // Verificar primeiro se a sessão existe
-      const { data: sessionData, error: sessionCheckError } = await supabase
-        .from('workout_sessions')
-        .select('id, completed')
-        .eq('id', finalSessionId)
-        .single();
-      
-      if (sessionCheckError) {
-        console.error('Erro ao verificar sessão no Supabase:', sessionCheckError);
-        
-        // Se o erro for "não encontrado", criar uma nova sessão como último recurso
-        if (sessionCheckError.code === 'PGRST116') {
-          console.log('Sessão não encontrada, criando uma nova');
-          
-          try {
-            const startTime = workoutStartTime || new Date(Date.now() - 60000); // Fallback para 1 minuto atrás
-            
-            const { data: newSession, error: newSessionError } = await supabase
-              .from('workout_sessions')
-              .insert({
-                user_id: user.id,
-                workout_list_id: id,
-                started_at: startTime.toISOString()
-              })
-              .select('id')
-              .single();
-              
-            if (newSessionError) {
-              console.error('Erro ao criar nova sessão:', newSessionError);
-              throw new Error('Não foi possível criar uma nova sessão');
-            }
-            
-            console.log('Nova sessão criada:', newSession.id);
-            finalSessionId = newSession.id;
-            setSessionId(newSession.id); // Atualizar o estado
-            
-            // Salvar no localStorage para futuras referências
-            localStorage.setItem(`treinoPro_sessionId_${id}`, finalSessionId);
-          } catch (createError) {
-            console.error('Erro ao criar nova sessão:', createError);
-            throw new Error('Não foi possível criar uma nova sessão');
-          }
-        } else {
-          throw new Error('Sessão não encontrada no banco de dados');
-        }
-      }
-      
-      if (sessionData && sessionData.completed) {
-        console.log('Esta sessão já está marcada como concluída no banco de dados');
-        // Limpar tudo e redirecionar
-        cleanupWorkoutState();
-        alert('Esta sessão de treino já estava finalizada. Redirecionando para o dashboard.');
-        router.push('/dashboard');
-        return;
-      }
-      
-      const endTime = new Date();
-      const startTime = workoutStartTime || new Date(endTime.getTime() - 60000); // Fallback para 1 minuto atrás
-      const durationInSeconds = Math.floor((endTime - startTime) / 1000);
-      
-      // Atualizar a sessão de treino
-      const { data, error } = await supabase
-        .from('workout_sessions')
-        .update({
-          completed: true,
-          ended_at: endTime.toISOString(),
-          duration: durationInSeconds
-        })
-        .eq('id', finalSessionId)
-        .select();
-
-      if (error) {
-        console.error('Erro ao atualizar sessão no Supabase:', error);
-        throw error;
-      }
-      
-      console.log('Sessão finalizada com sucesso no banco de dados:', data);
-      
-      // Limpar o estado e dados
-      cleanupWorkoutState();
-      
-      // Alertar o usuário sobre o sucesso antes de redirecionar
-      alert('Treino finalizado com sucesso!');
-      
-      // Redirecionar para o dashboard
-      console.log('Redirecionando para o dashboard...');
-      router.push('/dashboard');
-    } catch (error) {
-      console.error('Erro ao finalizar treino:', error);
-      alert('Ocorreu um erro ao finalizar o treino. Por favor, tente novamente.');
-      setError('Ocorreu um erro ao finalizar o treino. Por favor, tente novamente.');
-      // Restaurar o estado do botão em caso de erro
-      restoreButtonState();
-    } finally {
-      // Resetar estado de submissão
-      isSubmittingRef.current = false;
-    }
-  };
-  
-  // Função para limpar o estado e localStorage ao finalizar o treino
-  const cleanupWorkoutState = () => {
-    // Liberar o Wake Lock quando o treino terminar
-    releaseWakeLock();
-    
-    // Limpar TODOS os dados do localStorage relacionados ao treino
-    try {
-      // Limpar estado geral do treino
-      localStorage.removeItem(`treinoPro_isWorkoutActive_${id}`);
-      localStorage.removeItem(`treinoPro_currentExerciseIndex_${id}`);
-      localStorage.removeItem(`treinoPro_currentSetIndex_${id}`);
-      localStorage.removeItem(`treinoPro_completedSets_${id}`);
-      localStorage.removeItem(`treinoPro_setRepsHistory_${id}`);
-      localStorage.removeItem(`treinoPro_sessionId_${id}`);
-      localStorage.removeItem(`treinoPro_workoutStartTime_${id}`);
-      
-      // Limpar timers
-      localStorage.removeItem('treinoPro_timerState');
-      localStorage.removeItem('treinoPro_exerciseTimerStart');
-      localStorage.removeItem('treinoPro_exerciseTimerDuration');
-      localStorage.removeItem('treinoPro_exerciseTimerEnd');
-      localStorage.removeItem('treinoPro_backgroundTimestamp');
-      
-      // Limpar mapeamento de exercícios
-      localStorage.removeItem(`treinoPro_currentExerciseIdMap_${id}`);
-      localStorage.removeItem(`treinoPro_lastExerciseIndex`);
-      localStorage.removeItem(`treinoPro_currentExerciseIndexOrder_${id}`);
-      
-      console.log('Todos os dados do treino foram limpos do localStorage');
-    } catch (e) {
-      console.error('Erro ao limpar localStorage:', e);
-    }
-      
-      // Resetar o estado do treino
-      setIsWorkoutActive(false);
-      setCurrentExerciseIndex(0);
-      setCurrentSetIndex(0);
-      setCompletedSets({});
-      setTimerActive(false);
-      setTimeRemaining(0);
-      setRestTimerActive(false);
-      setRestTimeRemaining(0);
-      setWorkoutStartTime(null);
-      setSessionId(null);
-    setRepsCompleted('');
-      setSetRepsHistory({});
-  };
-
-  // Nova função para verificar se uma sessão já foi concluída
-  const checkSessionStatus = async (sessionId) => {
-    if (!sessionId) return false;
-    
-    try {
-      const { data, error } = await supabase
-        .from('workout_sessions')
-        .select('completed')
-        .eq('id', sessionId)
-        .single();
-        
-      if (error) {
-        console.error('Erro ao verificar status da sessão:', error);
-        return false;
-      }
-      
-      return data?.completed === true;
-    } catch (error) {
-      console.error('Erro ao verificar status da sessão:', error);
-      return false;
-    }
-  };
-
-  // Efeito para carregar estado do treino com verificação adicional de sessão concluída
-  useEffect(() => {
-    // Verificar se há um treino ativo
-    if (typeof window !== 'undefined' && id) {
-      try {
-        const storedWorkoutActive = localStorage.getItem(`treinoPro_isWorkoutActive_${id}`);
-        const storedSessionId = localStorage.getItem(`treinoPro_sessionId_${id}`);
-        
-        if (storedWorkoutActive === 'true' && storedSessionId) {
-          // Verificar primeiro se a sessão já foi concluída
-          checkSessionStatus(storedSessionId).then(isCompleted => {
-            if (isCompleted) {
-              console.log('Sessão já concluída, limpando estado do localStorage');
-              // Se a sessão já foi concluída, limpar o localStorage e não restaurar o estado
-              try {
-                localStorage.removeItem(`treinoPro_isWorkoutActive_${id}`);
-                localStorage.removeItem(`treinoPro_currentExerciseIndex_${id}`);
-                localStorage.removeItem(`treinoPro_currentSetIndex_${id}`);
-                localStorage.removeItem(`treinoPro_completedSets_${id}`);
-                localStorage.removeItem(`treinoPro_setRepsHistory_${id}`);
-                localStorage.removeItem(`treinoPro_sessionId_${id}`);
-                localStorage.removeItem(`treinoPro_workoutStartTime_${id}`);
-                localStorage.removeItem('treinoPro_timerState');
-                localStorage.removeItem(`treinoPro_currentExerciseIdMap_${id}`);
-                localStorage.removeItem(`treinoPro_lastExerciseIndex`);
-              } catch (e) {
-                console.error('Erro ao limpar localStorage:', e);
-              }
-              return;
-            }
-            
-            // Se a sessão não foi concluída, continuar com a restauração do estado
-            // Carregar estado do treino do localStorage
-            const storedExerciseIndex = localStorage.getItem(`treinoPro_currentExerciseIndex_${id}`);
-            const storedSetIndex = localStorage.getItem(`treinoPro_currentSetIndex_${id}`);
-            const storedCompletedSets = localStorage.getItem(`treinoPro_completedSets_${id}`);
-            const storedRepsHistory = localStorage.getItem(`treinoPro_setRepsHistory_${id}`);
-            const storedStartTime = localStorage.getItem(`treinoPro_workoutStartTime_${id}`);
-            
-            if (storedExerciseIndex) setCurrentExerciseIndex(parseInt(storedExerciseIndex) || 0);
-            if (storedSetIndex) setCurrentSetIndex(parseInt(storedSetIndex) || 0);
-            if (storedCompletedSets) {
-              try {
-                const parsedSets = JSON.parse(storedCompletedSets);
-                if (parsedSets && typeof parsedSets === 'object') {
-                  setCompletedSets(parsedSets);
-                } else {
-                  setCompletedSets({});
-                }
-              } catch (e) {
-                console.error('Erro ao fazer parse de completedSets:', e);
-                setCompletedSets({});
-              }
-            }
-            if (storedRepsHistory) {
-              try {
-                const parsedHistory = JSON.parse(storedRepsHistory);
-                if (parsedHistory && typeof parsedHistory === 'object') {
-                  setSetRepsHistory(parsedHistory);
-                } else {
-                  setSetRepsHistory({});
-                }
-              } catch (e) {
-                console.error('Erro ao fazer parse de setRepsHistory:', e);
-                setSetRepsHistory({});
-              }
-            }
-            if (storedSessionId) setSessionId(storedSessionId);
-            if (storedStartTime) {
-              try {
-                setWorkoutStartTime(new Date(storedStartTime));
-              } catch (e) {
-                console.error('Erro ao fazer parse de workoutStartTime:', e);
-                setWorkoutStartTime(new Date());
-              }
-            }
-            
-            setIsWorkoutActive(true);
-          });
-        }
-      } catch (error) {
-        console.error('Erro ao restaurar estado do treino:', error);
-        // Em caso de erro, reiniciar o estado do treino
-        setIsWorkoutActive(false);
-        setCurrentExerciseIndex(0);
-        setCurrentSetIndex(0);
-        setCompletedSets({});
-        setSetRepsHistory({});
-        
-        // Limpar o localStorage para evitar problemas futuros
-        try {
-          localStorage.removeItem(`treinoPro_isWorkoutActive_${id}`);
-          localStorage.removeItem(`treinoPro_currentExerciseIndex_${id}`);
-          localStorage.removeItem(`treinoPro_currentSetIndex_${id}`);
-          localStorage.removeItem(`treinoPro_completedSets_${id}`);
-          localStorage.removeItem(`treinoPro_setRepsHistory_${id}`);
-          localStorage.removeItem(`treinoPro_sessionId_${id}`);
-          localStorage.removeItem(`treinoPro_workoutStartTime_${id}`);
-          localStorage.removeItem('treinoPro_timerState');
-        } catch (e) {
-          console.error('Erro ao limpar localStorage:', e);
-        }
-      }
-    }
-  }, [id]);
 
   const handleSetCompleted = async () => {
     if (!isWorkoutActive || !currentExercise) {
@@ -1540,24 +1219,8 @@ export default function WorkoutMode() {
     setShowVideo(!showVideo);
   };
 
-  const getYoutubeVideoId = (url) => {
-    if (!url) return null;
-    
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    
-    return (match && match[2].length === 11) ? match[2] : null;
-  };
-
-  const formatTime = (seconds) => {
-    // Garantir que seconds seja um número inteiro
-    const secondsInt = Math.floor(seconds);
-    const mins = Math.floor(secondsInt / 60);
-    const secs = secondsInt % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
-
-  // Função para verificar se uma série está completa, usando o ID do exercício como chave
+  // Remover a declaração duplicada de getYoutubeVideoId aqui (linha 1222 aproximadamente)
+  
   const isSetCompleted = (exerciseIndex, setIndex) => {
     const exercise = exercises[exerciseIndex];
     if (!exercise) return false;
@@ -1566,153 +1229,20 @@ export default function WorkoutMode() {
     return completedSets[exerciseKey]?.includes(setIndex) || false;
   };
 
-  const resumeWorkout = async (sessionToResumeId) => {
-    try {
-      // Buscar dados da sessão existente
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('workout_sessions')
-        .select('*')
-        .eq('id', sessionToResumeId)
-        .single();
-      
-      if (sessionError) throw sessionError;
-      
-      if (!sessionData) {
-        setError('Sessão de treino não encontrada.');
-        return;
-      }
-      
-      // Se a sessão já estiver concluída, não permite retomar
-      if (sessionData.completed) {
-        setError('Esta sessão de treino já foi concluída e não pode ser retomada.');
-        return;
-      }
-      
-      // Verificar se temos exercícios carregados
-      if (!exercises || exercises.length === 0) {
-        console.error('Erro ao retomar treino: lista de exercícios vazia.');
-        setError('Não foi possível retomar o treino porque a lista de exercícios não foi carregada. Tente recarregar a página.');
-        return;
-      }
-      
-      // Calcular tempo decorrido desde o início da sessão
-      const startTime = new Date(sessionData.started_at);
-      
-      // Buscar detalhes da sessão para recuperar o progresso
-      try {
-        const { data: sessionDetails, error: detailsError } = await supabase
-          .from('workout_session_details')
-          .select('*')
-          .eq('session_id', sessionToResumeId)
-          .order('exercise_index', { ascending: true })
-          .order('set_index', { ascending: true });
-        
-        if (detailsError) throw detailsError;
-        
-        // Reconstruir completedSets a partir dos detalhes da sessão
-        const newCompletedSets = {};
-        const newSetRepsHistory = {};
-        
-          let lastExerciseIndex = 0;
-          let lastSetIndex = 0;
-          
-        if (sessionDetails && sessionDetails.length > 0) {
-          // Identificar o último exercício e série concluídos
-          sessionDetails.forEach(detail => {
-            const exerciseKey = `${detail.exercise_index}`;
-            
-            // Inicializar arrays se não existirem
-            if (!newCompletedSets[exerciseKey]) {
-              newCompletedSets[exerciseKey] = [];
-            }
-            if (!newSetRepsHistory[exerciseKey]) {
-              newSetRepsHistory[exerciseKey] = [];
-            }
-            
-            // Adicionar série concluída
-            newCompletedSets[exerciseKey].push(detail.set_index);
-            newSetRepsHistory[exerciseKey][detail.set_index] = detail.reps_completed;
-            
-            // Atualizar último exercício/série
-            if (detail.exercise_index > lastExerciseIndex) {
-              lastExerciseIndex = detail.exercise_index;
-              lastSetIndex = detail.set_index;
-            } else if (detail.exercise_index === lastExerciseIndex && detail.set_index > lastSetIndex) {
-              lastSetIndex = detail.set_index;
-            }
-          });
-          
-          // Garantir que estamos dentro dos limites válidos de exercícios
-          lastExerciseIndex = Math.min(lastExerciseIndex, exercises.length - 1);
-          const exerciseObj = exercises[lastExerciseIndex];
-          
-          // Configurar para o próximo exercício/série não concluído
-          if (exerciseObj && lastSetIndex + 1 >= (exerciseObj.sets || 1)) {
-            // Se todas as séries do último exercício foram concluídas, passar para o próximo
-            const nextExerciseIndex = Math.min(lastExerciseIndex + 1, exercises.length - 1);
-            setCurrentExerciseIndex(nextExerciseIndex);
-            setCurrentSetIndex(0);
-          } else {
-            // Senão, continuar no mesmo exercício, próxima série
-            setCurrentExerciseIndex(lastExerciseIndex);
-            setCurrentSetIndex(lastSetIndex + 1);
-          }
-        } else {
-          // Se não houver detalhes, começar do início
-          setCurrentExerciseIndex(0);
-          setCurrentSetIndex(0);
-        }
-        
-        // Atualizar o estado com os dados reconstruídos
-        setCompletedSets(newCompletedSets);
-        setSetRepsHistory(newSetRepsHistory);
-      } catch (detailError) {
-        console.error('Erro ao buscar detalhes da sessão:', detailError);
-        // Se falhar, simplesmente comece do início
-        setCurrentExerciseIndex(0);
-        setCurrentSetIndex(0);
-        setCompletedSets({});
-        setSetRepsHistory({});
-      }
-      
-      // Configurar o estado básico da sessão
-      setSessionId(sessionToResumeId);
-      setWorkoutStartTime(startTime);
-      setIsWorkoutActive(true);
-      setRepsCompleted(''); // Alterado para string vazia
-      
-      // Notificar o usuário
-      alert('Treino retomado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao retomar treino:', error);
-      setError('Ocorreu um erro ao retomar o treino. Por favor, tente novamente.');
-      
-      // Em caso de erro, reiniciar o estado
-      setIsWorkoutActive(false);
-      setCurrentExerciseIndex(0);
-      setCurrentSetIndex(0);
-      setCompletedSets({});
-      setSetRepsHistory({});
-    }
-  };
+  // ... existing code ...
 
-  // Solicitar permissão para notificações ao iniciar a aplicação
+  // Efeito para lidar com o Wake Lock quando o treino começa ou termina
   useEffect(() => {
-    // Verificar se o navegador suporta notificações
-    if ('Notification' in window) {
-      // Verificar permissão atual
-      if (Notification.permission === 'granted') {
-        setNotificationPermission(true);
-      } else if (Notification.permission !== 'denied') {
-        // Se ainda não negou, solicitar permissão
-        Notification.requestPermission().then(permission => {
-          if (permission === 'granted') {
-            setNotificationPermission(true);
-          }
-        });
-      }
+    if (isWorkoutActive) {
+      // Ativar o Wake Lock quando o treino começar
+      acquireWakeLock();
+    } else {
+      // Liberar o Wake Lock quando o treino terminar
+      releaseWakeLock();
     }
-  }, []);
+  }, [isWorkoutActive, acquireWakeLock, releaseWakeLock]);
+
+  // Remover a declaração duplicada de validateExercises aqui (linha 1366 aproximadamente)
   
   // Função para enviar notificação
   const sendRestFinishedNotification = () => {
@@ -1732,6 +1262,8 @@ export default function WorkoutMode() {
       console.error('Erro ao mostrar notificação de descanso:', error);
     }
   };
+
+  // ... existing code ...
 
   // Função para mostrar alerta visual simplificado
   const showIOSAlert = () => {
@@ -2094,18 +1626,6 @@ export default function WorkoutMode() {
     }
   }, [exercises, isWorkoutActive, currentExerciseIndex, currentSetIndex]);
 
-  // Adicionar estado para o modal de erro
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [isRecovering, setIsRecovering] = useState(false);
-
-  // Função para mostrar modal de erro personalizado
-  const showErrorMessageModal = (message) => {
-    setErrorMessage(message);
-    setShowErrorModal(true);
-    setIsRecovering(false);
-  };
-
   // Função para tentar recuperar a sessão
   const recoverSession = async () => {
     setIsRecovering(true);
@@ -2191,6 +1711,139 @@ export default function WorkoutMode() {
       </div>
     );
   };
+
+  // Adicione as funções necessárias que foram removidas
+  const saveTimersState = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        const now = Date.now();
+        lastUpdatedTimeRef.current = now;
+        
+        // Calcular os tempos absolutos de término para cada timer
+        let exerciseEndTime = null;
+        if (timerActive && timeRemaining > 0) {
+          exerciseEndTime = now + (timeRemaining * 1000);
+          exerciseTimerEndRef.current = exerciseEndTime;
+        }
+        
+        let restEndTime = null;
+        if (restTimerActive && restTimeRemaining > 0) {
+          restEndTime = now + (restTimeRemaining * 1000);
+          restTimerEndRef.current = restEndTime;
+        }
+        
+        const timerState = {
+          workoutStartTime: workoutStartTime ? workoutStartTime.getTime() : null,
+          exerciseEndTime: exerciseEndTime,
+          restEndTime: restEndTime,
+          lastUpdate: now,
+          isWorkoutActive,
+          currentExerciseIndex,
+          currentSetIndex,
+          timerActive,
+          restTimerActive,
+          sessionId,
+          workoutId: id,
+          backgroundTime: backgroundTimeRef.current
+        };
+        
+        // Salvar estado para persistência (caso o usuário saia e volte)
+        localStorage.setItem('treinoPro_timerState', JSON.stringify(timerState));
+        console.log('Estado dos timers salvo no localStorage');
+      } catch (error) {
+        console.error('Erro ao salvar o estado dos timers:', error);
+      }
+    }
+  };
+
+  // Função para carregar estado dos timers do localStorage
+  const loadTimersState = useCallback(() => {
+    if (typeof window !== 'undefined' && id) {
+      try {
+        const savedState = localStorage.getItem('treinoPro_timerState');
+        if (savedState) {
+          const state = JSON.parse(savedState);
+          const now = Date.now();
+          
+          // Verificar se o estado é válido e corresponde à sessão atual
+          if (state && state.workoutId === id && state.isWorkoutActive) {
+            console.log('Carregando estado dos timers do localStorage');
+            
+            // Restaurar estado do treino
+            setIsWorkoutActive(true);
+            setSessionId(state.sessionId);
+            
+            // Restaurar índices
+            if (state.currentExerciseIndex !== undefined) {
+              setCurrentExerciseIndex(state.currentExerciseIndex);
+            }
+            if (state.currentSetIndex !== undefined) {
+              setCurrentSetIndex(state.currentSetIndex);
+            }
+            
+            // Restaurar tempo de treino total
+            if (state.workoutStartTime) {
+              const elapsed = Math.floor((now - state.workoutStartTime) / 1000);
+              setTotalWorkoutTime(elapsed);
+              setWorkoutStartTime(new Date(state.workoutStartTime));
+              workoutStartRef.current = state.workoutStartTime;
+            }
+            
+            // Restaurar timers
+            if (state.exerciseEndTime && state.timerActive) {
+              const remaining = Math.max(0, (state.exerciseEndTime - now) / 1000);
+              if (remaining > 0) {
+                setTimeRemaining(remaining);
+                setTimerActive(true);
+                exerciseTimerEndRef.current = state.exerciseEndTime;
+              } else {
+                setTimeRemaining(0);
+                setTimerActive(false);
+              }
+            }
+            
+            if (state.restEndTime && state.restTimerActive) {
+              const remaining = Math.max(0, (state.restEndTime - now) / 1000);
+              if (remaining > 0) {
+                setRestTimeRemaining(remaining);
+                setRestTimerActive(true);
+                restTimerEndRef.current = state.restEndTime;
+              } else {
+                setRestTimeRemaining(0);
+                setRestTimerActive(false);
+                restTimerEndRef.current = null;
+              }
+            }
+          } else {
+            // Se o estado não corresponder, limpar
+            localStorage.removeItem('treinoPro_timerState');
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar o estado dos timers:', error);
+        localStorage.removeItem('treinoPro_timerState');
+      }
+    }
+  }, [id, setIsWorkoutActive, setSessionId, setCurrentExerciseIndex, setCurrentSetIndex, setTotalWorkoutTime, setWorkoutStartTime, setTimeRemaining, setTimerActive, setRestTimeRemaining, setRestTimerActive]);
+
+  // Efeito para lidar com mudanças de visibilidade da página
+  useEffect(() => {
+    // Função para lidar com mudanças de visibilidade
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && isWorkoutActive && !wakeLockRef.current) {
+        // Reativar o Wake Lock quando o usuário voltar para a página e o treino estiver ativo
+        await acquireWakeLock();
+      }
+    };
+
+    // Adicionar listener para mudanças de visibilidade
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isWorkoutActive, acquireWakeLock]);
 
   if (loading) {
     return (
