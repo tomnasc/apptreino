@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import Link from 'next/link';
 
 export default function WorkoutLists() {
   const supabase = useSupabaseClient();
   const user = useUser();
+  const router = useRouter();
   const [workoutLists, setWorkoutLists] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -61,6 +63,10 @@ export default function WorkoutLists() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleStartWorkout = (listId) => {
+    router.push(`/workout-mode/${listId}`);
   };
 
   const formatDate = (dateString) => {
@@ -144,12 +150,12 @@ export default function WorkoutLists() {
                   >
                     Editar
                   </Link>
-                  <Link
-                    href={`/workout-mode/${list.id}`}
+                  <button
+                    onClick={() => handleStartWorkout(list.id)}
                     className="btn-secondary flex-1"
                   >
                     Treinar
-                  </Link>
+                  </button>
                 </div>
               </div>
             ))}

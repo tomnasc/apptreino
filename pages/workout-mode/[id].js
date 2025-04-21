@@ -1953,12 +1953,12 @@ function WorkoutMode() {
               </div>
             ) : (
               <>
-                <Link
-                  href="/workout-lists"
+                <button
+                  onClick={() => router.push('/workout-lists')}
                   className="bg-white/30 backdrop-blur-sm text-white hover:bg-white/40 font-medium py-2 px-4 rounded-full shadow transition-all"
                 >
                   Voltar
-                </Link>
+                </button>
                 <button
                   onClick={startWorkout}
                   className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full shadow transition-all transform hover:scale-105"

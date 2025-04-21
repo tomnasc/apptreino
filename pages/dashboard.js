@@ -10,6 +10,7 @@ import { useRouter } from 'next/router';
 export default function DashboardPage() {
   const supabase = useSupabaseClient();
   const user = useUser();
+  const router = useRouter();
   const [workoutLists, setWorkoutLists] = useState([]);
   const [recentWorkouts, setRecentWorkouts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -415,13 +416,13 @@ export default function DashboardPage() {
               ) : workoutLists.length > 0 ? (
                 <div className="space-y-2">
                   {workoutLists.slice(0, 3).map((list) => (
-                    <Link
+                    <button
                       key={list.id}
-                      href={`/workout-mode/${list.id}`}
-                      className="btn-secondary block text-center"
+                      onClick={() => router.push(`/workout-mode/${list.id}`)}
+                      className="btn-secondary block text-center w-full"
                     >
                       {list.name}
-                    </Link>
+                    </button>
                   ))}
                 </div>
               ) : (
@@ -529,12 +530,12 @@ export default function DashboardPage() {
                       
                       <div className="mt-3 flex justify-end">
                         {!session.completed ? (
-                          <Link
-                            href={`/workout-mode/${session.workout_list_id}?session=${session.id}`}
+                          <button
+                            onClick={() => router.push(`/workout-mode/${session.workout_list_id}?session=${session.id}`)}
                             className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
                           >
                             Retomar Treino
-                          </Link>
+                          </button>
                         ) : (
                           <Link
                             href={`/workout-report/${session.id}`}
@@ -638,16 +639,16 @@ export default function DashboardPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           {!session.completed ? (
-                            <Link
-                              href={`/workout-mode/${session.workout_list_id}?session=${session.id}`}
-                              className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                            <button
+                              onClick={() => router.push(`/workout-mode/${session.workout_list_id}?session=${session.id}`)}
+                              className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
                             >
                               Retomar Treino
-                            </Link>
+                            </button>
                           ) : (
                             <Link
                               href={`/workout-report/${session.id}`}
-                              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+                              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium"
                             >
                               Ver Relatório
                             </Link>
