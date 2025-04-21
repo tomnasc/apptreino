@@ -1833,22 +1833,89 @@ function WorkoutMode() {
 
   // Efeito para lidar com mudanças de visibilidade da página
   useEffect(() => {
-    // Função para lidar com mudanças de visibilidade
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && isWorkoutActive && !wakeLockRef.current) {
-        // Reativar o Wake Lock quando o usuário voltar para a página e o treino estiver ativo
-        await acquireWakeLock();
-      }
-    };
-
-    // Adicionar listener para mudanças de visibilidade
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isWorkoutActive, acquireWakeLock]);
+    if (isWorkoutActive) {
+      // Função para lidar com mudanças de visibilidade
+      const handleVisibilityChange = () => {
+        try {
+          if (document.visibilityState === 'hidden') {
+            // Quando o usuário sai da página, salvar o estado
+            saveTimersState();
+            backgroundTimeRef.current = Date.now();
+          } else if (document.visibilityState === 'visible') {
+            // Quando o usuário volta para a página
+            console.log('Página voltou a ficar visível');
+            
+            // Verificar quanto tempo se passou e atualizar os timers
+            const now = Date.now();
+            const timeAway = now - (backgroundTimeRef.current || now);
+            
+            // Contabilizar o tempo ausente (se for válido)
+            if (backgroundTimeRef.current && timeAway > 0) {
+              console.log(`Ausente por ${Math.round(timeAway / 1000)} segundos`);
+              
+              // Atualizar o tempo total do treino
+              if (workoutStartRef.current) {
+                const elapsedTime = Math.floor((now - workoutStartRef.current) / 1000);
+                setTotalWorkoutTime(elapsedTime);
+              }
+              
+              // Atualizar timer de exercício se estiver ativo
+              if (timerActive && exerciseTimerEndRef.current) {
+                const remaining = Math.max(0, (exerciseTimerEndRef.current - now) / 1000);
+                console.log('Tempo restante de exercício:', remaining);
+                
+                if (remaining <= 0) {
+                  // O timer de exercício terminou enquanto estávamos fora
+                  setTimeRemaining(0);
+                  setTimerActive(false);
+                  
+                  // Marcar a série como concluída
+                  if (currentExercise && completedSets) {
+                    const exerciseId = currentExercise.id;
+                    const exerciseKey = `exercise_${exerciseId}`;
+                    
+                    // Atualizar estado de séries completadas
+                    const updatedCompletedSets = { ...completedSets };
+                    if (!updatedCompletedSets[exerciseKey]) {
+                      updatedCompletedSets[exerciseKey] = [];
+                    }
+                    updatedCompletedSets[exerciseKey].push(currentSetIndex);
+                    setCompletedSets(updatedCompletedSets);
+                  } else {
+                    setTimeRemaining(remaining);
+                  }
+                }
+              }
+              
+              // Atualizar timer de descanso se estiver ativo
+              if (restTimerActive && restTimerEndRef.current) {
+                const remaining = Math.max(0, (restTimerEndRef.current - now) / 1000);
+                console.log('Tempo restante de descanso:', remaining);
+                
+                if (remaining <= 0) {
+                  setRestTimerActive(false);
+                  setRestTimeRemaining(0);
+                  sendRestFinishedNotification();
+                } else {
+                  setRestTimeRemaining(remaining);
+                }
+              }
+            }
+            
+            // Reativar o Wake Lock quando o usuário voltar
+            acquireWakeLock();
+          }
+        } catch (error) {
+          console.error('Erro ao manipular mudança de visibilidade:', error);
+        }
+      };
+      
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    }
+  }, [isWorkoutActive, timerActive, restTimerActive, timeRemaining, restTimeRemaining, currentExerciseIndex, currentSetIndex, completedSets, exercises, currentExercise, acquireWakeLock, saveTimersState, sendRestFinishedNotification]);
 
   if (loading) {
     return (
