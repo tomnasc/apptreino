@@ -71,13 +71,42 @@ export default function AffiliateSystem() {
 
   const fetchBonuses = async () => {
     try {
+      // Versão corrigida da consulta - primeiro busca os bônus sem o join
       const { data, error } = await supabase
         .from('affiliate_bonuses')
-        .select('*, referred_user:referred_user_id(email)')
+        .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      // Agora vamos buscar os emails dos usuários referidos em uma segunda consulta se houver bônus
+      if (data && data.length > 0) {
+        // Obter todos os IDs de usuários referidos
+        const referredUserIds = data.map(bonus => bonus.referred_user_id);
+        
+        // Buscar os emails dos usuários referidos
+        const { data: usersData, error: usersError } = await supabase
+          .from('user_profiles')
+          .select('id, email')
+          .in('id', referredUserIds);
+        
+        if (!usersError && usersData) {
+          // Criar um mapa de id -> email para facilitar o join manual
+          const userMap = {};
+          usersData.forEach(user => {
+            userMap[user.id] = user.email;
+          });
+          
+          // Adicionar o email ao objeto de bônus
+          data.forEach(bonus => {
+            bonus.referred_user = {
+              email: userMap[bonus.referred_user_id] || 'Usuário não encontrado'
+            };
+          });
+        }
+      }
+      
       setBonuses(data || []);
 
       // Calcular estatísticas de bônus
