@@ -476,165 +476,162 @@ function WorkoutMode() {
             </div>
           </div>
         ) : (
-          // Interface do treino ativo
-          <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold dark-text-primary mb-2">
-                {workoutList?.name}
-              </h2>
-              
-              <div className="flex justify-between items-center">
-                <div className="flex space-x-4">
-                  <div>
-                    <span className="text-xs dark-text-tertiary">Exercício</span>
-                    <p className="font-medium dark-text-secondary">{currentExerciseIndex + 1} / {exercises.length}</p>
-                  </div>
-                  {restTimerActive && (
-                    <div>
-                      <span className="text-xs dark-text-tertiary">Descanso</span>
-                      <p className="font-medium text-yellow-600 dark:text-yellow-400">{formatTime(restTimeRemaining)}</p>
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={cancelWorkout}
-                  className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-sm font-medium"
-                >
-                  Cancelar Treino
-                </button>
-              </div>
+          // Interface do treino ativo - ajustada para o layout original
+          <div className="bg-dark dark:bg-gray-800 shadow-lg rounded-2xl overflow-hidden">
+            {/* Cabeçalho verde do exercício */}
+            <div className="bg-green-600 dark:bg-green-700 p-4 text-white">
+              <h2 className="text-xl font-bold">Exercício Atual</h2>
             </div>
             
-            {currentExercise && (
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-5 mb-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold dark-text-primary">
-                      {currentExercise.name}
-                    </h3>
-                    <p className="text-sm dark-text-tertiary">
-                      {currentExercise.reps 
-                        ? `${currentExercise.sets} séries × ${currentExercise.reps} repetições` 
-                        : `${currentExercise.sets} séries × ${currentExercise.time}s`}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs dark-text-tertiary">Série atual</span>
-                    <p className="font-medium dark-text-secondary">{currentSetIndex + 1} / {currentExercise.sets}</p>
+            <div className="p-6">
+              {/* Nome do exercício com círculo numerado */}
+              <div className="flex items-center mb-6">
+                <div className="flex-shrink-0 w-14 h-14 rounded-full bg-green-700 flex items-center justify-center text-white text-2xl font-bold mr-4">
+                  {currentExerciseIndex + 1}
+                </div>
+                <h3 className="text-xl font-bold text-white">{currentExercise?.name}</h3>
+              </div>
+              
+              {/* Cards de informações */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                {/* Card de Carga */}
+                <div className="bg-gray-700/50 rounded-xl p-4">
+                  <div className="flex flex-col items-center">
+                    <div className="text-gray-400 mb-2 text-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                      Carga
+                    </div>
+                    <div className="flex items-center">
+                      <button className="w-10 h-10 rounded-lg bg-red-600 text-white flex items-center justify-center mr-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                        </svg>
+                      </button>
+                      <span className="text-white text-2xl font-bold">{currentExercise?.weight || 0} kg</span>
+                      <button className="w-10 h-10 rounded-lg bg-green-600 text-white flex items-center justify-center ml-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
                 
-                <div className="flex flex-col space-y-2">
-                  {Array.from({ length: currentExercise.sets }).map((_, setIndex) => (
-                    <div 
-                      key={setIndex}
-                      className={`flex justify-between items-center p-3 rounded-md ${
-                        setIndex === currentSetIndex 
-                          ? 'bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800/50' 
-                          : isSetCompleted(currentExerciseIndex, setIndex)
-                            ? 'bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800/50'
-                            : 'bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50'
-                      }`}
-                    >
-                      <div className="flex items-center">
-                        <span className={`w-8 h-8 flex items-center justify-center rounded-full mr-3 ${
-                          isSetCompleted(currentExerciseIndex, setIndex)
-                            ? 'bg-green-500 text-white'
-                            : setIndex === currentSetIndex
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300'
-                        }`}>
-                          {setIndex + 1}
-                        </span>
-                        <span className="font-medium dark-text-primary">Série {setIndex + 1}</span>
-                      </div>
-                      
-                      {/* Mostrar input apenas para a série atual */}
-                      {setIndex === currentSetIndex && !isSetCompleted(currentExerciseIndex, setIndex) && (
-                        <div className="flex items-center space-x-2">
-                          {currentExercise.reps ? (
-                            <>
-                              <input
-                                type="number"
-                                placeholder={`${currentExercise.reps}`}
-                                className="w-16 p-2 border border-gray-300 dark:border-gray-600 rounded-md dark-input"
-                                value={repsCompleted}
-                                onChange={(e) => setRepsCompleted(e.target.value)}
-                              />
-                              <span className="text-sm dark-text-tertiary">reps</span>
-                            </>
-                          ) : (
-                            <span className="text-sm dark-text-tertiary">{currentExercise.time}s</span>
-                          )}
-                          <button
-                            onClick={completeSet}
-                            className="ml-2 px-3 py-1 bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white rounded-md"
-                          >
-                            Concluído
-                          </button>
-                        </div>
-                      )}
-                      
-                      {/* Mostrar marca de concluído para séries já completadas */}
-                      {isSetCompleted(currentExerciseIndex, setIndex) && (
-                        <div className="flex items-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 dark:text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span className="ml-1 text-sm text-green-700 dark:text-green-400">Concluído</span>
-                        </div>
-                      )}
+                {/* Card de Séries */}
+                <div className="bg-gray-700/50 rounded-xl p-4">
+                  <div className="flex flex-col items-center">
+                    <div className="text-gray-400 mb-2 text-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                      </svg>
+                      Séries
                     </div>
-                  ))}
+                    <div className="text-white text-2xl font-bold">
+                      {(completedSets[`exercise_${currentExercise?.id}`]?.length || 0) + 1} / {currentExercise?.sets}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Card de Repetições */}
+                <div className="bg-gray-700/50 rounded-xl p-4 col-span-2">
+                  <div className="flex flex-col items-center">
+                    <div className="text-gray-400 mb-2 text-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      Repetições
+                    </div>
+                    <div className="text-white text-2xl font-bold">
+                      {repsCompleted || 0} / {currentExercise?.reps || currentExercise?.time}
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
-            
-            {/* Progresso geral */}
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm dark-text-tertiary">Progresso</span>
-                <span className="text-sm dark-text-tertiary">
-                  {Object.values(completedSets).reduce((total, sets) => total + sets.length, 0)} / 
-                  {exercises.reduce((total, ex) => total + ex.sets, 0)} séries
-                </span>
+              
+              {/* Input de repetições realizadas */}
+              <div className="bg-navy-800 rounded-xl p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <span className="text-white">Repetições realizadas:</span>
+                  <div className="flex items-center">
+                    <input
+                      type="number"
+                      className="bg-gray-700 text-white text-center w-16 h-10 rounded-lg mx-2"
+                      value={repsCompleted}
+                      onChange={(e) => setRepsCompleted(e.target.value)}
+                    />
+                    <span className="text-white">/ {currentExercise?.reps || currentExercise?.time}</span>
+                  </div>
+                </div>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-                <div 
-                  className="bg-blue-600 h-2.5 rounded-full" 
-                  style={{ 
-                    width: `${Math.round(
-                      (Object.values(completedSets).reduce((total, sets) => total + sets.length, 0) /
-                      exercises.reduce((total, ex) => total + ex.sets, 0)) * 100
-                    )}%` 
+              
+              {/* Botões de ação */}
+              <div className="space-y-4">
+                <button
+                  onClick={completeSet}
+                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full"
+                >
+                  Confirmar
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (currentExerciseIndex < exercises.length - 1) {
+                      setCurrentExerciseIndex(currentExerciseIndex + 1);
+                      setCurrentSetIndex(0);
+                    }
                   }}
-                ></div>
+                  className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-full"
+                >
+                  Pular para Próximo Exercício
+                </button>
+                
+                {currentExercise?.video_url && (
+                  <button
+                    className="w-full py-4 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-full flex items-center justify-center"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Mostrar Vídeo
+                  </button>
+                )}
               </div>
             </div>
             
-            {/* Próximos exercícios */}
-            {currentExerciseIndex < exercises.length - 1 && (
-              <div>
-                <h3 className="text-md font-medium dark-text-primary mb-3">Próximos exercícios</h3>
-                <div className="space-y-2">
-                  {exercises.slice(currentExerciseIndex + 1, currentExerciseIndex + 3).map((exercise, index) => (
-                    <div key={exercise.id} className="flex items-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md">
-                      <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm mr-3">
-                        {currentExerciseIndex + index + 2}
-                      </span>
-                      <div>
-                        <p className="font-medium dark-text-primary">{exercise.name}</p>
-                        <p className="text-xs dark-text-tertiary">
-                          {exercise.reps 
-                            ? `${exercise.sets} séries × ${exercise.reps} repetições` 
-                            : `${exercise.sets} séries × ${exercise.time}s`}
-                        </p>
+            {/* Outros Exercícios */}
+            <div className="mt-6">
+              <div className="bg-dark px-6 py-4 border-t border-gray-700">
+                <h3 className="text-xl font-bold text-white mb-4">Outros Exercícios</h3>
+                <div className="space-y-4">
+                  {exercises.map((exercise, index) => {
+                    // Não mostrar o exercício atual
+                    if (index === currentExerciseIndex) return null;
+                    
+                    return (
+                      <div key={exercise.id} className="flex items-center justify-between py-3 border-b border-gray-700">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-white font-bold mr-3">
+                            {index + 1}
+                          </div>
+                          <span className="text-white">{exercise.name}</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setCurrentExerciseIndex(index);
+                            setCurrentSetIndex(0);
+                          }}
+                          className="px-4 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded-full text-sm"
+                        >
+                          Ir para
+                        </button>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>
