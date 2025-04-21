@@ -27,7 +27,11 @@ export default function WorkoutModePage() {
   }
 
   // Se estamos no cliente, é seguro renderizar o componente completo
-  return <WorkoutMode />;
+  return (
+    <Layout title="Modo Treino">
+      <WorkoutMode />
+    </Layout>
+  );
 }
 
 // Componente que contém a lógica de treino - agora é interno ao arquivo
@@ -37,6 +41,9 @@ function WorkoutMode() {
   const { id, session: sessionUrlParam } = router.query;
   const supabase = useSupabaseClient();
   const user = useUser();
+  
+  // Estado para controlar a exibição do modal de vídeo
+  const [showVideoModal, setShowVideoModal] = useState(false);
   
   const [workoutList, setWorkoutList] = useState(null);
   const [exercises, setExercises] = useState([]);
@@ -608,9 +615,6 @@ function WorkoutMode() {
     return totalSets > 0 ? (completedSetsCount / totalSets) * 100 : 0;
   };
   
-  // Estado para controlar a exibição do modal de vídeo
-  const [showVideoModal, setShowVideoModal] = useState(false);
-  
   // Função para atualizar o peso
   const handleWeightAdjustment = (newWeight) => {
     if (parseInt(newWeight) < 0 || isNaN(parseInt(newWeight))) {
@@ -700,14 +704,6 @@ function WorkoutMode() {
   const renderVideoModal = () => {
     if (!showVideoModal || !currentExercise?.videoUrl) return null;
     
-    // Extrair o ID do vídeo da URL do YouTube
-    const getYoutubeVideoId = (url) => {
-      if (!url) return null;
-      const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-      const match = url.match(regex);
-      return match ? match[1] : null;
-    };
-    
     const videoId = getYoutubeVideoId(currentExercise.videoUrl);
     
     return (
@@ -718,6 +714,7 @@ function WorkoutMode() {
             <button 
               onClick={() => setShowVideoModal(false)}
               className="text-gray-500 hover:text-gray-700"
+              aria-label="Fechar"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -983,14 +980,11 @@ function WorkoutMode() {
   );
 }
 
-// Função para extrair o ID do vídeo do YouTube de uma URL
+// Função auxiliar para extrair o ID do vídeo YouTube a partir da URL
+// Esta função é usada em diferentes partes do código
 const getYoutubeVideoId = (url) => {
   if (!url) return null;
-  
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-  const match = url.match(regExp);
-  
-  return (match && match[2].length === 11)
-    ? match[2]
-    : null;
+  const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
 };
