@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import Layout from '../components/Layout';
 import { useRouter } from 'next/router';
+import AffiliateSystem from '../components/AffiliateSystem';
 
 export default function Profile() {
   const supabase = useSupabaseClient();
@@ -249,102 +250,78 @@ export default function Profile() {
                   
                   <div className="bg-yellow-50/60 dark:bg-yellow-900/20 rounded-lg p-4 border border-yellow-100 dark:border-yellow-800/50">
                     <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Último Treino</h3>
-                    {stats.lastWorkout ? (
-                      <div className="mt-1">
-                        <p className="font-medium dark-text-primary">{stats.lastWorkout.workout_list?.name || 'Lista removida'}</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{formatDate(stats.lastWorkout.created_at)}</p>
-                      </div>
-                    ) : (
-                      <p className="mt-1 dark-text-tertiary">Nenhum treino realizado</p>
-                    )}
+                    <p className="mt-1 text-sm font-medium dark-text-secondary">
+                      {stats.lastWorkout ? (
+                        <>
+                          <span className="block">{stats.lastWorkout.workout_list?.name || 'Treino'}</span>
+                          <span className="block text-xs text-gray-500 dark:text-gray-400">
+                            {formatDate(stats.lastWorkout.created_at)}
+                          </span>
+                        </>
+                      ) : (
+                        'Nenhum treino registrado'
+                      )}
+                    </p>
                   </div>
                 </div>
               )}
             </div>
-          </div>
-          
-          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex flex-col md:flex-row gap-4">
-              <button
-                onClick={handleSignOut}
-                className="btn-danger"
-              >
-                Sair da Conta
-              </button>
-              
-              <button
-                onClick={() => setShowDeleteModal(true)}
-                className="btn-danger bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
-              >
-                Excluir Conta
-              </button>
+
+            {/* Sistema de Afiliados */}
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+              <AffiliateSystem />
+            </div>
+            
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold dark-text-primary mb-4">Ações da Conta</h2>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={handleSignOut}
+                  className="py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Sair da Conta
+                </button>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="py-2 px-4 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-md text-sm font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                >
+                  Excluir Conta
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
       
-      {/* Modal de confirmação para exclusão de conta */}
+      {/* Modal de confirmação de exclusão */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4">
-            <div className="fixed inset-0 bg-black opacity-50"></div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold dark-text-primary mb-4">Excluir Conta</h3>
+            <p className="dark-text-secondary mb-6">
+              Tem certeza que deseja excluir sua conta? Esta ação não pode ser desfeita e você perderá todos os seus dados.
+            </p>
             
-            <div className="relative bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-xl">
-              <div className="mb-4">
-                <h3 className="text-xl font-bold text-red-600 dark:text-red-400">Excluir Conta</h3>
+            {deleteError && (
+              <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-md text-sm">
+                {deleteError}
               </div>
-              
-              <div className="mb-6">
-                <p className="dark-text-secondary mb-4">
-                  <strong>ATENÇÃO:</strong> Você está prestes a excluir sua conta permanentemente.
-                </p>
-                <div className="bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-500 dark:border-yellow-600 p-4 mb-4">
-                  <div className="flex">
-                    <div className="ml-3">
-                      <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                        Esta ação <strong>NÃO PODE</strong> ser desfeita. Todos os seus dados serão excluídos:
-                      </p>
-                      <ul className="list-disc ml-5 mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-                        <li>Listas de treino</li>
-                        <li>Histórico de treinos</li>
-                        <li>Estatísticas e relatórios</li>
-                        <li>Informações da conta</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
-                  Você precisará criar uma nova conta se desejar usar o aplicativo novamente.
-                </p>
-              </div>
-              
-              {deleteError && (
-                <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 dark:border-red-600 p-4 mb-4">
-                  <div className="flex">
-                    <div className="ml-3">
-                      <p className="text-sm text-red-700 dark:text-red-300">{deleteError}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setShowDeleteModal(false)}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
-                  disabled={deleteLoading}
-                >
-                  Cancelar
-                </button>
-                
-                <button
-                  onClick={handleDeleteAccount}
-                  className="px-4 py-2 bg-red-600 dark:bg-red-700 text-white rounded hover:bg-red-700 dark:hover:bg-red-800"
-                  disabled={deleteLoading}
-                >
-                  {deleteLoading ? 'Excluindo...' : 'Confirmar Exclusão'}
-                </button>
-              </div>
+            )}
+            
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteLoading}
+                className="py-2 px-4 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {deleteLoading ? 'Excluindo...' : 'Sim, Excluir'}
+              </button>
             </div>
           </div>
         </div>

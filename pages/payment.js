@@ -257,10 +257,9 @@ export default function Payment() {
             
             <div className="mb-6">
               <PaymentButton 
-                priceId="price_1OjcOEJoWbpBlubVE8NjmAbe"
+                userId={user?.id}
                 buttonText="Assinar Plano Premium"
-                variant="primary"
-                fullWidth={true}
+                className="w-full"
               />
             </div>
             
