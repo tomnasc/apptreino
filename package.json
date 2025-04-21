@@ -13,6 +13,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@babel/runtime": "^7.27.0",
     "@heroicons/react": "^2.2.0",
     "@stripe/stripe-js": "^6.1.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
@@ -40,6 +41,7 @@
   "devDependencies": {
     "@babel/core": "^7.26.10",
     "@babel/plugin-transform-react-jsx": "^7.25.9",
+    "@babel/plugin-transform-runtime": "^7.26.10",
     "@babel/preset-react": "^7.26.3",
     "stylelint": "^16.16.0",
     "stylelint-config-standard": "^37.0.0"
