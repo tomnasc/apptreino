@@ -61,6 +61,9 @@ function WorkoutMode() {
   const [exerciseTimeRemaining, setExerciseTimeRemaining] = useState(0);
   const [wakeLock, setWakeLock] = useState(null);
   
+  // Estado para armazenar o histórico de pesos dos exercícios
+  const [weightHistory, setWeightHistory] = useState({});
+  
   // Referências para timers
   const restTimerRef = useRef(null);
   const exerciseTimerRef = useRef(null);
@@ -82,6 +85,18 @@ function WorkoutMode() {
       checkExistingSession();
     }
   }, [id, user]);
+
+  // Carregar histórico de pesos do localStorage
+  useEffect(() => {
+    try {
+      const savedWeightHistory = localStorage.getItem('weightHistory');
+      if (savedWeightHistory) {
+        setWeightHistory(JSON.parse(savedWeightHistory));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar histórico de pesos:', error);
+    }
+  }, []);
 
   // Efeito para iniciar o wakeLock quando o treino estiver ativo
   useEffect(() => {
@@ -640,7 +655,8 @@ function WorkoutMode() {
   // Atualiza o input de peso quando o exercício muda
   useEffect(() => {
     if (currentExercise) {
-      const savedWeight = weightHistory[currentExercise.id] || 0;
+      // Usar um valor padrão caso não haja peso salvo
+      const savedWeight = weightHistory[currentExercise.id] || currentExercise.weight || 0;
       setCustomWeight(savedWeight.toString());
       setWeightInput(savedWeight.toString());
     }
