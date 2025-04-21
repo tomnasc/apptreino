@@ -453,10 +453,11 @@ export default function DashboardPage() {
                 Faça uma avaliação física rápida e nossa IA vai sugerir treinos específicos para seus objetivos.
               </p>
               
-              <Link href="/assessment">
-                <a className="inline-flex items-center justify-center px-4 py-2 bg-purple-600 hover:bg-purple-700 dark:bg-purple-700 dark:hover:bg-purple-800 text-white rounded-md text-sm font-medium w-full">
-                  Iniciar Avaliação Física
-                </a>
+              <Link 
+                href="/assessment"
+                className="inline-flex items-center justify-center px-4 py-2 bg-purple-600 hover:bg-purple-700 dark:bg-purple-700 dark:hover:bg-purple-800 text-white rounded-md text-sm font-medium w-full"
+              >
+                Iniciar Avaliação Física
               </Link>
             </div>
           </div>
