@@ -274,27 +274,33 @@ export default function Layout({ children, title = 'Treino na Mão', hideNavigat
                   Admin
                 </Link>
               )}
-              <button
-                onClick={handleSignOut}
-                className="w-full text-left border-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 hover:text-gray-800 dark:hover:text-gray-200 block pl-3 pr-4 py-2 border-l-4 text-base font-medium transition-colors"
-              >
-                Sair
-              </button>
+              <div className="pt-4 pb-3 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={handleSignOut}
+                  className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Sair
+                </button>
+              </div>
             </div>
           </div>
         )}
       </header>
 
-      <main className="flex-grow">
-        {hideNavigation ? (
-          children
-        ) : (
-          <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            <div className="px-4 sm:px-0">{children}</div>
-          </div>
-        )}
+      <main className={`flex-grow ${!hideNavigation ? 'max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6' : ''}`}>
+        {children}
       </main>
-
+      
+      {!hideNavigation && (
+        <footer className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 transition-colors">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+              &copy; {new Date().getFullYear()} Treino na Mão. Todos os direitos reservados.
+            </p>
+          </div>
+        </footer>
+      )}
+      
       <AddToHomeScreen />
     </div>
   );

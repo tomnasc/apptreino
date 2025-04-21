@@ -28,6 +28,51 @@ const nextConfig = {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   },
   swcMinify: true,
+  compiler: {
+    // Desativa a remoção de console.logs em produção
+    removeConsole: false
+  },
+  experimental: {
+    // Desabilita a otimização de código para o arquivo problemático
+    optimizeCss: true,
+    optimizePackageImports: ['@supabase/auth-helpers-react'],
+    // Desativa a geração estática para a página de workout-mode
+    isrMemoryCacheSize: 0,
+  },
+  webpack: (config, { isServer, dev }) => {
+    // Configuração especial para o arquivo problemático
+    config.module.rules.push({
+      test: /\[id\]\.js$/,
+      include: /pages\/workout-mode/,
+      use: {
+        loader: 'babel-loader',
+        options: {
+          presets: ['next/babel'],
+          plugins: [
+            '@babel/plugin-transform-react-jsx',
+            ['@babel/plugin-transform-runtime', { regenerator: true }]
+          ]
+        }
+      }
+    });
+    
+    return config;
+  },
+  // Desativar a exportação estática para a página workout-mode/[id]
+  exportPathMap: async function (
+    defaultPathMap,
+    { dev, dir, outDir, distDir, buildId }
+  ) {
+    // Remover a página workout-mode/[id] da exportação estática
+    const paths = { ...defaultPathMap };
+    delete paths['/workout-mode/[id]'];
+    
+    return paths;
+  },
+  // Adicionar workout-mode/[id] à lista de páginas que devem ser renderizadas apenas no cliente
+  unstable_runtimeJS: {
+    '/workout-mode/[id]': true,
+  },
   async rewrites() {
     return [
       {
