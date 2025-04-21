@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import Layout from '../../components/Layout';
@@ -376,11 +376,15 @@ export default function WorkoutMode() {
   }, [sessionId]);
 
   useEffect(() => {
-    if (id && user) {
-      fetchWorkoutList();
-      fetchExercises();
+    const fetchData = async () => {
+      await fetchWorkoutList();
+      await fetchExercises();
+    };
+
+    if (router.isReady && id && user) {
+      fetchData();
     }
-  }, [id, user]);
+  }, [router.isReady, id, user, fetchWorkoutList, fetchExercises]);
 
   useEffect(() => {
     // Verificar se há um ID de sessão na URL para retomar treino
@@ -501,7 +505,8 @@ export default function WorkoutMode() {
     }
   }, [isWorkoutActive, currentExerciseIndex, currentSetIndex, completedSets, sessionId, workoutStartTime, id]);
 
-  const fetchWorkoutList = async () => {
+  // Funções para buscar dados do banco de dados com useCallback
+  const fetchWorkoutList = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -523,9 +528,9 @@ export default function WorkoutMode() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, id, router]);
 
-  const fetchExercises = async () => {
+  const fetchExercises = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('workout_exercises')
@@ -538,7 +543,7 @@ export default function WorkoutMode() {
     } catch (error) {
       console.error('Erro ao buscar exercícios:', error);
     }
-  };
+  }, [supabase, id]);
 
   // Função para adquirir o Wake Lock (manter a tela acesa)
   const acquireWakeLock = async () => {
@@ -609,8 +614,44 @@ export default function WorkoutMode() {
     }
   }, [isWorkoutActive]);
 
+  // Função para verificar se todos os exercícios têm os campos necessários
+  const validateExercises = () => {
+    if (!exercises || exercises.length === 0) {
+      return { isValid: false, message: "Não há exercícios para iniciar o treino." };
+    }
+    
+    for (let i = 0; i < exercises.length; i++) {
+      const exercise = exercises[i];
+      
+      // Verificar se o exercício tem o número de séries definido
+      if (typeof exercise.sets === 'undefined' || exercise.sets === null) {
+        return { 
+          isValid: false, 
+          message: `O exercício "${exercise.name}" (nº ${i+1}) não tem o número de séries definido. Edite o exercício para corrigir.` 
+        };
+      }
+      
+      // Se não for baseado em tempo, precisa ter repetições
+      if (!exercise.time && (!exercise.reps || exercise.reps <= 0)) {
+        return { 
+          isValid: false, 
+          message: `O exercício "${exercise.name}" (nº ${i+1}) não tem repetições definidas e nem tempo. Edite o exercício para corrigir.` 
+        };
+      }
+    }
+    
+    return { isValid: true };
+  };
+
   const startWorkout = async () => {
     try {
+      // Verificar se os exercícios são válidos antes de iniciar o treino
+      const { isValid, message } = validateExercises();
+      if (!isValid) {
+        setError(message);
+        return;
+      }
+
       // Verificar primeiro se já existe uma sessão não concluída
       const { data: existingSessions, error: sessionError } = await supabase
         .from('workout_sessions')
@@ -1175,6 +1216,13 @@ export default function WorkoutMode() {
       return;
     }
     
+    // Verificar se o exercício tem séries definidas
+    if (typeof currentExercise.sets === 'undefined' || currentExercise.sets === null) {
+      console.error('Exercício sem número de séries definido:', currentExercise.name);
+      showErrorMessageModal(`O exercício "${currentExercise.name || 'atual'}" não tem número de séries definido. Edite o exercício para corrigir.`);
+      return;
+    }
+    
     // Garantir que temos um valor numérico para repsCompleted
     const reps = typeof repsCompleted === 'string' ? 
       (repsCompleted === '' ? 0 : parseInt(repsCompleted)) : 
@@ -1212,6 +1260,8 @@ export default function WorkoutMode() {
     // 2. O usuário atingiu o número alvo de repetições em TODAS as séries deste exercício
     if (
       currentExercise?.reps && 
+      typeof currentExercise?.sets !== 'undefined' && 
+      currentExercise?.sets !== null &&
       currentSetIndex === (currentExercise?.sets || 1) - 1
     ) {
       // Verificar se todas as séries atingiram o número alvo de repetições
@@ -1308,7 +1358,7 @@ export default function WorkoutMode() {
     setPreviousSetEndTime(endTime);
     
     // Verificar se todas as séries do exercício atual foram completadas
-    if (currentSetIndex + 1 >= currentExercise.sets) {
+    if (currentExercise && typeof currentExercise.sets !== 'undefined' && currentExercise.sets !== null && currentSetIndex + 1 >= currentExercise.sets) {
       // Passar para o próximo exercício
       if (currentExerciseIndex + 1 < exercises.length) {
         setCurrentExerciseIndex(currentExerciseIndex + 1);
@@ -1320,7 +1370,7 @@ export default function WorkoutMode() {
         
         // Se o próximo exercício for baseado em tempo, configurar o timer
         const nextExercise = exercises[currentExerciseIndex + 1];
-        if (nextExercise.time) {
+        if (nextExercise && nextExercise.time) {
           setTimeRemaining(nextExercise.time);
           setTimerActive(false); // Não inicia automaticamente, espera o usuário clicar
         } else {
@@ -1335,7 +1385,7 @@ export default function WorkoutMode() {
       setCurrentSetIndex(currentSetIndex + 1);
       
       // Iniciar temporizador de descanso se estiver configurado
-      if (currentExercise.rest_time) {
+      if (currentExercise && currentExercise.rest_time) {
         startRestTimer(currentExercise.rest_time);
       }
       
@@ -1344,7 +1394,7 @@ export default function WorkoutMode() {
       setCurrentSetStartTime(newSetStartTime);
       
       // Se o exercício for baseado em tempo, configurar o timer
-      if (currentExercise.time) {
+      if (currentExercise && currentExercise.time) {
         setTimeRemaining(currentExercise.time);
         setTimerActive(false); // Não inicia automaticamente, espera o usuário clicar
       } else {
@@ -2027,10 +2077,19 @@ export default function WorkoutMode() {
       
       // Verificar se temos valores inválidos no currentSetIndex
       const currentEx = exercises[currentExerciseIndex];
-      if (currentEx && currentSetIndex >= currentEx.sets) {
+      if (currentEx && typeof currentEx.sets !== 'undefined' && currentEx.sets !== null && currentSetIndex >= currentEx.sets) {
         // Se o índice da série for maior que o número de séries, ajustar
         setCurrentSetIndex(Math.max(0, currentEx.sets - 1));
         console.log('Ajustando currentSetIndex para um valor válido:', Math.max(0, currentEx.sets - 1));
+      } else if (!currentEx || typeof currentEx.sets === 'undefined' || currentEx.sets === null) {
+        // Se o exercício atual for inválido ou não tiver sets definidos, ajustar para 0
+        setCurrentSetIndex(0);
+        console.log('Exercício inválido ou sem séries definidas, ajustando para série 0');
+        
+        // Mostrar modal de erro se o exercício não tiver sets definidos
+        if (currentEx && (typeof currentEx.sets === 'undefined' || currentEx.sets === null)) {
+          showErrorMessageModal(`O exercício "${currentEx.name || 'atual'}" não tem número de séries definido. Edite o exercício para corrigir.`);
+        }
       }
     }
   }, [exercises, isWorkoutActive, currentExerciseIndex, currentSetIndex]);
@@ -2274,7 +2333,9 @@ export default function WorkoutMode() {
                               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                             </svg>
                                 <span className="font-medium text-gray-500 dark:text-gray-400">Séries:</span>{' '}
-                            <span className="ml-1 font-bold text-gray-700 dark:text-gray-300">{exercise.sets}</span>
+                            <span className="ml-1 font-bold text-gray-700 dark:text-gray-300">
+                              {typeof exercise.sets !== 'undefined' && exercise.sets !== null ? exercise.sets : '?'}
+                            </span>
                               </div>
                               {exercise.reps && (
                             <div className="flex items-center">
@@ -2355,7 +2416,9 @@ export default function WorkoutMode() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 5.25h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5" />
                     </svg>
                     <span className="font-medium text-gray-600 dark:text-gray-300">Série atual:</span>{' '}
-                    <span className="ml-2 font-bold text-blue-700 dark:text-blue-300">{currentSetIndex + 1} de {currentExercise.sets}</span>
+                    <span className="ml-2 font-bold text-blue-700 dark:text-blue-300">
+                      {currentSetIndex + 1} de {currentExercise?.sets || '?'}
+                    </span>
                 </div>
                   <div className="flex items-center bg-blue-50 dark:bg-blue-900/40 rounded-lg px-4 py-3 flex-grow">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-blue-500 dark:text-blue-400 mr-2">
