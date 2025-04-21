@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import Layout from '../../components/Layout';
 import Head from 'next/head';
+import toast from 'react-hot-toast';
+import Link from 'next/link';
 
 // Componente principal da página de treino
 export default function WorkoutModePage() {
@@ -52,10 +54,26 @@ function WorkoutMode() {
   const [restTimeRemaining, setRestTimeRemaining] = useState(0);
   const [totalWorkoutTime, setTotalWorkoutTime] = useState(0);
   const [existingSession, setExistingSession] = useState(null);
+  const [customWeight, setCustomWeight] = useState('');
+  const [showLoadDecreaseAlert, setShowLoadDecreaseAlert] = useState(false);
+  const [showLoadIncreaseAlert, setShowLoadIncreaseAlert] = useState(false);
+  const [exerciseTimerActive, setExerciseTimerActive] = useState(false);
+  const [exerciseTimeRemaining, setExerciseTimeRemaining] = useState(0);
+  const [wakeLock, setWakeLock] = useState(null);
+  
+  // Referências para timers
+  const restTimerRef = useRef(null);
+  const exerciseTimerRef = useRef(null);
+  
+  // Referência para o WakeLock
+  const wakeLockRef = useRef(null);
   
   // Calculamos o objeto de exercício atual com base no índice
   const currentExercise = exercises[currentExerciseIndex] || null;
 
+  // Estado para o input de peso
+  const [weightInput, setWeightInput] = useState('');
+  
   // Verificar se existe um treino em andamento para esta lista quando a página carrega
   useEffect(() => {
     if (id && user) {
@@ -65,6 +83,85 @@ function WorkoutMode() {
     }
   }, [id, user]);
 
+  // Efeito para iniciar o wakeLock quando o treino estiver ativo
+  useEffect(() => {
+    if (isWorkoutActive) {
+      requestWakeLock();
+    }
+    
+    return () => {
+      releaseWakeLock();
+    };
+  }, [isWorkoutActive]);
+
+  // Adquirir WakeLock quando a página carrega
+  useEffect(() => {
+    if (id) {
+      acquireWakeLock();
+    }
+    
+    // Liberar WakeLock quando o componente é desmontado
+    return () => {
+      releaseWakeLock();
+    };
+  }, [id]);
+
+  // Função para solicitar o WakeLock (manter tela acesa)
+  const requestWakeLock = async () => {
+    if ('wakeLock' in navigator) {
+      try {
+        const lock = await navigator.wakeLock.request('screen');
+        setWakeLock(lock);
+        
+        lock.addEventListener('release', () => {
+          console.log('Tela pode adormecer novamente');
+          setWakeLock(null);
+        });
+        
+        console.log('WakeLock ativo - tela permanecerá acesa');
+      } catch (err) {
+        console.error(`Erro ao ativar WakeLock: ${err.name}, ${err.message}`);
+      }
+    } else {
+      console.warn('WakeLock API não disponível neste navegador');
+    }
+  };
+  
+  // Função para liberar o WakeLock
+  const releaseWakeLock = async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        console.log('WakeLock liberado');
+      } catch (err) {
+        console.error('Erro ao liberar WakeLock:', err);
+      }
+    }
+  };
+
+  // Função para adquirir o WakeLock
+  const acquireWakeLock = async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        console.log('WakeLock adquirido');
+        
+        // Reativar o WakeLock quando o documento volta a ficar visível
+        document.addEventListener('visibilitychange', async () => {
+          if (document.visibilityState === 'visible' && !wakeLockRef.current) {
+            wakeLockRef.current = await navigator.wakeLock.request('screen');
+            console.log('WakeLock reativado');
+          }
+        });
+      } else {
+        console.log('WakeLock API não suportada neste navegador');
+      }
+    } catch (err) {
+      console.error('Erro ao adquirir WakeLock:', err);
+    }
+  };
+  
   // Função para verificar se existe uma sessão em andamento
   const checkExistingSession = async () => {
     try {
@@ -211,11 +308,100 @@ function WorkoutMode() {
     }
   };
 
+  // Efeito para gerenciar o timer de descanso
+  useEffect(() => {
+    if (restTimerActive && restTimeRemaining > 0) {
+      restTimerRef.current = setInterval(() => {
+        setRestTimeRemaining(prev => {
+          if (prev <= 1) {
+            clearInterval(restTimerRef.current);
+            setRestTimerActive(false);
+            playAlertSound();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else if (restTimeRemaining <= 0 && restTimerRef.current) {
+      clearInterval(restTimerRef.current);
+      setRestTimerActive(false);
+    }
+    
+    return () => {
+      if (restTimerRef.current) {
+        clearInterval(restTimerRef.current);
+      }
+    };
+  }, [restTimerActive, restTimeRemaining]);
+  
+  // Efeito para gerenciar o timer de exercício baseado em tempo
+  useEffect(() => {
+    if (exerciseTimerActive && exerciseTimeRemaining > 0) {
+      exerciseTimerRef.current = setInterval(() => {
+        setExerciseTimeRemaining(prev => {
+          if (prev <= 1) {
+            clearInterval(exerciseTimerRef.current);
+            setExerciseTimerActive(false);
+            playAlertSound();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else if (exerciseTimeRemaining <= 0 && exerciseTimerRef.current) {
+      clearInterval(exerciseTimerRef.current);
+      setExerciseTimerActive(false);
+    }
+    
+    return () => {
+      if (exerciseTimerRef.current) {
+        clearInterval(exerciseTimerRef.current);
+      }
+    };
+  }, [exerciseTimerActive, exerciseTimeRemaining]);
+
+  // Função para tocar um som de alerta quando o timer terminar
+  const playAlertSound = () => {
+    try {
+      const audio = new Audio('/beep.mp3');
+      audio.play();
+    } catch (error) {
+      console.error('Erro ao tocar som:', error);
+    }
+  };
+  
+  // Iniciar o cronômetro para exercícios baseados em tempo
+  const startExerciseTimer = () => {
+    if (currentExercise?.time) {
+      setExerciseTimeRemaining(currentExercise.time);
+      setExerciseTimerActive(true);
+    }
+  };
+  
+  // Reiniciar o cronômetro para exercícios baseados em tempo
+  const resetExerciseTimer = () => {
+    setExerciseTimerActive(false);
+    if (currentExercise?.time) {
+      setExerciseTimeRemaining(currentExercise.time);
+    }
+  };
+
   // Função para marcar uma série como concluída
   const completeSet = async () => {
     if (!currentExercise) return;
     
     try {
+      // Verificar se é necessário mostrar alertas de carga
+      if (currentExercise.reps) {
+        const reps = parseInt(repsCompleted);
+        
+        // Se fez 6 ou menos repetições, mostrar alerta para diminuir a carga
+        if (reps <= 6 && reps > 0) {
+          setShowLoadDecreaseAlert(true);
+          setTimeout(() => setShowLoadDecreaseAlert(false), 5000);
+        }
+      }
+      
       // Marcar a série como concluída no estado
       const exerciseKey = `exercise_${currentExercise.id}`;
       const updatedCompletedSets = { ...completedSets };
@@ -230,6 +416,9 @@ function WorkoutMode() {
       
       setCompletedSets(updatedCompletedSets);
       
+      // Salvar o peso customizado se foi alterado
+      const weightToSave = customWeight !== '' ? parseFloat(customWeight) : currentExercise.weight;
+      
       // Registrar os detalhes da série
       await supabase
         .from('workout_session_details')
@@ -240,9 +429,26 @@ function WorkoutMode() {
             exercise_index: currentExerciseIndex,
             set_index: currentSetIndex,
             reps_completed: parseInt(repsCompleted) || 0,
-            weight: currentExercise.weight
+            weight: weightToSave || 0
           }
         ]);
+      
+      // Verificar se todas as séries foram concluídas com o número máximo de repetições
+      if (currentExercise.reps && 
+          currentSetIndex === currentExercise.sets - 1 && 
+          updatedCompletedSets[exerciseKey].length === currentExercise.sets) {
+        
+        // Verificar se todas as séries atingiram o número máximo de repetições
+        const allMaxReps = updatedCompletedSets[exerciseKey].every((_, idx) => {
+          const setDetails = { reps_completed: parseInt(repsCompleted) }; // Para a série atual
+          return setDetails.reps_completed >= currentExercise.reps;
+        });
+        
+        if (allMaxReps) {
+          setShowLoadIncreaseAlert(true);
+          setTimeout(() => setShowLoadIncreaseAlert(false), 5000);
+        }
+      }
       
       // Passar para a próxima série ou exercício
       if (currentSetIndex < currentExercise.sets - 1) {
@@ -257,8 +463,10 @@ function WorkoutMode() {
         finishWorkout();
       }
       
-      // Limpar o campo de repetições
+      // Limpar campos
       setRepsCompleted('');
+      setCustomWeight('');
+      setExerciseTimerActive(false);
       
       // Iniciar timer de descanso
       if (currentExercise.rest_time) {
@@ -268,6 +476,21 @@ function WorkoutMode() {
     } catch (error) {
       console.error('Erro ao completar série:', error);
     }
+  };
+
+  // Função para verificar se o botão de concluir deve estar ativo
+  const isCompleteButtonActive = () => {
+    if (!currentExercise) return false;
+    
+    if (currentExercise.reps) {
+      // Exercícios baseados em repetições precisam ter um valor no campo
+      return repsCompleted !== '';
+    } else if (currentExercise.time) {
+      // Exercícios baseados em tempo precisam ter o timer finalizado
+      return exerciseTimeRemaining === 0 || !exerciseTimerActive;
+    }
+    
+    return false;
   };
 
   // Função para finalizar o treino
@@ -312,329 +535,440 @@ function WorkoutMode() {
     return completedSets[exerciseKey] && completedSets[exerciseKey].includes(setIndex);
   };
 
+  // Pular para o próximo exercício
+  const skipExercise = () => {
+    if (currentExerciseIndex + 1 < exercises.length) {
+      setCurrentExerciseIndex(currentExerciseIndex + 1);
+      setCurrentSetIndex(0);
+      setRepsCompleted('');
+      setCustomWeight('');
+      
+      // Reiniciar timer para exercícios baseados em tempo
+      const nextExercise = exercises[currentExerciseIndex + 1];
+      if (nextExercise && !nextExercise.reps && nextExercise.time) {
+        setExerciseTimeRemaining(nextExercise.time);
+        setExerciseTimerActive(false);
+      }
+    }
+  };
+  
+  // Voltar para o exercício anterior
+  const goToPreviousExercise = () => {
+    if (currentExerciseIndex > 0) {
+      setCurrentExerciseIndex(currentExerciseIndex - 1);
+      setCurrentSetIndex(0);
+      setRepsCompleted('');
+      setCustomWeight('');
+      
+      // Reiniciar timer para exercícios baseados em tempo
+      const prevExercise = exercises[currentExerciseIndex - 1];
+      if (prevExercise && !prevExercise.reps && prevExercise.time) {
+        setExerciseTimeRemaining(prevExercise.time);
+        setExerciseTimerActive(false);
+      }
+    }
+  };
+  
+  // Calcular o progresso total do treino
+  const calculateProgress = () => {
+    if (!exercises || exercises.length === 0) return 0;
+    
+    let totalSets = 0;
+    let completedSetsCount = 0;
+    
+    exercises.forEach(exercise => {
+      totalSets += exercise.sets;
+      
+      const key = `exercise_${exercise.id}`;
+      const exCompletedSets = completedSets[key] || [];
+      completedSetsCount += exCompletedSets.length;
+    });
+    
+    return totalSets > 0 ? (completedSetsCount / totalSets) * 100 : 0;
+  };
+  
+  // Estado para controlar a exibição do modal de vídeo
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  
+  // Função para atualizar o peso
+  const handleWeightAdjustment = (newWeight) => {
+    if (parseInt(newWeight) < 0 || isNaN(parseInt(newWeight))) {
+      return;
+    }
+    
+    setExercises(prevExercises => {
+      const updatedExercises = [...prevExercises];
+      const currentExIndex = currentExerciseIndex;
+      
+      updatedExercises[currentExIndex] = {
+        ...updatedExercises[currentExIndex],
+        weight: newWeight
+      };
+      
+      return updatedExercises;
+    });
+  };
+
+  // Função para lidar com a mudança de peso manualmente
+  const handleWeightChange = (e) => {
+    const value = e.target.value;
+    // Permite apenas números e ponto decimal
+    if (/^(\d*\.?\d*)$/.test(value) || value === '') {
+      setWeightInput(value);
+    }
+  };
+  
+  // Função para atualizar o peso ao pressionar Enter ou ao perder o foco
+  const updateWeight = () => {
+    if (weightInput === '') return;
+    
+    const newWeight = parseFloat(weightInput);
+    if (!isNaN(newWeight)) {
+      setCustomWeight(newWeight.toString());
+      handleWeightAdjustment(newWeight.toString());
+      
+      // Atualiza o histórico de pesos
+      const updatedWeightHistory = {
+        ...weightHistory,
+        [currentExercise.id]: newWeight
+      };
+      setWeightHistory(updatedWeightHistory);
+      localStorage.setItem('weightHistory', JSON.stringify(updatedWeightHistory));
+    }
+  };
+  
+  // Atualiza o input de peso quando o exercício muda
+  useEffect(() => {
+    if (currentExercise) {
+      const savedWeight = weightHistory[currentExercise.id] || 0;
+      setCustomWeight(savedWeight.toString());
+      setWeightInput(savedWeight.toString());
+    }
+  }, [currentExercise, weightHistory]);
+  
+  // Renderizar a interface
   if (loading) {
     return (
-      <Layout title="Carregando treino...">
-        <div className="text-center py-10">
-          <p>Carregando...</p>
-        </div>
-      </Layout>
+      <div className="container mx-auto px-4 py-8 text-center">
+        <h1 className="text-2xl font-bold mb-4">Carregando treino...</h1>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+      </div>
     );
   }
-
-  return (
-    <Layout title={`Treino: ${workoutList?.name || ''}`}>
-      <Head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-        <meta name="theme-color" content="#3b82f6" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="TreinoPro" />
-        <meta name="mobile-web-app-capable" content="yes" />
-      </Head>
-      
-      <div className="space-y-6">
-        <div className="flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-700 dark:to-blue-500 rounded-lg shadow-lg p-3 text-white">
-          <h1 className="text-xl font-bold">
-            {isWorkoutActive ? 'Treino em Andamento' : 'Iniciar Treino'}
-          </h1>
-          <div className="flex space-x-2">
-            {isWorkoutActive ? (
-              <div className="bg-white/20 backdrop-blur-sm text-white px-3 py-1.5 rounded-full">
-                Treino ativo
-              </div>
+  
+  if (!currentExercise) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <h1 className="text-2xl font-bold mb-4">Nenhum exercício encontrado</h1>
+        <button 
+          onClick={() => router.push('/workouts')}
+          className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
+        >
+          Voltar para treinos
+        </button>
+      </div>
+    );
+  }
+  
+  const progress = calculateProgress();
+  const exerciseKey = `exercise_${currentExercise.id}`;
+  const completedForExercise = completedSets[exerciseKey] || [];
+  
+  // Função para renderizar o modal de vídeo do exercício
+  const renderVideoModal = () => {
+    if (!showVideoModal || !currentExercise?.videoUrl) return null;
+    
+    // Extrair o ID do vídeo da URL do YouTube
+    const getYoutubeVideoId = (url) => {
+      if (!url) return null;
+      const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+      const match = url.match(regex);
+      return match ? match[1] : null;
+    };
+    
+    const videoId = getYoutubeVideoId(currentExercise.videoUrl);
+    
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-75">
+        <div className="relative w-full max-w-2xl bg-white rounded-lg overflow-hidden">
+          <div className="flex justify-between items-center p-4 border-b">
+            <h3 className="text-lg font-semibold">{currentExercise.name}</h3>
+            <button 
+              onClick={() => setShowVideoModal(false)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="p-0 aspect-video">
+            {videoId ? (
+              <iframe
+                width="100%"
+                height="100%"
+                src={`https://www.youtube.com/embed/${videoId}`}
+                title={`${currentExercise.name} video`}
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="aspect-video"
+              ></iframe>
             ) : (
-              <>
-                <button
-                  onClick={() => router.push('/workout-lists')}
-                  className="bg-white/30 backdrop-blur-sm text-white hover:bg-white/40 font-medium py-2 px-4 rounded-full shadow transition-all"
-                >
-                  Voltar
-                </button>
-                {existingSession ? (
-                  <button
-                    onClick={resumeWorkout}
-                    className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full shadow transition-all transform hover:scale-105"
-                  >
-                    Retomar Treino
-                  </button>
-                ) : (
-                  <button
-                    onClick={startWorkout}
-                    className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full shadow transition-all transform hover:scale-105"
-                    disabled={exercises.length === 0}
-                  >
-                    Iniciar Treino
-                  </button>
-                )}
-              </>
+              <div className="flex items-center justify-center h-full bg-gray-100">
+                <p className="text-gray-500">URL de vídeo inválida</p>
+              </div>
             )}
           </div>
         </div>
-
-        {error && (
-          <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 dark:border-red-600 p-4 rounded-r-lg shadow-sm">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg
-                  className="h-5 w-5 text-red-500 dark:text-red-400"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
+      </div>
+    );
+  };
+  
+  // Renderiza o controle de peso
+  const renderWeightControl = () => {
+    return (
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Peso (kg)
+        </label>
+        <div className="flex items-center">
+          <input
+            type="text"
+            value={weightInput}
+            onChange={handleWeightChange}
+            onBlur={updateWeight}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                updateWeight();
+                e.target.blur();
+              }
+            }}
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            placeholder="Digite o peso"
+          />
+        </div>
+      </div>
+    );
+  };
+  
+  return (
+    <>
+      <Head>
+        <title>Treino - {workoutList?.name || 'Carregando...'}</title>
+      </Head>
+      <div className="min-h-screen bg-gray-100">
+        <div className="container mx-auto px-4 py-6">
+          {/* Áudio de alerta */}
+          <audio ref={alertAudioRef} src="/alert-sound.mp3" preload="auto"></audio>
+          
+          {/* Cabeçalho do treino */}
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-xl font-bold">{workoutList?.name || 'Treino'}</h1>
+            <div className="text-sm">
+              Exercício {currentExerciseIndex + 1} de {exercises.length}
+            </div>
+          </div>
+          
+          {/* Barra de progresso */}
+          <div className="w-full bg-gray-200 rounded-full h-2.5 mb-6">
+            <div 
+              className="bg-blue-600 h-2.5 rounded-full" 
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+          
+          {/* Alerta de carga */}
+          {showLoadDecreaseAlert && (
+            <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 mb-4">
+              <p className="text-sm">Poucas repetições! Considere diminuir a carga.</p>
+            </div>
+          )}
+          
+          {showLoadIncreaseAlert && (
+            <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-3 mb-4">
+              <p className="text-sm">Você completou todas as séries com o máximo de repetições! Considere aumentar a carga no próximo treino.</p>
+            </div>
+          )}
+          
+          {/* Timer de descanso */}
+          {restTimerActive && (
+            <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-4 rounded-r">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold">Descanso</p>
+                  <p className="text-2xl">{formatTime(restTimeRemaining)}</p>
+                </div>
+                <button 
+                  onClick={() => setRestTimerActive(false)}
+                  className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded text-sm"
                 >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                    clipRule="evenodd"
-                  />
+                  Pular
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* Card do exercício atual */}
+          <div className="bg-white shadow-md rounded-lg p-4 mb-4">
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <h2 className="text-lg font-bold">{currentExercise.name}</h2>
+                <p className="text-sm text-gray-600">{currentExercise.muscle_group}</p>
+              </div>
+              <button 
+                onClick={() => setShowVideoModal(true)}
+                className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded text-sm flex items-center"
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
-              </div>
+                Vídeo
+              </button>
             </div>
-          </div>
-        )}
-
-        {existingSession && !isWorkoutActive && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-500 dark:border-yellow-600 p-4 rounded-r-lg shadow-sm">
-            <div className="flex">
-              <div className="ml-3">
-                <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                  Você tem um treino em andamento. Clique em "Retomar Treino" para continuar.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {!isWorkoutActive ? (
-          <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
-            <div className="p-6">
-              <h2 className="text-xl font-semibold dark-text-primary mb-4">
-                Lista de Treino: {workoutList?.name}
-              </h2>
-              
-              {workoutList?.description && (
-                <p className="dark-text-secondary mb-6">{workoutList.description}</p>
-              )}
-              
-              <div className="space-y-6">
-                <h3 className="text-lg font-medium dark-text-primary">Exercícios ({exercises.length})</h3>
-                
-                {exercises.length > 0 ? (
-                  <div className="space-y-3">
-                    {exercises.map((exercise, index) => (
-                      <div key={exercise.id} className="dark-card border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                        <div className="flex justify-between">
-                          <h4 className="font-medium dark-text-primary">
-                            {index + 1}. {exercise.name}
-                          </h4>
-                        </div>
-                        <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                          <div>
-                            <p className="text-xs dark-text-tertiary">Séries</p>
-                            <p className="font-medium dark-text-secondary">{exercise.sets}</p>
-                          </div>
-                          <div>
-                            {exercise.reps ? (
-                              <>
-                                <p className="text-xs dark-text-tertiary">Repetições</p>
-                                <p className="font-medium dark-text-secondary">{exercise.reps}</p>
-                              </>
-                            ) : (
-                              <>
-                                <p className="text-xs dark-text-tertiary">Tempo</p>
-                                <p className="font-medium dark-text-secondary">{exercise.time}s</p>
-                              </>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-xs dark-text-tertiary">Carga</p>
-                            <p className="font-medium dark-text-secondary">{exercise.weight ? `${exercise.weight}kg` : '-'}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs dark-text-tertiary">Descanso</p>
-                            <p className="font-medium dark-text-secondary">{exercise.rest_time}s</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+            
+            {/* Detalhes do exercício */}
+            <div className="bg-gray-100 p-3 rounded-md mb-3">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-xs text-gray-500">Séries</p>
+                  <p className="font-bold">
+                    {completedForExercise.length}/{currentExercise.sets}
+                  </p>
+                </div>
+                {currentExercise.time ? (
+                  <div>
+                    <p className="text-xs text-gray-500">Tempo</p>
+                    <p className="font-bold">{formatTime(currentExercise.time)}</p>
                   </div>
                 ) : (
-                  <div className="text-center p-8 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-                    <p className="dark-text-tertiary mb-2">Não há exercícios nesta lista de treino</p>
+                  <div>
+                    <p className="text-xs text-gray-500">Repetições</p>
+                    <p className="font-bold">{currentExercise.reps || '-'}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-gray-500">Peso</p>
+                  <p className="font-bold">{weightInput || '0'} kg</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Controle de peso */}
+            {renderWeightControl()}
+            
+            {/* Timer para exercícios baseados em tempo */}
+            {currentExercise.time && (
+              <div className="mb-4">
+                <div className="text-center mb-2">
+                  <p className="text-lg font-bold">{formatTime(exerciseTimeRemaining)}</p>
+                </div>
+                <div className="flex justify-center space-x-2">
+                  {!exerciseTimerActive ? (
                     <button
-                      onClick={() => router.push(`/workout-lists/${id}`)}
-                      className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                      onClick={startExerciseTimer}
+                      className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded"
                     >
-                      Adicionar exercícios
+                      Iniciar
                     </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
-          // Interface do treino ativo - ajustada para o layout original
-          <div className="bg-dark dark:bg-gray-800 shadow-lg rounded-2xl overflow-hidden">
-            {/* Cabeçalho verde do exercício */}
-            <div className="bg-green-600 dark:bg-green-700 p-4 text-white">
-              <h2 className="text-xl font-bold">Exercício Atual</h2>
-            </div>
-            
-            <div className="p-6">
-              {/* Nome do exercício com círculo numerado */}
-              <div className="flex items-center mb-6">
-                <div className="flex-shrink-0 w-14 h-14 rounded-full bg-green-700 flex items-center justify-center text-white text-2xl font-bold mr-4">
-                  {currentExerciseIndex + 1}
-                </div>
-                <h3 className="text-xl font-bold text-white">{currentExercise?.name}</h3>
-              </div>
-              
-              {/* Cards de informações */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                {/* Card de Carga */}
-                <div className="bg-gray-700/50 rounded-xl p-4">
-                  <div className="flex flex-col items-center">
-                    <div className="text-gray-400 mb-2 text-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                      </svg>
-                      Carga
-                    </div>
-                    <div className="flex items-center">
-                      <button className="w-10 h-10 rounded-lg bg-red-600 text-white flex items-center justify-center mr-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                        </svg>
-                      </button>
-                      <span className="text-white text-2xl font-bold">{currentExercise?.weight || 0} kg</span>
-                      <button className="w-10 h-10 rounded-lg bg-green-600 text-white flex items-center justify-center ml-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Card de Séries */}
-                <div className="bg-gray-700/50 rounded-xl p-4">
-                  <div className="flex flex-col items-center">
-                    <div className="text-gray-400 mb-2 text-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                      </svg>
-                      Séries
-                    </div>
-                    <div className="text-white text-2xl font-bold">
-                      {(completedSets[`exercise_${currentExercise?.id}`]?.length || 0) + 1} / {currentExercise?.sets}
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Card de Repetições */}
-                <div className="bg-gray-700/50 rounded-xl p-4 col-span-2">
-                  <div className="flex flex-col items-center">
-                    <div className="text-gray-400 mb-2 text-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                      Repetições
-                    </div>
-                    <div className="text-white text-2xl font-bold">
-                      {repsCompleted || 0} / {currentExercise?.reps || currentExercise?.time}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Input de repetições realizadas */}
-              <div className="bg-navy-800 rounded-xl p-4 mb-6">
-                <div className="flex items-center justify-between">
-                  <span className="text-white">Repetições realizadas:</span>
-                  <div className="flex items-center">
-                    <input
-                      type="number"
-                      className="bg-gray-700 text-white text-center w-16 h-10 rounded-lg mx-2"
-                      value={repsCompleted}
-                      onChange={(e) => setRepsCompleted(e.target.value)}
-                    />
-                    <span className="text-white">/ {currentExercise?.reps || currentExercise?.time}</span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Botões de ação */}
-              <div className="space-y-4">
-                <button
-                  onClick={completeSet}
-                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full"
-                >
-                  Confirmar
-                </button>
-                
-                <button
-                  onClick={() => {
-                    if (currentExerciseIndex < exercises.length - 1) {
-                      setCurrentExerciseIndex(currentExerciseIndex + 1);
-                      setCurrentSetIndex(0);
-                    }
-                  }}
-                  className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-full"
-                >
-                  Pular para Próximo Exercício
-                </button>
-                
-                {currentExercise?.video_url && (
+                  ) : (
+                    <button
+                      onClick={() => setExerciseTimerActive(false)}
+                      className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded"
+                    >
+                      Pausar
+                    </button>
+                  )}
                   <button
-                    className="w-full py-4 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-full flex items-center justify-center"
+                    onClick={resetExerciseTimer}
+                    className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    Mostrar Vídeo
+                    Reiniciar
                   </button>
-                )}
-              </div>
-            </div>
-            
-            {/* Outros Exercícios */}
-            <div className="mt-6">
-              <div className="bg-dark px-6 py-4 border-t border-gray-700">
-                <h3 className="text-xl font-bold text-white mb-4">Outros Exercícios</h3>
-                <div className="space-y-4">
-                  {exercises.map((exercise, index) => {
-                    // Não mostrar o exercício atual
-                    if (index === currentExerciseIndex) return null;
-                    
-                    return (
-                      <div key={exercise.id} className="flex items-center justify-between py-3 border-b border-gray-700">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-white font-bold mr-3">
-                            {index + 1}
-                          </div>
-                          <span className="text-white">{exercise.name}</span>
-                        </div>
-                        <button
-                          onClick={() => {
-                            setCurrentExerciseIndex(index);
-                            setCurrentSetIndex(0);
-                          }}
-                          className="px-4 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded-full text-sm"
-                        >
-                          Ir para
-                        </button>
-                      </div>
-                    );
-                  })}
                 </div>
               </div>
+            )}
+            
+            {/* Input de repetições para exercícios não baseados em tempo */}
+            {!currentExercise.time && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Repetições Realizadas:
+                </label>
+                <input
+                  type="number"
+                  value={repsCompleted}
+                  onChange={(e) => setRepsCompleted(e.target.value)}
+                  placeholder="Número de repetições"
+                  className="w-full px-3 py-2 border rounded"
+                />
+              </div>
+            )}
+            
+            {/* Informação da série atual */}
+            <div className="text-center mb-3">
+              <p className="text-sm text-gray-600">
+                Série atual: {currentSetIndex + 1} de {currentExercise.sets}
+              </p>
+            </div>
+            
+            {/* Botões de ação */}
+            <div className="flex justify-between space-x-2">
+              <button
+                onClick={goToPreviousExercise}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-3 rounded text-sm"
+              >
+                Anterior
+              </button>
+              
+              <button
+                onClick={completeSet}
+                disabled={!isCompleteButtonActive()}
+                className={`flex-grow font-bold py-2 px-4 rounded ${
+                  isCompleteButtonActive()
+                    ? 'bg-green-500 hover:bg-green-600 text-white'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                Concluir
+              </button>
+              
+              <button
+                onClick={skipExercise}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-3 rounded text-sm"
+              >
+                Próximo
+              </button>
             </div>
           </div>
-        )}
+          
+          {/* Renderiza o modal de vídeo */}
+          {renderVideoModal()}
+          
+          {/* Botão para finalizar treino */}
+          <div className="mt-6 text-center">
+            <button 
+              onClick={() => router.push('/workouts')}
+              className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded mr-2"
+            >
+              Sair do Treino
+            </button>
+          </div>
+        </div>
       </div>
-    </Layout>
+    </>
   );
 }
+
+// Função para extrair o ID do vídeo do YouTube de uma URL
+const getYoutubeVideoId = (url) => {
+  if (!url) return null;
+  
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  
+  return (match && match[2].length === 11)
+    ? match[2]
+    : null;
+};
