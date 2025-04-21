@@ -33,11 +33,8 @@ const nextConfig = {
     removeConsole: false
   },
   experimental: {
-    // Desabilita a otimização de código para o arquivo problemático
-    optimizeCss: true,
+    // Reduz a otimização para evitar problemas no build
     optimizePackageImports: ['@supabase/auth-helpers-react'],
-    // Desativa a geração estática para a página de workout-mode
-    isrMemoryCacheSize: 0,
   },
   webpack: (config, { isServer, dev }) => {
     // Configuração especial para o arquivo problemático
@@ -58,21 +55,14 @@ const nextConfig = {
     
     return config;
   },
-  // Desativar a exportação estática para a página workout-mode/[id]
-  exportPathMap: async function (
-    defaultPathMap,
-    { dev, dir, outDir, distDir, buildId }
-  ) {
-    // Remover a página workout-mode/[id] da exportação estática
-    const paths = { ...defaultPathMap };
-    delete paths['/workout-mode/[id]'];
-    
-    return paths;
+  // Desativar a exportação estática para todas as páginas que requerem autenticação
+  trailingSlash: false,
+  images: {
+    domains: ['']
   },
-  // Adicionar workout-mode/[id] à lista de páginas que devem ser renderizadas apenas no cliente
-  unstable_runtimeJS: {
-    '/workout-mode/[id]': true,
-  },
+  // Desabilitar estaticamente a pré-renderização para conteúdo autenticado
+  // Isso faz com que as páginas sejam renderizadas no cliente
+  target: 'serverless',
   async rewrites() {
     return [
       {
