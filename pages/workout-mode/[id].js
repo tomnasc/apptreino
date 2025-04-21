@@ -1184,21 +1184,20 @@ function WorkoutMode() {
     }
 
     try {
-      // Criar uma cópia profunda da lista de exercícios
-      const currentExercises = JSON.parse(JSON.stringify(exercises));
-      const targetExercise = currentExercises[targetIndex];
-      
-      // Manter referência dos IDs originais para rastreamento
-      const originalExerciseId = currentExercises[currentExerciseIndex].id;
-      const targetExerciseId = targetExercise.id;
-      
+      // Acessar o exercício alvo diretamente
+      if (targetIndex < 0 || targetIndex >= exercises.length) {
+        console.error('Índice de exercício inválido:', targetIndex);
+        return;
+      }
+
       // Atualizar o estado atual
       setCurrentExerciseIndex(targetIndex);
       setCurrentSetIndex(0);
-      setRepsCompleted(''); // Alterado para string vazia
+      setRepsCompleted('');
       
       // Se o exercício de destino é baseado em tempo, configurar temporizador
-      if (targetExercise.time) {
+      const targetExercise = exercises[targetIndex];
+      if (targetExercise && targetExercise.time) {
         setTimeRemaining(targetExercise.time);
         setTimerActive(false);
       }
@@ -1206,12 +1205,16 @@ function WorkoutMode() {
       // Atualizar o tempo inicial da série
       setCurrentSetStartTime(new Date());
       
-      // Armazenar troca de exercícios no localStorage
+      // Armazenar informações no localStorage
       localStorage.setItem(`treinoPro_lastExerciseIndex`, targetIndex.toString());
-      localStorage.setItem(`treinoPro_currentExerciseIdMap_${id}`, JSON.stringify({
-        currentIndex: targetIndex,
-        exerciseId: targetExerciseId
-      }));
+      
+      // Armazenar o ID do exercício atual
+      if (targetExercise && targetExercise.id) {
+        localStorage.setItem(`treinoPro_currentExerciseIdMap_${id}`, JSON.stringify({
+          currentIndex: targetIndex,
+          exerciseId: targetExercise.id
+        }));
+      }
     } catch (error) {
       console.error('Erro ao pular para exercício:', error);
     }
