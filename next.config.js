@@ -55,14 +55,11 @@ const nextConfig = {
     
     return config;
   },
-  // Desativar a exportação estática para todas as páginas que requerem autenticação
+  // Configuração para páginas que requerem autenticação
   trailingSlash: false,
   images: {
     domains: ['']
   },
-  // Desabilitar estaticamente a pré-renderização para conteúdo autenticado
-  // Isso faz com que as páginas sejam renderizadas no cliente
-  target: 'serverless',
   async rewrites() {
     return [
       {
@@ -71,6 +68,9 @@ const nextConfig = {
       },
     ];
   },
+  // Desativar a geração estática para páginas específicas
+  // Usando a nova abordagem em vez de 'target'
+  output: 'standalone',
 };
 
 // Log para depuração das variáveis de ambiente no momento do build
