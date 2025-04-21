@@ -1,12 +1,22 @@
+'use client'
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import Layout from '../../components/Layout';
 import Link from 'next/link';
-import YouTube from 'react-youtube';
+import dynamic from 'next/dynamic';
 import Head from 'next/head';
 
-export default function WorkoutMode() {
+// Importe o YouTube dinamicamente para evitar problemas de SSR
+const YouTube = dynamic(() => import('react-youtube'), { ssr: false });
+
+// Adicione a opção noSSR para evitar renderização no servidor
+export default dynamic(() => Promise.resolve(WorkoutMode), {
+  ssr: false
+});
+
+function WorkoutMode() {
   const router = useRouter();
   const { id, session: sessionUrlParam } = router.query;
   const supabase = useSupabaseClient();
@@ -1138,40 +1148,32 @@ export default function WorkoutMode() {
     if (!confirm('Deseja realmente pular este exercício? Ele será trocado com o próximo exercício.')) {
       return;
     }
-
-    // Se estamos no último exercício, não há para onde pular
+    
+    // Verificar se ainda há pelo menos um exercício para fazer a troca
     if (currentExerciseIndex >= exercises.length - 1) {
-      alert('Este é o último exercício da ficha.');
+      alert('Este é o último exercício, não é possível pular.');
       return;
     }
-
-    // Copiar a lista de exercícios
-    const updatedExercises = [...exercises];
     
-    // Trocar a posição do exercício atual com o próximo (inverter posições)
-    [updatedExercises[currentExerciseIndex], updatedExercises[currentExerciseIndex + 1]] = 
-    [updatedExercises[currentExerciseIndex + 1], updatedExercises[currentExerciseIndex]];
+    // Criar uma cópia do array de exercícios
+    const newExercises = [...exercises];
     
-    // Atualizar o estado com a nova lista de exercícios
-    setExercises(updatedExercises);
+    // Obter os exercícios a serem trocados
+    const currentExercise = newExercises[currentExerciseIndex];
+    const nextExercise = newExercises[currentExerciseIndex + 1];
     
-    // Resetar contadores relacionados ao exercício
-    setCurrentSetIndex(0);
-    setRepsCompleted(''); // Alterado para string vazia
+    // Trocar as posições
+    newExercises[currentExerciseIndex] = nextExercise;
+    newExercises[currentExerciseIndex + 1] = currentExercise;
     
-    // Verificar se o "novo" exercício atual (que era o próximo) é baseado em tempo
-    if (updatedExercises[currentExerciseIndex].time) {
-      setTimeRemaining(updatedExercises[currentExerciseIndex].time);
-      setTimerActive(false);
-    }
-
-    // Atualizar o tempo inicial da série
-    setCurrentSetStartTime(new Date());
-
-    // Atualizar no localStorage para manter consistência
-    localStorage.setItem(`treinoPro_currentExerciseIndexOrder_${id}`, JSON.stringify(
-      updatedExercises.map(ex => ex.id)
-    ));
+    // Atualizar o estado
+    setExercises(newExercises);
+    
+    // Resetar o estado da série atual
+    setRepsCompleted('');
+    
+    // Atualizar a interface
+    alert(`Exercício "${currentExercise.name}" pulado. Agora você fará "${nextExercise.name}".`);
   };
 
   // Adicionar função para pular para um exercício específico
