@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
-import { ClipboardIcon, CheckIcon, UserPlusIcon, GiftIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
+import { ClipboardIcon, CheckIcon, UserPlusIcon, GiftIcon } from '@heroicons/react/24/outline';
 import { useToast } from '../context/ToastContext';
 
 export default function AffiliateSystem() {
@@ -9,8 +9,6 @@ export default function AffiliateSystem() {
   const { showToast } = useToast();
   
   const [loading, setLoading] = useState(true);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [sendingInvite, setSendingInvite] = useState(false);
   const [copied, setCopied] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const [invites, setInvites] = useState([]);
@@ -137,44 +135,6 @@ export default function AffiliateSystem() {
     window.open(`https://wa.me/?text=${message}`, '_blank');
   };
 
-  const sendInvite = async (e) => {
-    e.preventDefault();
-    if (!inviteEmail || !inviteEmail.includes('@')) {
-      showToast('Por favor, informe um email válido', 'error');
-      return;
-    }
-
-    try {
-      setSendingInvite(true);
-      
-      // Gerar um novo código de convite único para este email específico
-      const inviteCode = userProfile.affiliate_code + '-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-      
-      // Salvar o convite no banco de dados
-      const { error } = await supabase
-        .from('affiliate_invites')
-        .insert({
-          sender_id: user.id,
-          email: inviteEmail,
-          code: inviteCode
-        });
-
-      if (error) throw error;
-      
-      // Enviar email (isso seria feito via Edge Function no Supabase)
-      // Por enquanto, só vamos simular como se o email fosse enviado
-      
-      showToast('Convite enviado com sucesso!', 'success');
-      setInviteEmail('');
-      fetchInvites(); // Atualizar a lista de convites
-    } catch (error) {
-      console.error('Erro ao enviar convite:', error);
-      showToast('Erro ao enviar convite', 'error');
-    } finally {
-      setSendingInvite(false);
-    }
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     
@@ -267,31 +227,6 @@ export default function AffiliateSystem() {
           <h3 className="text-sm font-medium text-purple-800 dark:text-purple-300">Bônus Aplicados</h3>
           <p className="mt-1 text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.appliedBonuses}</p>
         </div>
-      </div>
-      
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold dark-text-primary mb-2 flex items-center">
-          <EnvelopeIcon className="w-5 h-5 mr-2" />
-          Também Disponível: Envio de Convite por Email
-        </h3>
-        
-        <form onSubmit={sendInvite} className="flex flex-col sm:flex-row items-center gap-2">
-          <input
-            type="email"
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-            placeholder="Email do seu amigo"
-            className="w-full p-2 border dark:border-gray-700 rounded-md bg-white/90 dark:bg-gray-800/90"
-            required
-          />
-          <button
-            type="submit"
-            disabled={sendingInvite}
-            className="sm:w-auto w-full py-2 px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-md text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {sendingInvite ? 'Enviando...' : 'Enviar Convite'}
-          </button>
-        </form>
       </div>
       
       {/* Convites Enviados */}
